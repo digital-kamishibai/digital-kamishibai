@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { monthCapBytes, readCaps, decide, pickRevokes, utcRange, usageVariables, readUsage, gate, STALE_MS, USAGE_QUERY } from '../../src/guard.js';
+import { monthCapBytes, readCaps, readDonation, donationKey, DONATION_MAX_USD, decide, pickRevokes, utcRange, usageVariables, readUsage, gate, STALE_MS, USAGE_QUERY } from '../../src/guard.js';
 
 const GB = 1e9;
 const near = (a, b) => assert.ok(Math.abs(a - b) < 1, `${a} ≈ ${b}`);
@@ -10,7 +10,7 @@ test('月の枠: 寄付なしで 1,000GB ＋ 1,000ドル÷12÷0.05ドル ≈ 2,6
   assert.ok(Math.round(monthCapBytes() / GB) === 2667);
 });
 
-test('月の枠: 前の月の寄付 50ドルで 1,000GB 増える（式の確認。いまは寄付0で固定）', () => {
+test('月の枠: 前の月の寄付 50ドルで 1,000GB 増える', () => {
   near(monthCapBytes({ donationUsd: 50 }) - monthCapBytes(), 1000 * GB);
 });
 
@@ -28,6 +28,33 @@ test('天井は設定の値で変えられる（試験用で小さく）・寄�
   near(c.day, 2e7);
   near(readCaps({ TURN_FREE_GB: '0', TURN_YEARLY_USD: '120', TURN_USD_PER_GB: '0.1' }).month, 100 * GB);
   near(readCaps({ TURN_DONATION_USD: '50' }).month, monthCapBytes());
+});
+
+test('寄付額のキーは UTC の前の月（年をまたぐ1月・月の境目）', () => {
+  assert.equal(donationKey(Date.parse('2026-12-15T00:00:00Z')), 'donation:2026-11');
+  assert.equal(donationKey(Date.parse('2027-01-01T00:00:00Z')), 'donation:2026-12');
+  assert.equal(donationKey(Date.parse('2026-11-30T23:59:59Z')), 'donation:2026-10');
+  assert.equal(donationKey(Date.parse('2026-03-31T12:00:00Z')), 'donation:2026-02');
+});
+
+test('寄付額: 無い・数でない・負・上限超えは 0（枠を広げない側）', () => {
+  assert.equal(readDonation(null), 0);
+  assert.equal(readDonation(''), 0);
+  assert.equal(readDonation('abc'), 0);
+  assert.equal(readDonation('-5'), 0);
+  assert.equal(readDonation(String(DONATION_MAX_USD + 0.01)), 0);
+  assert.equal(readDonation('2500'), 0);
+  assert.equal(readDonation('25'), 25);
+  assert.equal(readDonation('12.5'), 12.5);
+  assert.equal(readDonation(String(DONATION_MAX_USD)), DONATION_MAX_USD);
+  assert.equal(DONATION_MAX_USD, 1000);
+});
+
+test('寄付額は月の枠に足される・上限超えは足されない・月の枠を直に決めたときは効かない', () => {
+  near(readCaps({}, 50).month - readCaps({}).month, 1000 * GB);
+  near(readCaps({}, '50').month - readCaps({}).month, 1000 * GB);
+  near(readCaps({}, 2500).month, readCaps({}).month);
+  near(readCaps({ TURN_CAP_MONTH_GB: '0.05' }, 50).month, 5e7);
 });
 
 test('読めない設定の値は既定値に戻す（空・数でない・負）', () => {

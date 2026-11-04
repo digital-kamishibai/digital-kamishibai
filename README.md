@@ -161,6 +161,9 @@ The relay has a loss ceiling: a Cron Trigger (every 5 minutes, `src/watch.js`) r
 and writes a mark to Workers KV. A credential over its own cap is revoked; over the daily or monthly cap, `/api/ice`
 stops handing out the relay and the player tells the narrator. If the mark is more than 30 minutes old, the relay is
 not handed out either. Caps are plain variables (see `src/guard.js` and `wrangler.jsonc`; `--env staging` uses tiny caps for testing).
+The monthly cap grows by the previous month's sponsorships: the watcher reads `donation:YYYY-MM` (UTC, USD) from
+the same KV namespace, and a maintainer enters it once a month with the `donation` workflow (Actions → Run workflow;
+1000 at most, so a typo cannot widen the cap).
 
 `--env public` is the public site (https://digitalkamishibai.org). GitHub Actions deploys it on every push to `main`
 once the tests pass (`.github/workflows/ci.yml`, secret `CLOUDFLARE_API_TOKEN`).

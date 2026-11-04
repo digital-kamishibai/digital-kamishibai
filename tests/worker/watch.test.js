@@ -166,3 +166,34 @@ test('Cron の入口は見張りを waitUntil に渡す', async () => {
   try { await p; } finally { console.log = log; }
   assert.ok(p instanceof Promise);
 });
+
+// 寄付が効くかを見る設定: 無料枠0・運営者の負担0・1ドル＝1000バイト → 月の枠＝寄付×1000 バイト
+const donationEnv = (kv) => ({ ...baseEnv(kv), TURN_CAP_MONTH_GB: '', TURN_FREE_GB: '0', TURN_YEARLY_USD: '0', TURN_USD_PER_GB: '1000000', TURN_DAY_SHARE: '0.5' });
+
+test('見張り: 前の月（UTC）の寄付額を KV から読んで月の枠に足す', async () => {
+  const kv = fakeKV({ 'donation:2026-10': '10' }); // 月の枠 10000・日 5000
+  const r = await watch(donationEnv(kv), NOW, fakeFetch(usage(6000, 3000, [])));
+  assert.equal(r.serve, true);
+  const mark = JSON.parse(kv.m.get(MARK));
+  assert.equal(mark.donation, 10);
+  assert.equal(mark.caps.month, 10000);
+});
+
+test('見張り: 寄付額が無い月は 0（今の月のキーは読まない）', async () => {
+  const kv = fakeKV({ 'donation:2026-11': '10' });
+  const r = await watch(donationEnv(kv), NOW, fakeFetch(usage(6000, 3000, [])));
+  assert.deepEqual([r.serve, r.reason], [false, 'month']);
+  assert.equal(JSON.parse(kv.m.get(MARK)).donation, 0);
+});
+
+test('見張り: 上限を超えた寄付額は数えず、ログに出す', async () => {
+  const kv = fakeKV({ 'donation:2026-10': '2500' });
+  const logs = [];
+  const err = console.error; console.error = (m) => logs.push(m);
+  try {
+    const r = await watch(donationEnv(kv), NOW, fakeFetch(usage(6000, 3000, [])));
+    assert.deepEqual([r.serve, r.reason], [false, 'month']);
+  } finally { console.error = err; }
+  assert.equal(JSON.parse(kv.m.get(MARK)).donation, 0);
+  assert.ok(logs.some((m) => m.includes('donation:2026-10')));
+});

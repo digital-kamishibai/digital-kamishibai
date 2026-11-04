@@ -14,24 +14,47 @@ function num(v, fallback) {
 }
 
 /** 月の枠（バイト）＝ 無料枠 ＋（運営者の年の負担÷12 ＋ 前の月に受け取った寄付）÷ 1GB の単価。
- *  寄付はまだ受け付けていないので 0 に固定（受け付けを始めるときに、入れる口を作る）。 */
+ *  寄付の残高は持たない——その月に受け取った寄付は、次の月の枠に1回だけ足す。 */
 export function monthCapBytes({ freeGb = 1000, yearlyUsd = 1000, usdPerGb = 0.05, donationUsd = 0 } = {}) {
   if (!(usdPerGb > 0)) return freeGb * GB;
   return (freeGb + (yearlyUsd / 12 + donationUsd) / usdPerGb) * GB;
+}
+
+/** 寄付額の KV のキー。値はその月（UTC）に受け取った寄付の合計（USD）。人が月1回、
+ *  GitHub Actions の手動実行（.github/workflows/donation.yml）で入れる。 */
+export const DONATION_PREFIX = 'donation:';
+
+/** 1か月の寄付額の上限（USD）。打ち間違い（25 を 2500）で枠が膨らまないようにする歯止め。
+ *  入れる口（donation.yml）も同じ値で断る。 */
+export const DONATION_MAX_USD = 1000;
+
+/** 見張りが読む寄付額のキー＝UTC の前の月（'donation:YYYY-MM'） */
+export function donationKey(now) {
+  const d = new Date(now);
+  const prev = new Date(Date.UTC(d.getUTCFullYear(), d.getUTCMonth() - 1, 1));
+  return DONATION_PREFIX + prev.toISOString().slice(0, 7);
+}
+
+/** KV の値 → 寄付額（USD）。無い・数でない・負・上限を超える値は 0（枠を広げない側に倒す） */
+export function readDonation(v) {
+  if (v === undefined || v === null || String(v).trim() === '') return 0;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 && n <= DONATION_MAX_USD ? n : 0;
 }
 
 /** 設定の値（環境変数・文字）から3段の天井（バイト）を作る。数字は試験用の Worker で小さくできる。
  *  - TURN_CAP_CREDENTIAL_GB: 認証情報ごと（既定 20）
  *  - TURN_FREE_GB・TURN_YEARLY_USD・TURN_USD_PER_GB: 月の枠の式（既定 1000・1000・0.05）
  *  - TURN_CAP_MONTH_GB: 月の枠を式でなく直に決める（試験用。空なら式）
- *  - TURN_DAY_SHARE: 1日の枠＝月の枠×これ（既定 0.1） */
-export function readCaps(env = {}) {
+ *  - TURN_DAY_SHARE: 1日の枠＝月の枠×これ（既定 0.1）
+ *  寄付（donationUsd）は設定でなく KV から来る（readDonation を通した値）。月の枠を直に決めたときは効かない。 */
+export function readCaps(env = {}, donationUsd = 0) {
   const direct = num(env.TURN_CAP_MONTH_GB, null);
   const month = direct !== null ? direct * GB : monthCapBytes({
     freeGb: num(env.TURN_FREE_GB, 1000),
     yearlyUsd: num(env.TURN_YEARLY_USD, 1000),
     usdPerGb: num(env.TURN_USD_PER_GB, 0.05),
-    donationUsd: 0,
+    donationUsd: readDonation(donationUsd),
   });
   return {
     credential: num(env.TURN_CAP_CREDENTIAL_GB, 20) * GB,

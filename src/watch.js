@@ -1,5 +1,5 @@
 // 中継（TURN）の見張り。Cron（5分おき）から呼ぶ。判定は guard.js の純粋な関数、ここは照会・KV・取り消しの通信だけ。
-import { readCaps, decide, pickRevokes, USAGE_QUERY, usageVariables, readUsage } from './guard.js';
+import { readCaps, readDonation, donationKey, DONATION_MAX_USD, decide, pickRevokes, USAGE_QUERY, usageVariables, readUsage } from './guard.js';
 
 export const TTL = 4 * 60 * 60; // 認証情報の期限＝4時間（開演前の準備＋上演＋余裕）
 export const MARK = 'status'; // KV の印（配る／配らない・理由・付けた時刻）
@@ -23,11 +23,16 @@ export async function watch(env, now = Date.now(), fetcher = fetch) {
   });
   if (!res.ok) throw new Error(`turn guard: graphql ${res.status}`);
   const usage = readUsage(await res.json());
-  const caps = readCaps(env);
+  const raw = await env.TURN_GUARD.get(donationKey(now));
+  const donation = readDonation(raw);
+  if (raw !== null && raw !== undefined && donation === 0 && Number(raw) !== 0) {
+    console.error(`turn guard: ${donationKey(now)} is not a number from 0 to ${DONATION_MAX_USD} — counted as 0`);
+  }
+  const caps = readCaps(env, donation);
   const d = decide(usage, caps);
   await env.TURN_GUARD.put(MARK, JSON.stringify({
     serve: d.serve, reason: d.reason, at: now,
-    month: usage.month, day: usage.day, caps,
+    month: usage.month, day: usage.day, caps, donation,
   }));
   const revoked = new Set();
   for (const u of d.revoke.slice(0, CHECK_MAX)) {
