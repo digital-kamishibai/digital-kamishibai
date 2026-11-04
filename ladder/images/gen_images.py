@@ -16,7 +16,8 @@ translated; the rest of the plan may be in any language.
 
 Pictures are never overwritten. A slide with no picture gets pictures/NN.png. A slide that already has one gets a
 candidate, pictures/_candidates/NN-K.png; --use moves the old picture to pictures/_replaced/ and puts the candidate
-in its place. Every picture is saved as PNG, at most 1920 px on its long side, and without an alpha channel when it is
+in its place. If an ending video of the work (ending_video*.json) shows the old picture in a seat, --use names the seat
+and the command that puts the new picture there (it never changes the ending video itself). Every picture is saved as PNG, at most 1920 px on its long side, and without an alpha channel when it is
 fully opaque.
 
 A generated picture does not keep to the numbers and shapes in its prompt. After each run, look at every new picture
@@ -48,6 +49,7 @@ MAX_SIDE = 1920
 PICTURE_EXTS = ('.jpg', '.jpeg', '.png', '.webp')        # the builder's order (build_work.py)
 CANDIDATES = '_candidates'
 REPLACED = '_replaced'
+ENDING_DEFINITIONS = 'ending_video*.json'   # the ending video ladder's definitions, in the work folder
 BAND_LIMIT = 0.04                                         # side bands wider than this share of the width
 ASPECT = 16 / 9
 ASPECT_TOLERANCE = 0.02                                   # the builder stretches within 2%, letterboxes beyond
@@ -210,7 +212,47 @@ def use_candidate(pictures: Path, spec: str) -> str:
         moved = f'; the old picture is in {target}'
     new = pictures / f'{number:02d}.png'
     found[k].rename(new)
-    return f'slide {number}: {found[k].name} is now {new}{moved}'
+    lines = [f'slide {number}: {found[k].name} is now {new}{moved}']
+    if old is not None:
+        lines += ending_notes(pictures.parent, old, new)
+    return '\n'.join(lines)
+
+
+def ending_seats_showing(work: Path, picture: Path) -> list[tuple[str, int]]:
+    """(definition file, seat number) of every seat of the work's ending videos that shows this picture.
+    A seat's src is in the work folder when the definition has no photo_root or the seat says "root": "work"
+    (the ladder's resolve_src). Unreadable definitions are left to the ladder's own --check."""
+    target = os.path.normcase(os.path.normpath(str(picture.resolve())))
+    out = []
+    for path in sorted(work.glob(ENDING_DEFINITIONS)):
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+            root = data.get('photo_root')
+            base = (Path(root) if os.path.isabs(root) else work / root) if root else work
+            for f in data.get('frames', []):
+                src = f.get('src')
+                if not src:
+                    continue
+                where = work if f.get('root') == 'work' else base
+                if os.path.normcase(os.path.normpath(str((where / src).resolve()))) == target:
+                    out.append((path.name, int(f['i'])))
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            continue
+    return out
+
+
+def ending_notes(work: Path, old: Path, new: Path) -> list[str]:
+    """The ending video seats that still show the picture just moved away, and the command that puts the new one there.
+    Never replaced here: the ending video is the maker's; they say whether the new picture goes there too."""
+    notes = []
+    rel = new.relative_to(work).as_posix()
+    for name, seat in ending_seats_showing(work, old):
+        config = name[len('ending_video_'):-len('.json')] if name.startswith('ending_video_') else ''
+        opt = f'--config {config} ' if config else ''
+        notes.append(f'note: seat {seat} of the ending video ({name}) still shows the old picture. If the maker wants '
+                     f'the new one there too: build_ending_video.py <work folder> {opt}--replace {seat}={rel}, '
+                     'then the storyboard and the video again')
+    return notes
 
 
 # ---------- one picture ----------

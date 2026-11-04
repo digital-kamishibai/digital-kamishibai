@@ -46,7 +46,9 @@ python ladder/images/gen_images.py <work folder> --use 3    # take the newest ca
 
 - **Nothing is overwritten.** A slide with no picture gets `pictures/NN.png`, which the builder finds by itself.
   A slide that already has a picture gets a candidate, `pictures/_candidates/NN-K.png`. `--use N` (or `--use N-K`)
-  puts it in place and moves the old picture to `pictures/_replaced/`.
+  puts it in place and moves the old picture to `pictures/_replaced/`. If an ending video of the work
+  (`ending_video*.json`) shows the old picture in a seat, `--use` names the seat and the `--replace` command for the
+  ending video ladder; it does not change the ending video.
 - **The style follows slide 1.** Slide 1's picture is attached to the others with "match this style".
   If slide 1 is a photo or a placeholder, use `--anchor none` or `--anchor N`.
 - Every picture is saved as PNG, at most 1920 px on its long side, without an alpha channel when it is fully opaque.

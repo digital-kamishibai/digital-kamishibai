@@ -225,6 +225,38 @@ def test_use_takes_a_candidate_and_keeps_the_old_picture(work, fake):
     assert gi.main([str(work), '--use', '2']) == 1
 
 
+def test_use_names_the_ending_video_seats_that_still_show_the_old_picture(work, fake, capsys):
+    # Issue #7: the ending video kept the old picture and nothing said so
+    (work / 'pictures' / '01.jpg').write_bytes(png(size=(64, 36), mode='RGB'))
+    frames = [{'i': 1, 'at': 0, 'dur': 5, 'src': 'pictures/02.jpg'}, {'i': 2, 'at': 5, 'dur': 5, 'src': 'pictures/01.jpg'},
+              {'i': 3, 'at': 10, 'dur': 5, 'src': 'pictures/01.jpg', 'kind': 'final'}]
+    first = json.dumps({'output': 'e.mp4', 'frames': frames})
+    (work / 'ending_video.json').write_text(first, encoding='utf-8')
+    second = json.dumps({'output': 'f.mp4', 'photo_root': 'D:/Photos', 'frames': [
+        {'i': 1, 'at': 0, 'dur': 5, 'src': 'pictures/01.jpg'},                    # in the photo folder: another picture
+        {'i': 2, 'at': 5, 'dur': 5, 'src': 'pictures/01.jpg', 'root': 'work'}]})
+    (work / 'ending_video_second.json').write_text(second, encoding='utf-8')
+    (work / 'ending_video_broken.json').write_text('{', encoding='utf-8')
+    gi.main([str(work), '1'])
+    capsys.readouterr()
+    assert gi.main([str(work), '--use', '1']) == 0
+    out = capsys.readouterr().out
+    notes = [line for line in out.splitlines() if line.startswith('note: seat')]
+    assert len(notes) == 3, out
+    assert 'seat 2 of the ending video (ending_video.json)' in notes[0] and '--replace 2=pictures/01.png' in notes[0]
+    assert 'seat 3 of the ending video (ending_video.json)' in notes[1]
+    assert '(ending_video_second.json)' in notes[2] and '--config second --replace 2=pictures/01.png' in notes[2]
+    assert (work / 'ending_video.json').read_text(encoding='utf-8') == first, "the ending video is the maker's: never changed"
+
+
+def test_use_without_an_ending_video_says_nothing_more(work, fake, capsys):
+    (work / 'pictures' / '01.jpg').write_bytes(png(size=(64, 36), mode='RGB'))
+    gi.main([str(work), '1'])
+    capsys.readouterr()
+    assert gi.main([str(work), '--use', '1']) == 0
+    assert 'note:' not in capsys.readouterr().out
+
+
 def test_no_key(work, monkeypatch, capsys):
     monkeypatch.delenv(gi.KEY_ENV, raising=False)
     assert gi.main([str(work)]) == 1

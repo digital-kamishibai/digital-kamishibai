@@ -71,6 +71,9 @@ the key holder's job.
 
 - It never overwrites a picture: a slide that already has one gets a candidate in `pictures/_candidates/`, and nothing
   changes until `--use`. The old picture is kept in `pictures/_replaced/`. **The maker chooses** which candidate to use.
+- If the work's ending video shows the old picture in a seat, `--use` names the seat and the `--replace` command that
+  puts the new picture there; the builder warns too, as long as the seat points at a file that is gone. It never
+  changes the ending video itself: ask the maker, then replace, make the storyboard and the video again.
 - Pictures are saved at most 1920 px wide and without transparency, ready for the builder.
 - After each run it prints the `Asserts:` lines of the new pictures. Do the check above before calling a picture done.
 - A request from the room player's correction sheet (`## [Slide N] picture`) goes the same way: change the prompt,

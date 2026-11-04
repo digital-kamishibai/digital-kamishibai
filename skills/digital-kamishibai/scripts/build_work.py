@@ -453,6 +453,33 @@ def ending_seats(folder: Path | None, result: Result) -> dict[str, list[dict]]:
     return out
 
 
+def check_ending_sources(folder: Path | None, result: Result) -> None:
+    """Warn about seats of the ending videos whose picture or video in the work folder is not there any more —
+    for example a slide's picture that a chosen candidate replaced (it moved to pictures/_replaced/). The video then
+    still shows the old picture, and building it again stops. Seats in a photo folder elsewhere are not looked at
+    (it may be on another computer). Unreadable definitions are left to ending_seats and the ladder's --check."""
+    if folder is None:
+        return
+    for path in sorted(folder.glob(ENDING_DEFINITIONS)):
+        try:
+            data = json.loads(path.read_text(encoding='utf-8'))
+            frames = [f for f in data['frames'] if f.get('src') and (f.get('root') == 'work' or not data.get('photo_root'))]
+            name = path.name
+            opt = f'--config {name[len("ending_video_"):-len(".json")]} ' if name.startswith('ending_video_') else ''
+            for f in frames:
+                src = str(f['src']).replace('\\', '/')
+                if (folder / src).is_file():
+                    continue
+                same = sorted(p for p in (folder / src).parent.glob(Path(src).stem + '.*')
+                              if p.suffix.lower() in PICTURE_EXTS) if (folder / src).parent.is_dir() else []
+                new = same[0].relative_to(folder).as_posix() if same else 'FILE'
+                result.warnings.append(f'{name}: seat {f["i"]} shows {src}, which is not there any more, so the ending '
+                                       f'video still shows the old one. Ask the maker; to put {new} there: '
+                                       f'build_ending_video.py <work folder> {opt}--replace {f["i"]}={new}')
+        except (OSError, ValueError, KeyError, TypeError, AttributeError):
+            continue
+
+
 def add_seats(work: dict, folder: Path | None, result: Result) -> None:
     by_file = ending_seats(folder, result)
     for slide in work['slides']:
@@ -532,6 +559,7 @@ def build(source: str, media: Path | None = None, *, draft: bool = False, render
                              'install one, set DK_BROWSER to its path, or build with --skip-text')
     elif with_text and not result.errors:
         add_text(work, media, draft, renderer, result)
+    check_ending_sources(definitions, result)
     if draft:
         add_seats(work, definitions, result)
         work = {**{k: work[k] for k in ('format', 'version', 'title', 'language')}, 'draft': True,

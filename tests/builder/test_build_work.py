@@ -444,6 +444,29 @@ def ending_work(tmp_path, definition):
     return '# T\n\n## [Slide 1] End\n\n> [Video] videos/second.mp4\n'
 
 
+def test_a_seat_whose_picture_is_gone_is_warned_with_the_command(tmp_path):
+    # Issue #7: --use moved the slide's picture to _replaced/, and the ending video still showed the old one
+    (tmp_path / 'pictures').mkdir()
+    (tmp_path / 'pictures' / '07.png').write_bytes(b'x')
+    (tmp_path / 'pictures' / '08.jpg').write_bytes(b'x')
+    source = ending_work(tmp_path, {'output': 'second.mp4', 'frames': [
+        {'i': 1, 'at': 0, 'dur': 5, 'src': 'pictures/07.jpg'}, {'i': 2, 'at': 5, 'dur': 5, 'src': 'pictures/08.jpg'},
+        {'i': 3, 'at': 10, 'dur': 5, 'src': 'pictures/09.jpg'}, {'i': 4, 'at': 15, 'dur': 5}]})
+    for draft in (False, True):
+        warnings = [w for w in ok(source, tmp_path, draft=draft, definitions=tmp_path).warnings if 'seat' in w]
+        assert len(warnings) == 2, warnings
+        assert 'seat 1 shows pictures/07.jpg' in warnings[0]
+        assert '--config second --replace 1=pictures/07.png' in warnings[0]
+        assert 'seat 3 shows pictures/09.jpg' in warnings[1] and '--replace 3=FILE' in warnings[1]
+
+
+def test_seats_in_a_photo_folder_elsewhere_are_not_looked_at(tmp_path):
+    source = ending_work(tmp_path, {'output': 'second.mp4', 'photo_root': 'D:/Photos', 'frames': [
+        {'i': 1, 'at': 0, 'dur': 5, 'src': '2016/bike.jpg'}, {'i': 2, 'at': 5, 'dur': 5, 'src': 'pictures/01.jpg', 'root': 'work'}]})
+    warnings = [w for w in ok(source, tmp_path, definitions=tmp_path).warnings if 'seat' in w]
+    assert len(warnings) == 1 and 'seat 2 shows pictures/01.jpg' in warnings[0], warnings
+
+
 def test_seats_start_after_the_prologue(tmp_path):
     source = ending_work(tmp_path, {'output': 'second.mp4', 'prologue': {'src': 'a.mp4', 'dur': 8},
                                     'frames': [{'i': 1, 'at': 0, 'dur': 5, 'src': 'x.jpg'}, {'i': 2, 'at': 5, 'dur': 4.5}]})
