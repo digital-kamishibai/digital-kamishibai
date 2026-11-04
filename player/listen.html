@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#000000">
+<title>Kamishibai Room Player</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/app.css">
+<script src="vendor/peerjs.min.js"></script>
+<script type="module" src="js/listener.js"></script>
+</head>
+<body class="listener">
+<main id="join">
+  <h1 data-i18n="appName">Kamishibai Room Player</h1>
+  <form id="joinForm">
+    <label><span data-i18n="codePlaceholder">Code (6 digits)</span>
+      <input id="code" inputmode="numeric" autocomplete="off" maxlength="7" required>
+    </label>
+    <label><span data-i18n="yourName">Your name (optional)</span>
+      <input id="name" autocomplete="nickname" maxlength="40">
+    </label>
+    <!-- 段階3 V4: マイクを使うかは本人が選ぶ（決定: 「使う」を選んでおき、「聞くだけ」を同じ大きさで並べる） -->
+    <fieldset class="mics">
+      <label><input type="radio" name="mic" value="on" checked> <span data-i18n="micUse">Use my mic</span></label>
+      <label><input type="radio" name="mic" value="listen"> <span data-i18n="micListen">Just listen</span></label>
+    </fieldset>
+    <button class="primary" data-i18n="join">Join</button>
+  </form>
+</main>
+
+<div id="stage" hidden>
+  <img id="picture" alt="" hidden>
+  <video id="lvideo" playsinline hidden></video>
+  <!-- 絵の無い動画の枚で、再生前に出す最初のコマ（work-format §2.4・2026-10-25 D4）。再生用とは別の要素（札を誤らせない） -->
+  <video id="lposter" muted playsinline preload="auto" hidden></video>
+  <div id="hint" data-i18n="tapFull" hidden></div>
+  <audio id="voice" autoplay playsinline></audio>
+  <!-- 語り手が録画しているあいだ（録画と練習 G4。声と反応が記録に残ることを、聞き手が知っていられるように） -->
+  <div id="recBadge" data-i18n="recBadge" hidden>● Recording</div>
+  <div id="micBox" hidden>
+    <button id="micBtn"></button>
+    <div id="voiceNote"></div>
+    <!-- 語り手と同じ部屋と分かった端末では、語り手の声を鳴らさない（音の点呼。ハウリング止め）。移ったら本人が戻せる -->
+    <div id="quietNote" hidden></div>
+    <button id="quietBtn" hidden></button>
+  </div>
+  <div id="overlay">
+    <div id="status"></div>
+    <div id="diag" class="diag"></div>
+    <button id="retry" data-i18n="retry" hidden>Try again</button>
+    <button id="tapPlay" class="primary" data-i18n="tapPlay" hidden>Tap to play the video</button>
+    <button id="tapSound" class="primary" data-i18n="tapSound" hidden>Tap to turn the sound on</button>
+    <button id="clearVideos" data-i18n="clearVideos" hidden>Delete received videos</button>
+  </div>
+</div>
+</body>
+</html>

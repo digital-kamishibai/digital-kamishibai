@@ -1,0 +1,463 @@
+"""Tests for skills/digital-kamishibai/scripts/build_work.py against docs/work-format.md."""
+import importlib.util
+import json
+import sys
+from pathlib import Path
+
+import pytest
+
+ROOT = Path(__file__).resolve().parents[2]
+SAMPLE = ROOT / 'examples' / 'sample-story'
+_spec = importlib.util.spec_from_file_location(
+    'build_work', ROOT / 'skills' / 'digital-kamishibai' / 'scripts' / 'build_work.py')
+bw = importlib.util.module_from_spec(_spec)
+sys.modules['build_work'] = bw
+_spec.loader.exec_module(bw)
+
+
+def script(*slides, header='# T\n\n> Language: en\n'):
+    return header + '\n' + '\n---\n\n'.join(slides)
+
+
+def ok(source, media=None, **kw):
+    r = bw.build(source, media, **kw)
+    assert r.errors == [], r.errors
+    return r
+
+
+def errors(source, media=None, **kw):
+    r = bw.build(source, media, **kw)
+    assert r.work is None
+    return ' | '.join(r.errors)
+
+
+# ---------- the shared example ----------
+
+def test_sample_story_without_words_builds_to_its_work_json_exactly():
+    # examples/sample-story/work.json is the build with --skip-text (the built pictures are not in the repository)
+    r = ok((SAMPLE / 'script.md').read_text(encoding='utf-8'), SAMPLE, skip_text=True)
+    assert bw.dump(r.work) == (SAMPLE / 'work.json').read_text(encoding='utf-8')
+    assert any('[Text]' in w and 'slide 2' in w and 'left out' in w for w in r.warnings)
+
+
+def test_words_on_screen_without_a_browser_is_an_error():
+    assert 'need Microsoft Edge or Google Chrome' in errors((SAMPLE / 'script.md').read_text(encoding='utf-8'), SAMPLE)
+
+
+# ---------- headings (§2.2) ----------
+
+def test_no_slide_headings_is_an_error():
+    assert 'no slide headings' in errors('# T\n\nJust text.\n')
+
+
+def test_translated_heading_is_named():
+    e = errors('# T\n\n## [スライド 1] 表紙\n\nこんにちは\n')
+    assert 'never translated' in e and 'no slide headings' in e
+
+
+def test_numbers_must_run_1_to_n():
+    assert 'found 1, 3' in errors(script('## [Slide 1] A\n\na\n', '## [Slide 3] B\n\nb\n'))
+
+
+def test_missing_title_is_an_error():
+    assert 'no title' in errors('> Language: en\n\n## [Slide 1] A\n\na\n')
+
+
+def test_title_and_empty_slide_title():
+    w = ok('# My story\n\n> Language: en\n\n## [Slide 1]\n\nhello\n').work
+    assert w['title'] == 'My story' and w['slides'][0]['title'] == ''
+
+
+def test_heading_inside_a_production_note_does_not_count():
+    w = ok(script('## [Slide 1] A\n\na\n\n<!--\n## [Slide 2] draft\n-->\n')).work
+    assert len(w['slides']) == 1
+
+
+# ---------- notes (§3.2) ----------
+
+def test_note_only_lines_go_with_their_line_break_and_blank_runs_fold():
+    w = ok(script('## [Slide 1] A\n\none\n\n<!-- pause -->\n\ntwo\n')).work
+    assert w['slides'][0]['notes'] == 'one\n\ntwo'
+
+
+def test_note_inside_a_line_keeps_the_rest():
+    w = ok(script('## [Slide 1] A\n\nkeep <!-- not this --> this\n')).work
+    assert w['slides'][0]['notes'] == 'keep  this'
+
+
+def test_multi_line_note_is_removed():
+    w = ok(script('## [Slide 1] A\n\nbefore\n<!-- one\ntwo\nthree -->\nafter\n')).work
+    assert w['slides'][0]['notes'] == 'before\nafter'
+
+
+def test_blank_lines_stay_when_nothing_was_removed():
+    w = ok(script('## [Slide 1] A\n\none\n\n\n\ntwo\n')).work
+    assert w['slides'][0]['notes'] == 'one\n\n\n\ntwo'
+
+
+def test_bold_marks_go_and_free_cues_keep_their_mark():
+    w = ok(script('## [Slide 1] A\n\n> **Wait** here.\n\nSay **this**.\n')).work
+    assert w['slides'][0]['notes'] == '> Wait here.\n\nSay this.'
+
+
+def test_line_breaks_and_trailing_spaces_are_kept():
+    w = ok(script('## [Slide 1] A\n\na short line  \nand the next\n')).work
+    assert w['slides'][0]['notes'] == 'a short line  \nand the next'
+
+
+def test_crlf_builds_the_same_as_lf():
+    lf = script('## [Slide 1] A\n\none\n\n<!-- x -->\n\ntwo\n')
+    assert bw.dump(ok(lf.replace('\n', '\r\n')).work) == bw.dump(ok(lf).work)
+
+
+def test_unclosed_note_is_an_error():
+    assert 'never closed' in errors(script('## [Slide 1] A\n\na <!-- oops\n\nb\n'))
+
+
+def test_text_after_end_marker_is_ignored_with_a_warning():
+    r = ok('# T\n\n> Language: en\n\n## [Slide 1] A\n\na\n\n---\n\nstray\n')
+    assert r.work['slides'][0]['notes'] == 'a'
+    assert any('after "---"' in w for w in r.warnings)
+
+
+# ---------- machine cues (§2.4, §3.3) ----------
+
+def test_cues_in_order_with_their_types():
+    w = ok(script('## [Slide 1] A\n\n> [BGM] sounds/a.mp3\n\n> [Sound] sounds/b.mp3\n\n> [Video] videos/c.mp4\n\n'
+                  '> [Video] videos/d.mp4\n\nnarration\n',
+                  '## [Slide 2] B\n\n> [BGM once] sounds/e.mp3\n\nb\n',
+                  '## [Slide 3] C\n\n> [BGM stop]\n\nc\n')).work
+    assert w['slides'][0]['cues'] == [{'type': 'bgm', 'file': 'sounds/a.mp3'}, {'type': 'sound', 'file': 'sounds/b.mp3'},
+                                      {'type': 'video', 'file': 'videos/c.mp4'}, {'type': 'video', 'file': 'videos/d.mp4'}]
+    assert w['slides'][1]['cues'] == [{'type': 'bgm', 'file': 'sounds/e.mp3', 'loop': False}]
+    assert w['slides'][2]['cues'] == [{'type': 'bgm-stop'}]
+    assert [s['notes'] for s in w['slides']] == ['narration', 'b', 'c']
+
+
+def test_bgm_after_video_waits_for_the_video_on_its_slide():
+    w = ok(script('## [Slide 1] A\n\n> [BGM after video] sounds/e.mp3\n> [Video] videos/c.mp4\n\na\n')).work
+    assert w['slides'][0]['cues'] == [{'type': 'bgm', 'file': 'sounds/e.mp3', 'loop': False, 'start': 'after-video'},
+                                      {'type': 'video', 'file': 'videos/c.mp4'}]
+    assert '[BGM after video] needs a [Video]' in errors(script('## [Slide 1] A\n\n> [BGM after video] sounds/e.mp3\n\na\n'))
+    assert 'more than one of' in errors(script('## [Slide 1] A\n\n> [BGM] sounds/a.mp3\n> [BGM after video] sounds/e.mp3\n'
+                                               '> [Video] videos/c.mp4\n\na\n'))
+
+
+def test_machine_cues_may_follow_one_another():
+    w = ok(script('## [Slide 1] A\n\n> [Picture] pictures/x.png\n> [Sound] sounds/b.mp3\n\na\n')).work
+    assert w['slides'][0]['picture'] == 'pictures/x.png'
+    assert w['slides'][0]['cues'] == [{'type': 'sound', 'file': 'sounds/b.mp3'}]
+
+
+def test_unknown_or_translated_cue_is_an_error():
+    assert 'unknown cue "[Bild]"' in errors(script('## [Slide 1] A\n\n> [Bild] pictures/1.jpg\n'))
+
+
+def test_cue_block_with_another_line_is_an_error():
+    assert 'not a machine cue' in errors(script('## [Slide 1] A\n\n> [Sound] sounds/b.mp3\n> wait for it\n'))
+
+
+def test_cue_hidden_in_a_free_cue_is_an_error():
+    assert 'would do nothing' in errors(script('## [Slide 1] A\n\n> Wait.\n> [BGM] sounds/a.mp3\n'))
+
+
+def test_two_pictures_or_two_music_cues_are_errors():
+    assert 'more than one [Picture]' in errors(
+        script('## [Slide 1] A\n\n> [Picture] pictures/a.jpg\n\n> [Picture] pictures/b.jpg\n'))
+    assert 'more than one of [BGM]' in errors(script('## [Slide 1] A\n\n> [BGM] s/a.mp3\n\n> [BGM stop]\n'))
+
+
+def test_paths_use_forward_slashes():
+    assert 'use "/"' in errors(script('## [Slide 1] A\n\n> [Sound] sounds\\b.mp3\n'))
+
+
+def test_cue_without_a_file_is_an_error():
+    assert 'needs a file path' in errors(script('## [Slide 1] A\n\n> [Video]\n'))
+
+
+# ---------- words on the screen (§2.6) ----------
+
+def test_text_block_is_read_and_left_out_of_notes():
+    w = ok(script('## [Slide 1] A\n\n> [Text] place top size 54pt bold\n> The storm\n>\n> that night\n\nnarration\n'),
+           skip_text=True).work
+    assert w['slides'][0]['notes'] == 'narration'
+    assert 'overlays' not in w['slides'][0]
+
+
+def test_text_with_four_lengths_and_every_option():
+    ok(script('## [Slide 1] A\n\n> [Text] left 0.50in top 6.3in width 4in height 0.80in size 28pt align left '
+              'anchor bottom color #FFFFFF fill #102030\n> Winter\n'), skip_text=True)
+
+
+@pytest.mark.parametrize('line, message', [
+    ('> [Text] size 40pt', 'needs "place'),
+    ('> [Text] place top left 1in top 1in width 1in height 1in', 'not both'),
+    ('> [Text] left 1in top 1in width 1in', 'missing: height'),
+    ('> [Text] place top couleur #FFFFFF', 'unknown word "couleur"'),
+    ('> [Text] place top size 40', '"size 40" is not a value'),
+    ('> [Text] place top left 0.505in', 'not both'),
+    ('> [Text] place up', '"place up" is not a value'),
+    ('> [Text] place top place bottom', 'written twice'),
+])
+def test_text_line_mistakes(line, message):
+    assert message in errors(script(f'## [Slide 1] A\n\n{line}\n> words\n'))
+
+
+def test_text_without_words_is_an_error():
+    assert 'has no words' in errors(script('## [Slide 1] A\n\n> [Text] place top\n\nnarration\n'))
+
+
+def test_forgotten_blank_line_after_text_is_an_error():
+    assert 'read as words' in errors(script('## [Slide 1] A\n\n> [Text] place top\n> Title\n> [Sound] s/b.mp3\n'))
+
+
+# ---------- pictures and media (§2.5, §4) ----------
+
+@pytest.fixture
+def media(tmp_path):
+    (tmp_path / 'pictures').mkdir()
+    (tmp_path / 'pictures' / '01.png').write_bytes(b'x')
+    (tmp_path / 'videos').mkdir()
+    (tmp_path / 'videos' / 'v.mp4').write_bytes(b'x' * 10)
+    return tmp_path
+
+
+def test_picture_without_cue_finds_the_real_extension(media):
+    w = ok(script('## [Slide 1] A\n\na\n'), media).work
+    assert w['slides'][0]['picture'] == 'pictures/01.png'
+
+
+def test_missing_picture_keeps_the_default_name_and_warns(media):
+    r = ok(script('## [Slide 1] A\n\na\n', '## [Slide 2] B\n\nb\n'), media)
+    assert r.work['slides'][1]['picture'] == 'pictures/02.jpg'
+    assert any('slide 2: picture not found' in w for w in r.warnings)
+
+
+def test_video_slide_without_picture_has_null(media):
+    r = ok(script('## [Slide 1] A\n\na\n', '## [Slide 2] B\n\n> [Video] videos/v.mp4\n'), media)
+    assert r.work['slides'][1]['picture'] is None
+    assert not any('slide 2' in w for w in r.warnings)
+
+
+def test_without_media_folder_default_names_are_written(media):
+    w = ok(script('## [Slide 1] A\n\na\n')).work
+    assert w['slides'][0]['picture'] == 'pictures/01.jpg'
+
+
+def test_heic_picture_is_an_error(media):
+    (media / 'pictures' / '02.heic').write_bytes(b'x')
+    assert 'Export it as JPEG' in errors(script('## [Slide 1] A\n\na\n', '## [Slide 2] B\n\nb\n'), media)
+
+
+def test_missing_media_and_large_video_warn(media, monkeypatch):
+    monkeypatch.setattr(bw, 'VIDEO_MAX_BYTES', 5)
+    r = ok(script('## [Slide 1] A\n\n> [Video] videos/v.mp4\n\n> [Sound] sounds/none.mp3\n\n> [Video] videos/c.mov\n'),
+           media)
+    text = ' | '.join(r.warnings)
+    assert 'over 300 MB' in text and 'file not found: sounds/none.mp3' in text and 'c.mov is not MP4' in text
+
+
+# ---------- language ----------
+
+def test_language_from_header_or_guessed():
+    assert ok('# T\n\n> Language: ja\n\n## [Slide 1] A\n\nhello\n').work['language'] == 'ja'
+    r = ok('# T\n\n## [Slide 1] 表紙\n\nこんばんは。\n')
+    assert r.work['language'] == 'ja' and any('guessed "ja"' in w for w in r.warnings)
+
+
+# ---------- command line ----------
+
+def test_cli_writes_work_json(tmp_path):
+    (tmp_path / 'script.md').write_text(script('## [Slide 1] A\n\na\n'), encoding='utf-8')
+    assert bw.main([str(tmp_path)]) == 0
+    assert (tmp_path / 'work.json').read_text(encoding='utf-8').startswith('{\n  "format": "digital-kamishibai/work"')
+
+
+def test_cli_check_writes_nothing(tmp_path):
+    (tmp_path / 'script.md').write_text(script('## [Slide 1] A\n\na\n'), encoding='utf-8')
+    assert bw.main([str(tmp_path), '--check']) == 0
+    assert not (tmp_path / 'work.json').exists()
+
+
+def test_cli_error_writes_nothing_and_keeps_the_old_work_json(tmp_path, capsys):
+    (tmp_path / 'script.md').write_text('# T\n\nno slides\n', encoding='utf-8')
+    (tmp_path / 'work.json').write_text('old', encoding='utf-8')
+    assert bw.main([str(tmp_path)]) == 1
+    assert (tmp_path / 'work.json').read_text(encoding='utf-8') == 'old'
+    assert 'not written' in capsys.readouterr().err
+
+
+# ---------- drawing the words into the picture (§2.6) ----------
+
+class FakeRenderer:
+    def __init__(self, fits=None, fail=None):
+        self.jobs, self.fits, self.fail = None, fits, fail
+
+    def __call__(self, jobs, media):
+        if self.fail:
+            raise RuntimeError(self.fail)
+        self.jobs = jobs
+        return self.fits
+
+
+TEXT_SLIDES = script(
+    '## [Slide 1] A\n\n> [Text] place top size 54pt bold color #ffffff\n> The storm\n>\n>\n>\n> that night\n\nnarration\n',
+    '## [Slide 2] B\n\n> [Text] left 0.50in top 6.30in width 4.00in height 0.80in fill #102030 align left anchor bottom\n'
+    '> Winter\n\n> [Text] place bottom\n> second box\n\nb\n',
+    '## [Slide 3] C\n\nno words\n')
+
+
+def test_built_pictures_replace_the_slide_pictures_only_where_there_are_words(media):
+    fake = FakeRenderer()
+    w = ok(TEXT_SLIDES, media, renderer=fake).work
+    assert [s['picture'] for s in w['slides']] == ['pictures/_built/01.jpg', 'pictures/_built/02.jpg', 'pictures/03.jpg']
+    assert [j['out'] for j in fake.jobs] == [media / 'pictures/_built/01.jpg', media / 'pictures/_built/02.jpg']
+    assert [j['base'] for j in fake.jobs] == [None, None]
+    assert fake.jobs[0]['picture'] == 'pictures/01.png' and fake.jobs[1]['picture'] is None   # 02 is missing: black
+    assert 'draft' not in w and 'overlays' not in w['slides'][0]
+
+
+def test_draft_writes_overlays_layout_base_and_slide_size(media):
+    fake = FakeRenderer()
+    w = ok(TEXT_SLIDES, media, renderer=fake, draft=True).work
+    assert list(w)[:6] == ['format', 'version', 'title', 'language', 'draft', 'slide_size']
+    assert w['draft'] is True and w['slide_size'] == {'width': 12192000, 'height': 6858000}
+    s1, s2, s3 = w['slides']
+    assert s1['overlays'] == [[['The storm'], [''], ['that night']]]
+    assert s1['overlay_base'] == 'pictures/_built/01.base.jpg'
+    assert fake.jobs[0]['base'] == media / 'pictures/_built/01.base.jpg'
+    assert s1['overlay_layout'] == [{
+        'x': 457200, 'y': 274320, 'width': 11274552, 'height': 1097280, 'inset': [91440, 45720, 91440, 45720],
+        'anchor': 'middle', 'wrap': True,
+        'paragraphs': [{'align': 'center', 'space_before': 0, 'size': 54, 'bold': True, 'color': '#FFFFFF',
+                        'font': 'Arial'}] * 3}]
+    box = s2['overlay_layout'][0]
+    assert (box['x'], box['y'], box['width'], box['height']) == (457200, 5760720, 3657600, 731520)
+    assert box['fill'] == '#102030' and box['anchor'] == 'bottom'
+    assert box['paragraphs'][0] == {'align': 'left', 'space_before': 0, 'size': 40, 'bold': False,
+                                    'color': '#000000', 'font': 'Arial'}
+    assert s2['overlays'] == [[['Winter']], [['second box']]]
+    assert 'overlays' not in s3 and s3['picture'] == 'pictures/03.jpg'
+
+
+def test_draft_names_the_picture_each_built_picture_was_made_from(media):
+    # the player tells a new picture by this file: the built one is written again at every build (Issue #5)
+    w = ok(TEXT_SLIDES, media, renderer=FakeRenderer(), draft=True).work
+    s1, s2, s3 = w['slides']
+    assert s1['picture_source'] == 'pictures/01.png'
+    assert 'picture_source' not in s2      # its picture is missing: drawn on black
+    assert 'picture_source' not in s3      # no words: the slide shows the picture itself
+    w = ok(TEXT_SLIDES, media, renderer=FakeRenderer()).work
+    assert 'picture_source' not in w['slides'][0], 'only for practising'
+
+
+@pytest.mark.parametrize('language, font', [('ja', 'Meiryo'), ('ko', 'Malgun Gothic'), ('zh-TW', 'Microsoft YaHei'),
+                                            ('en', 'Arial'), ('fr', 'Arial')])
+def test_font_follows_the_language(media, language, font):
+    w = ok(script('## [Slide 1] A\n\n> [Text] place top\n> x\n', header=f'# T\n\n> Language: {language}\n'),
+           media, renderer=FakeRenderer(), draft=True).work
+    assert w['slides'][0]['overlay_layout'][0]['paragraphs'][0]['font'] == font
+
+
+def test_words_that_do_not_fit_warn(media):
+    r = ok(TEXT_SLIDES, media, renderer=FakeRenderer(fits=[[{'off': True, 'outside': False}],
+                                                            [{'off': False, 'outside': True},
+                                                             {'off': False, 'outside': False}]]))
+    text = ' | '.join(r.warnings)
+    assert 'slide 1: the words of [Text] 1 run off the slide' in text
+    assert 'slide 2: the words of [Text] 1 run out of its colour band' in text
+    assert '[Text] 2' not in text
+
+
+def test_a_failed_drawing_is_an_error(media):
+    assert 'could not draw the words on the screen: no browser' in errors(
+        TEXT_SLIDES, media, renderer=FakeRenderer(fail='no browser'))
+
+
+def test_a_cut_connection_points_at_the_sandbox(media):
+    class Cut(FakeRenderer):
+        def __call__(self, *args, **kwargs):
+            raise ConnectionResetError(10054, 'the connection was reset')
+    said = errors(TEXT_SLIDES, media, renderer=Cut())
+    assert 'run this command outside it' in said
+    assert 'run this command outside it' not in errors(TEXT_SLIDES, media, renderer=FakeRenderer(fail='no browser'))
+
+
+def test_words_on_a_video_only_slide_are_an_error(media):
+    assert 'needs a picture to draw on' in errors(
+        script('## [Slide 1] A\n\na\n', '## [Slide 2] B\n\n> [Video] videos/v.mp4\n\n> [Text] place top\n> x\n'),
+        media, renderer=FakeRenderer())
+
+
+def test_skip_text_leaves_pictures_alone(media):
+    w = ok(TEXT_SLIDES, media, skip_text=True, renderer=FakeRenderer()).work
+    assert w['slides'][0]['picture'] == 'pictures/01.png'
+
+
+# ---------- the real browser (only where Edge or Chrome is installed) ----------
+
+def jpeg_size(data):
+    i = 2
+    while i < len(data):
+        marker, length = data[i + 1], int.from_bytes(data[i + 2:i + 4], 'big')
+        if marker in (0xC0, 0xC1, 0xC2):
+            return int.from_bytes(data[i + 7:i + 9], 'big'), int.from_bytes(data[i + 5:i + 7], 'big')
+        i += 2 + length
+    return None
+
+
+@pytest.mark.skipif(bw.burn.find_browser() is None, reason='no Microsoft Edge or Google Chrome')
+def test_burning_the_sample_story(tmp_path):
+    import shutil
+    work = tmp_path / 'sample'
+    shutil.copytree(SAMPLE, work)
+    before = {p.name: p.read_bytes() for p in (work / 'pictures').iterdir()}
+    assert bw.main([str(work), '--draft']) == 0
+    built = work / 'pictures' / '_built'
+    for name in ('02.jpg', '02.base.jpg'):
+        data = (built / name).read_bytes()
+        assert data[:2] == b'\xff\xd8' and jpeg_size(data) == (1920, 1080)
+    assert (built / '02.jpg').read_bytes() != (built / '02.base.jpg').read_bytes()
+    assert {p.name: p.read_bytes() for p in (work / 'pictures').iterdir() if p.is_file()} == before  # originals untouched
+    w = json.loads((work / 'work.json').read_text(encoding='utf-8'))
+    assert w['slides'][1]['picture'] == 'pictures/_built/02.jpg' and w['draft'] is True
+
+
+# ---------- ending video seats (§3.3, only with --draft) ----------
+
+def test_the_ending_video_gets_its_seats_only_in_a_draft():
+    source = (SAMPLE / 'script.md').read_text(encoding='utf-8')
+    plain = ok(source, SAMPLE, skip_text=True, definitions=SAMPLE).work
+    assert plain['slides'][3]['cues'] == [{'type': 'video', 'file': 'videos/ending.mp4'}]
+    draft = ok(source, SAMPLE, skip_text=True, draft=True, definitions=SAMPLE).work
+    cue = draft['slides'][3]['cues'][0]
+    assert cue['role'] == 'ending'
+    assert cue['seats'] == [
+        {'n': 1, 'from': 0.0, 'to': 6.4, 'label': 'pictures/02.png'},          # the 0.8 s cross-fades split at the middle
+        {'n': 2, 'from': 6.4, 'to': 12.4, 'label': 'pictures/03.png'},
+        {'n': 3, 'from': 12.4, 'to': 18.0, 'label': 'pictures/01.jpg', 'pin': 'the title at the end of the song'},
+    ]
+
+
+def ending_work(tmp_path, definition):
+    (tmp_path / 'ending_video_second.json').write_text(json.dumps(definition), encoding='utf-8')
+    return '# T\n\n## [Slide 1] End\n\n> [Video] videos/second.mp4\n'
+
+
+def test_seats_start_after_the_prologue(tmp_path):
+    source = ending_work(tmp_path, {'output': 'second.mp4', 'prologue': {'src': 'a.mp4', 'dur': 8},
+                                    'frames': [{'i': 1, 'at': 0, 'dur': 5, 'src': 'x.jpg'}, {'i': 2, 'at': 5, 'dur': 4.5}]})
+    cue = ok(source, tmp_path, draft=True, definitions=tmp_path).work['slides'][0]['cues'][0]
+    assert cue['seats'] == [{'n': 1, 'from': 8.0, 'to': 13.0, 'label': 'x.jpg'}, {'n': 2, 'from': 13.0, 'to': 17.5}]
+
+
+@pytest.mark.parametrize('frames, why', [
+    ([{'i': 1, 'at': 0, 'dur': 5}, {'i': 3, 'at': 5, 'dur': 5}], 'numbered 3'),
+    ([{'i': 1, 'at': 0, 'dur': 5}, {'i': 2, 'at': 4, 'dur': 5}], 'not in order'),
+    ([{'i': 1, 'dur': 5}], 'cannot read'),
+])
+def test_a_broken_definition_leaves_the_seats_out_with_a_warning(tmp_path, frames, why):
+    source = ending_work(tmp_path, {'output': 'second.mp4', 'frames': frames})
+    r = ok(source, tmp_path, draft=True, definitions=tmp_path)
+    assert r.work['slides'][0]['cues'][0] == {'type': 'video', 'file': 'videos/second.mp4'}
+    assert any('ending_video_second.json' in w and why in w for w in r.warnings), r.warnings

@@ -1,0 +1,14 @@
+{
+  "name": "digital-kamishibai",
+  "description": "Digital Kamishibai: make a picture-story show for your own children.",
+  "owner": {
+    "name": "Digital Kamishibai"
+  },
+  "plugins": [
+    {
+      "name": "digital-kamishibai",
+      "source": "./",
+      "description": "Make a picture-story show (kamishibai) for your own children: interview, plan, script, fact check, performance and retro."
+    }
+  ]
+}

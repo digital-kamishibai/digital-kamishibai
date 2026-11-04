@@ -1,0 +1,19 @@
+# Made by the tools: made again every time
+**/work.json
+**/pictures/_built/
+**/pictures/_candidates/
+**/pictures/_replaced/
+**/ending/
+**/ending_*/
+
+# Large or not ours to publish: keep these safe outside the repository
+**/sounds/
+**/videos/
+*.mp4
+*.mov
+*.mp3
+*.m4a
+*.wav
+*.heic
+
+__pycache__/

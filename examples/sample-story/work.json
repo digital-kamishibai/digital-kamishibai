@@ -1,0 +1,41 @@
+{
+  "format": "digital-kamishibai/work",
+  "version": 1,
+  "title": "The Lighthouse Keeper's Lamp",
+  "language": "en",
+  "slides": [
+    {
+      "number": 1,
+      "title": "Cover",
+      "picture": "pictures/01.jpg",
+      "notes": "> Wait until everyone is looking at the screen.\n\nTonight's story is about a lamp.\n\nWho do you think lit it, every night, for forty years?",
+      "cues": []
+    },
+    {
+      "number": 2,
+      "title": "The storm",
+      "picture": "pictures/02.png",
+      "notes": "One winter night, the wind was so strong\nthat the windows sang.\n\nAnd the lamp went out.",
+      "cues": []
+    },
+    {
+      "number": 3,
+      "title": "Morning",
+      "picture": "pictures/03.png",
+      "notes": "In the morning, the keeper found a small boat on the beach,\nand a child asleep inside it.\n\nThe lamp had gone out —\nbut someone had kept a candle burning in the window.",
+      "cues": []
+    },
+    {
+      "number": 4,
+      "title": "The end",
+      "picture": null,
+      "notes": "> Press play when everyone is looking. Say nothing until the song ends.",
+      "cues": [
+        {
+          "type": "video",
+          "file": "videos/ending.mp4"
+        }
+      ]
+    }
+  ]
+}

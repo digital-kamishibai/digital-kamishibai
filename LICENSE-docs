@@ -1,0 +1,22 @@
+Documents: Creative Commons Attribution 4.0 International (CC BY 4.0)
+
+Copyright (c) 2026 Fast Focus Technologies
+
+The following are licensed under CC BY 4.0
+(https://creativecommons.org/licenses/by/4.0/ ;
+full legal code: https://creativecommons.org/licenses/by/4.0/legalcode):
+
+- every Markdown file (*.md) in this repository, including the skill
+  (skills/digital-kamishibai/SKILL.md and its references) and this README
+- everything under templates/
+- everything under examples/
+
+You may share and adapt them for any purpose, including commercially, as long
+as you give credit ("Digital Kamishibai, by Fast Focus Technologies") and a
+link to this repository, and say whether you changed them.
+
+Everything else (the player, the worker, the scripts and the tests) is under
+the MIT License in LICENSE.
+
+Third-party code in player/vendor/ keeps its own license; see
+player/vendor/LICENSES.md.

@@ -1,0 +1,14 @@
+{
+  "name": "digital-kamishibai",
+  "version": "0.4.4",
+  "description": "Make a picture-story show (kamishibai) for your own children: interview, plan, script, fact check, performance and retro.",
+  "keywords": [
+    "kamishibai",
+    "storytelling",
+    "family",
+    "picture-story"
+  ],
+  "author": {
+    "name": "Digital Kamishibai"
+  }
+}

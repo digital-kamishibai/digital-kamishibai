@@ -1,0 +1,44 @@
+title: "How we filled: "
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Made a kamishibai? Tell others **how you filled the holes** — not what your story was.
+
+        "The house's sound: the piece my daughter is practising, played on the closing slide" says enough.
+        Please **do not** write names, the story itself, places, or anything that points to your family,
+        and do not attach photos or recordings. Every field is optional except the first.
+  - type: checkboxes
+    id: holes
+    attributes:
+      label: Which holes did you fill?
+      options:
+        - label: The child is there
+        - label: The parent's own stumble
+        - label: The sounds and things of the house
+        - label: Loss and handing on
+        - label: Real records (footage, the family's photos and videos)
+        - label: A seat in the making
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How you filled them
+      description: One or two lines per hole, in general terms. "Empty — it did not fit this time" is a fine answer too.
+      placeholder: |
+        The child is there: named on the last slide, as thanks for helping with the pictures.
+        The sounds of the house: the piece my son is practising, as the music of the ending.
+    validations:
+      required: true
+  - type: textarea
+    id: landed
+    attributes:
+      label: How it landed (optional)
+      description: What you saw during or after the show. What happened, not what you hoped for.
+  - type: textarea
+    id: next
+    attributes:
+      label: Next time (optional)
+      description: What you would do again, and what you would not.

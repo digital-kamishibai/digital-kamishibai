@@ -1,0 +1,22 @@
+{
+ "audio": "sounds/ending.mp3",
+ "duration_sec": 18.0,
+ "output": "ending.mp4",
+ "note": "A fictional ending video for the fictional example: its three placeholder pictures on a made-up tone. Make the tone first: see ladder/ending-video/README.md.",
+ "final_still": {
+  "title": "The Lighthouse Keeper's Lamp",
+  "color": "#FFFFFF",
+  "title_pt": 40,
+  "top_in": 0.8
+ },
+ "page": {
+  "lang": "en",
+  "title": "The Lighthouse Keeper's Lamp",
+  "lead": "The example's ending video: three seats on an 18-second tone."
+ },
+ "frames": [
+  {"i": 1, "at": 0.0, "dur": 6.0, "xfade": 0.8, "beat": "Night", "root": "work", "src": "pictures/02.png", "status": "placeholder"},
+  {"i": 2, "at": 6.0, "dur": 6.0, "xfade": 0.8, "beat": "Morning", "root": "work", "src": "pictures/03.png", "status": "placeholder", "zoom_from": 1.25, "zoom_center": [0.5, 0.5], "ease": "out"},
+  {"i": 3, "at": 12.0, "dur": 6.0, "xfade": 0.0, "beat": "End", "kind": "final", "root": "work", "src": "pictures/01.jpg", "zoom": 1.0, "status": "confirmed", "pin": "the title at the end of the song"}
+ ]
+}

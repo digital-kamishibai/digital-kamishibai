@@ -1,0 +1,7 @@
+# Cloudflare のレスポンスヘッダ。
+# connect-src の 0.peerjs.com は紹介役（つなぎ始めの紹介だけ。絵・動画・声は通らない）。
+/*
+  Content-Security-Policy: default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data:; media-src 'self' blob:; connect-src 'self' https://0.peerjs.com wss://0.peerjs.com; frame-ancestors 'none'
+  Permissions-Policy: microphone=(self), camera=(), geolocation=(), screen-wake-lock=(self), fullscreen=(self)
+  Referrer-Policy: no-referrer
+  X-Content-Type-Options: nosniff

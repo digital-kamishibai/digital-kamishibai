@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>burn</title>
+<!-- Draws the words of a slide on its picture for build_work.py, with the player's own code and CSS
+     (overlay-dom.js, app.css), so the narrator's draft and the listeners' picture are drawn by one hand.
+     Served by build_work.py on 127.0.0.1 only: /player/ is the repository's player, /media/ the work's media. -->
+<link rel="stylesheet" href="/player/css/app.css">
+<style>
+  html, body { margin: 0; background: #000; overflow: hidden; }
+  #stage { width: 1920px; }
+</style>
+</head>
+<body>
+<div id="stage" class="lay"><img id="pic" alt=""><div id="boxes"></div></div>
+<script type="module">
+import { boxElement } from '/player/js/overlay-dom.js';
+
+const SLIDE_WIDTH = 12192000;          // EMU, 13.333 in (work-format §2.6)
+const TOLERANCE = 0.02;                // shapes within 2% of 16:9 are stretched; others are shown whole on black
+
+async function loadPicture(src) {
+  const img = document.getElementById('pic');
+  if (!src) { img.hidden = true; img.removeAttribute('src'); return; }
+  img.hidden = false;
+  if (img.getAttribute('src') !== src) {
+    img.src = src;
+    await img.decode();
+  }
+  const ratio = img.naturalWidth / img.naturalHeight;
+  img.style.objectFit = Math.abs(ratio / (16 / 9) - 1) <= TOLERANCE ? 'fill' : 'contain';
+}
+
+// boxes: [{ box: overlay_layout entry, words: paragraphs → lines }]. Empty list = the picture alone (overlay_base).
+window.dkRender = async ({ picture, boxes }) => {
+  await loadPicture(picture);
+  const scale = document.getElementById('stage').clientWidth / SLIDE_WIDTH;
+  document.getElementById('boxes').replaceChildren(...boxes.map((b) => boxElement(document, b.box, b.words, scale)));
+  await document.fonts.ready;
+  await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+  // For warnings: words running off the slide, or out of a box that has a colour band behind them.
+  const stage = document.getElementById('stage').getBoundingClientRect();
+  return [...document.getElementById('boxes').children].map((el, i) => {
+    const rects = [...el.querySelectorAll('p')].flatMap((p) => [...p.getClientRects()]);
+    const off = rects.some((r) => r.left < stage.left - 1 || r.top < stage.top - 1
+      || r.right > stage.right + 1 || r.bottom > stage.bottom + 1);
+    const outside = !!boxes[i].box.fill && el.scrollHeight > el.clientHeight + 1;
+    return { off, outside };
+  });
+};
+window.dkReady = true;
+</script>
+</body>
+</html>

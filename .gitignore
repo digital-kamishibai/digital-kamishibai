@@ -1,0 +1,38 @@
+# 家族の写真・動画・音・完成品をリポジトリに入れない（親プラン Phase 4-2。テキスト検査では見つけられないので構造で守る）
+*.pptx
+*.mp4
+*.mov
+*.m4v
+*.webm
+*.mp3
+*.m4a
+*.wav
+*.aac
+*.png
+*.jpg
+*.jpeg
+*.heic
+*.gif
+*.webp
+*.zip
+# 文書用の図版はここだけ許す
+!docs/images/**
+
+node_modules/
+.wrangler/
+__pycache__/
+.pytest_cache/
+
+# 見本作品の仮の絵だけは追跡する（架空・文字だけの絵。家族の写真をここに置かない）
+!examples/sample-story/pictures/*
+
+# ビルダーが画面の文字を焼き込んだ絵（毎回作り直す写し）
+**/pictures/_built/
+
+# 絵の梯子の候補と、差し替えで退けた絵（ladder/images/gen_images.py）
+**/pictures/_candidates/
+**/pictures/_replaced/
+
+# エンディング動画の梯子の絵コンテと中間ファイル（家族の写真が入る）
+**/ending/
+**/ending_*/

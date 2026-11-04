@@ -1,0 +1,298 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Narrator — Kamishibai Room Player</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/app.css">
+<script src="vendor/peerjs.min.js"></script>
+<script type="module" src="js/narrator.js"></script>
+</head>
+<body class="narrator">
+<!-- 画面は3つ（準備・受付・上演）。⚠️ 別のページへ移ると聞き手との接続が切れるので、同じページの中で切り替える（U1） -->
+<nav class="tabs" id="tabs">
+  <strong class="app" data-i18n="appName">Kamishibai Room Player</strong>
+  <button class="tab" data-screen="prep" data-i18n="tabPrep">Prepare</button>
+  <button class="tab" data-screen="room" data-i18n="tabRoom" disabled>Room</button>
+  <button class="tab" data-screen="show" data-i18n="tabShow" disabled>Show</button>
+  <span class="grow"></span>
+  <span id="tabWork" class="muted"></span>
+  <span id="tabCount" class="pill" hidden></span>
+</nav>
+
+<main>
+  <!-- 練習用の版（work.json の draft）を読んだら、どの画面でも上に帯（E9）。直す欄と修正票はこの版だけ（決定5） -->
+  <div id="draftBanner" class="banner draft" data-i18n="draftBanner" hidden>This version can be corrected while practising</div>
+  <!-- 1. 準備: 作品フォルダ・見つからない素材・配れない動画 -->
+  <section id="screenPrep" class="screen">
+    <div class="row">
+      <label class="file"><span data-i18n="pickWork">Choose the work folder</span>
+        <input id="pickWork" type="file" webkitdirectory multiple>
+      </label>
+      <strong id="workTitle"></strong>
+    </div>
+    <div id="loadError" class="card error" hidden></div>
+    <div id="missing" class="card error" hidden></div>
+    <div id="videoWarn" class="card error" hidden></div>
+    <div id="mediaRow" class="row" hidden>
+      <label class="file"><span data-i18n="pickMedia">Choose the media folder</span>
+        <input id="pickMedia" type="file" webkitdirectory multiple>
+      </label>
+    </div>
+    <div id="prepNext" class="row" style="margin-top: 16px" hidden>
+      <button class="primary" data-goto="room" data-i18n="toRoom">Go to the room</button>
+      <!-- 練習＝受付を開かずに上演の画面を使う（録画と練習 P1。別の練習モードは作らない） -->
+      <button data-goto="show" data-i18n="practice">Practice</button>
+    </div>
+  </section>
+
+  <!-- 2. 受付: 予定台数・QR と合言葉・承認待ち・聞き手ごとの受け取り・待ち時間の記録（U6: 待ち時間とつなぎかけはここだけ） -->
+  <section id="screenRoom" class="screen" hidden>
+    <div class="card">
+      <div class="row">
+        <label><span data-i18n="expected">Listeners expected</span>
+          <input id="expected" type="number" min="0" max="6" value="1" style="width: 5em">
+        </label>
+        <button id="openRoom" class="primary" data-i18n="open">Open the room</button>
+        <span id="roomStatus" class="muted"></span>
+      </div>
+      <p id="micWarn" class="error" data-i18n="micWarn" hidden></p>
+
+      <div id="room" hidden>
+        <div class="room" style="margin-top: 16px">
+          <div id="qr"></div>
+          <div>
+            <div class="muted" data-i18n="code">Code</div>
+            <div id="code" class="code"></div>
+            <div class="muted"><small data-i18n="joinHint"></small></div>
+            <div><small id="joinUrl"></small></div>
+          </div>
+        </div>
+        <p id="relayNote" class="warn" hidden></p>
+        <h2><span data-i18n="requests">Waiting to join</span></h2>
+        <ul id="requests" class="list"></ul>
+        <ul id="trying" class="list" hidden></ul>
+        <h2><span data-i18n="listeners">Listeners</span> <small id="count"></small></h2>
+        <ul id="listeners" class="list"></ul>
+        <!-- 開演前チェック: 音の点呼（段階3 V8・V9）。同じ部屋の2台・語り手のスピーカーを音で見つける -->
+        <h2><span data-i18n="rollTitle">Sound check</span></h2>
+        <div class="row">
+          <button id="rollCall" data-i18n="rollCall">Run the sound check</button>
+          <small data-i18n="rollHint"></small>
+        </div>
+        <p id="rollResult" class="roll"></p>
+        <div class="row" style="margin-top: 16px">
+          <button id="startShow" class="primary" data-i18n="startShow">Start the show (music and sounds)</button>
+          <button data-goto="show" data-i18n="toShow">Go to the show screen</button>
+        </div>
+        <div id="waitCard" hidden>
+          <h2><span data-i18n="waitLog">Waiting time</span> <button id="copyLog" data-i18n="copy">Copy</button></h2>
+          <pre id="waitLog" class="log"></pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- 3. 上演: 上＝開演・録画・音・声・修正票（U9）、左＝聞き手の画面と戻る／次へ・札・次の絵、右＝台本（U4'・2026-10-25 改め） -->
+  <section id="screenShow" class="screen" hidden>
+    <!-- 上演中に新しい端末が来たら、ここで「入れる／断る」（U5。入り直しの端末は出ない） -->
+    <div id="joinBanner" class="banner" hidden></div>
+    <!-- 受付を開いていないあいだは練習（P1） -->
+    <div id="practiceNote" class="banner practice" data-i18n="practiceNote" hidden>Practising (the room is not open)</div>
+    <!-- 上の帯（U9）: 準備・設定・ときどき開くもの。上演中に押し続ける「次へ」から離す -->
+    <div class="toolbar">
+      <button id="startShowBar" class="start" data-i18n="startShow">Start the show (music and sounds)</button>
+      <!-- 録画（G5）。受付を開いていなくても使える。録るのは聞き手の画面と音だけ（台本は録らない） -->
+      <button id="recBtn" class="start" data-i18n="recStart">Record</button>
+      <span id="recInfo" class="recinfo" hidden></span>
+      <button id="soundToggle" class="start" aria-expanded="false" aria-controls="soundPanel"><span data-i18n="sound">Sound</span> ▾</button>
+      <!-- 話していると判定して BGM を下げているあいだだけ見える（取り違えを語り手が目で確かめるため。2026-10-26）。
+           消すときも場所は取ったまま（.off）——hidden で出し入れすると帯が折り返して、下の「戻る／次へ」が上下に動く（2026-10-27） -->
+      <span id="talkLamp" class="pill warn off" data-i18n="talkLamp" data-i18n-title="talkLampHint">Music lowered</span>
+      <button id="micSelf" class="start" title="">My mic</button>
+      <button id="voiceAll" class="start">Listeners' voices</button>
+      <!-- 修正票（E5）と読み直し（E10）。修正票は練習用の版だけ・読み直しは受付を開いていないときだけ -->
+      <button id="sheetBtn" class="start" aria-expanded="false" aria-controls="sheetPanel" hidden></button>
+      <label id="reloadLabel" class="file start" hidden><span data-i18n="reloadWork">Open the work again</span>
+        <input id="reloadWork" type="file" webkitdirectory multiple>
+      </label>
+    </div>
+    <p id="reloadNote" class="muted rec-note" hidden></p>
+    <div id="sheetPanel" class="card" hidden>
+      <div class="row">
+        <strong data-i18n="sheetTitle">Correction sheet</strong>
+        <button id="sheetCopy" class="primary" data-i18n="sheetCopy">Copy</button>
+        <button id="sheetSave" data-i18n="sheetSave">Save to a file</button>
+        <small id="sheetNote" class="muted"></small>
+      </div>
+      <ul id="sheetList" class="list"></ul>
+    </div>
+    <p id="recNote" class="muted rec-note" hidden></p>
+    <div id="soundPanel" class="card row" hidden>
+      <label class="muted"><input id="muteLocal" type="checkbox" checked> <span data-i18n="playHere">Play music on this device too</span></label>
+      <!-- 語っているあいだ BGM を下げる（2026-10-26。聞き手の端末・録画にも効く。この端末が覚える） -->
+      <label class="muted"><input id="talkDuck" type="checkbox" checked> <span data-i18n="talkDuck">Lower the music while I speak</span></label>
+      <label class="muted"><input id="bgmHold" type="checkbox"> <span data-i18n="bgmHold">Do not pass on listeners' voices while music plays</span></label>
+      <label class="muted"><span data-i18n="volMusic">Music and sounds</span>
+        <input id="volMusic" type="range" min="0" max="200" step="5" value="100"> <span id="volMusicVal">100%</span></label>
+      <label class="muted"><span data-i18n="volVideo">Videos</span>
+        <input id="volVideo" type="range" min="0" max="100" step="5" value="100"> <span id="volVideoVal">100%</span></label>
+      <!-- マイクを選ぶ（2026-10-26: カメラのマイクとヘッドセットのどちらで拾っているか分からなかった）。選んだものはこの端末のブラウザが覚える -->
+      <label class="muted"><span data-i18n="micLabel">Microphone</span> <select id="micPick"></select></label>
+      <span id="micNow" class="muted"></span>
+    </div>
+    <!-- 左＝聞き手の画面・戻る／次へ・札・次の絵、右＝台本（U4'）。境目はドラッグで動かせる（U8） -->
+    <div class="show" id="showGrid">
+      <div class="side">
+        <div class="label" data-i18n="stageLabel">What listeners see</div>
+        <!-- 聞き手の端末の全画面と同じ見え方（16:9・黒地・絵か動画）。動画の枚では、この枠が再生のつまみ（U2） -->
+        <div id="stageFrame" class="frame">
+          <img id="current" alt="">
+          <video id="nvideo" controls playsinline preload="metadata" hidden></video>
+        </div>
+        <!-- 戻る／次へ（U4'）: 聞き手の画面の真下。上演中にいちばんよく押す -->
+        <div class="nav">
+          <button id="prev" data-i18n="prev">Back</button>
+          <span id="navNo" class="no"></span>
+          <button id="nextBtn" class="primary" data-i18n="next">Next</button>
+        </div>
+        <!-- 1枚に動画が複数ある枚では、ここで流す1本を選ぶ（W2） -->
+        <div id="videoPick" class="vpick" hidden></div>
+        <div id="videoNote" class="label"></div>
+        <!-- エンディング動画のコマを指す（M1）と絵コンテ（M2）。練習用の版で受付を開いていないときだけ。
+             絵コンテのカードは動画から切り出した下書きで、聞き手へは送らない（R1） -->
+        <div id="seatBar" class="seatbar" hidden>
+          <span id="seatNow" class="seat-now"></span>
+          <span class="seat-act">
+            <input id="seatComment" type="text">
+            <button id="seatPoint" class="mini" type="button"></button>
+            <button id="boardBtn" class="mini" type="button" aria-expanded="false" aria-controls="board" data-i18n="boardBtn">Storyboard</button>
+          </span>
+        </div>
+        <div id="board" class="board" hidden></div>
+        <!-- 上演中の動画の区間を直す（M3）。止めた位置を開始・終わりにして修正票へ。練習用の版で受付を開いていないときだけ -->
+        <div id="cutBar" class="seatbar" hidden>
+          <span id="cutNow" class="seat-now"></span>
+          <span id="cutSheet" class="seat-now"></span>
+          <span class="seat-act">
+            <input id="cutComment" type="text" data-i18n-placeholder="seatCommentPh">
+            <button id="cutFrom" class="mini" type="button" data-i18n="cutFrom">Start here</button>
+            <button id="cutTo" class="mini" type="button" data-i18n="cutTo">End here</button>
+          </span>
+        </div>
+        <!-- 絵の作り直しを頼む（M4）。何をどう直したいかの文（必須）を修正票へ。1枚に1件。練習用の版で受付を開いていないときだけ -->
+        <div id="picBar" class="seatbar" hidden>
+          <span id="picSheet" class="seat-now"></span>
+          <span class="seat-act">
+            <input id="picComment" type="text" data-i18n-placeholder="picPh">
+            <button id="picAsk" class="mini" type="button"></button>
+          </span>
+        </div>
+        <!-- 絵の候補（pictures/_candidates）を見くらべて選ぶ。選んだら修正票の picture に Use。練習用の版で受付を開いていないときだけ。聞き手へは送らない -->
+        <div id="candBar" class="seatbar" hidden>
+          <span id="candNow" class="seat-now"></span>
+          <span class="seat-act"><button id="candOpen" class="mini primary" type="button" aria-haspopup="dialog" data-i18n="candOpen">Compare</button></span>
+        </div>
+        <!-- 聞き手ごとの札（U3）。各端末の報告（view）から -->
+        <div id="chips" class="chips"></div>
+        <div id="nextLabel" class="label"></div>
+        <img id="next" class="next" alt="">
+      </div>
+      <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-title="splitterHint"></div>
+      <div class="script">
+        <div class="row"><strong id="slideNo"></strong><span id="slideTitle"></span><span id="editedMark" class="edited-mark" data-i18n="editedMark" hidden></span><span class="grow"></span><span id="clock" class="clock"></span>
+          <!-- 直す（E1）: 練習用の版を練習しているときだけ。本番（受付中）は出さない -->
+          <button id="editBtn" class="mini" data-i18n="edit" hidden>Correct</button></div>
+        <div id="notes" class="notes"></div>
+        <!-- 画面の文字（E3）。絵に焼き込まれている文字を、語り手の画面にだけ文字として出す（聞き手へは送らない） -->
+        <div id="overlaysView" class="overlays" hidden></div>
+        <!-- 直す欄（E1・E4）。台本と、その枚の画面の文字を並べて開く。work.json は書き換えず、閉じると修正票に入る -->
+        <div id="editPane" class="edit" hidden>
+          <!-- 絵の上で直す（overlay_layout）。文字の枠だけ抜いた下敷きの上に、ブラウザが枠を描く＝直すための下書き。聞き手には送らない（R1・L8） -->
+          <div id="layPane" class="lay-pane" hidden>
+            <div class="label" data-i18n="layLabel">Move the words on the picture</div>
+            <div id="layStage" class="lay" tabindex="0">
+              <img id="layBase" class="lay-base" alt="" draggable="false">
+              <div id="layBoxes"></div>
+              <img id="layPic" class="lay-pic" alt="" draggable="false" hidden>
+              <div id="layGuideV" class="lay-guide v" hidden></div>
+              <div id="layGuideH" class="lay-guide h" hidden></div>
+              <div id="laySel" class="lay-sel" hidden>
+                <span data-corner="nw"></span><span data-corner="ne"></span><span data-corner="sw"></span><span data-corner="se"></span>
+              </div>
+            </div>
+            <div class="row lay-tools">
+              <label class="lay-check"><input id="layOver" type="checkbox"> <span data-i18n="layOverlay">Overlay the current picture</span></label>
+              <span id="layFields" class="lay-fields" hidden>
+                <strong id="layName"></strong>
+                <label>left <input id="layLeft" type="number" step="0.01"></label>
+                <label>top <input id="layTop" type="number" step="0.01"></label>
+                <label>width <input id="layWidth" type="number" step="0.01" min="0.1"></label>
+                <label>height <input id="layHeight" type="number" step="0.01" min="0.1"></label>
+                <span class="muted">in</span>
+                <label>size <input id="laySize" type="number" step="1" min="1"></label>
+                <span class="muted">pt</span>
+                <button id="laySmaller" class="mini" type="button">−1pt</button>
+                <button id="layBigger" class="mini" type="button">+1pt</button>
+                <button id="layReset" class="mini" type="button" data-i18n="layReset">Undo changes</button>
+              </span>
+            </div>
+            <!-- 文字色と下地の色（§6 の color・fill）。見本＝その作品で使っている色＋白・黒。明暗差は印だけ（選ぶのは止めない） -->
+            <div id="layColors" class="lay-colors" hidden>
+              <div class="lay-color-row">
+                <span class="lay-color-name" data-i18n="layColor">Words</span>
+                <span id="layColorSw" class="lay-sw"></span>
+                <input id="layColorPick" type="color" data-i18n-title="layPick">
+                <span id="layColorMixed" class="muted" data-i18n="layColorMixed" hidden></span>
+              </div>
+              <div class="lay-color-row">
+                <span class="lay-color-name" data-i18n="layFill">Band</span>
+                <span id="layFillSw" class="lay-sw"></span>
+                <input id="layFillPick" type="color" data-i18n-title="layPick">
+                <button id="layFillNone" class="mini" type="button" data-i18n="layFillNone">No band</button>
+              </div>
+              <div id="layContrast" class="lay-contrast" hidden></div>
+            </div>
+            <small class="muted" data-i18n="layHint"></small>
+          </div>
+          <div class="edit-cols">
+            <div>
+              <div class="label" data-i18n="editNotes">Script</div>
+              <textarea id="editNotes" class="edit-notes" spellcheck="false"></textarea>
+            </div>
+            <div>
+              <div class="label" data-i18n="editOverlays">Words on the picture</div>
+              <div id="editBoxes"></div>
+            </div>
+          </div>
+          <div id="editOldComment" class="edit-old-comment" hidden><span class="muted" data-i18n="editOldComment">Earlier comment</span> <span id="editOldText"></span> <button id="editOldRemove" class="mini" data-i18n="editOldRemove">Remove</button></div>
+          <label class="edit-comment"><span data-i18n="editComment">Comment (optional)</span> <input id="editComment" type="text"></label>
+          <div class="row">
+            <button id="editDone" class="primary" data-i18n="editDone">Close and add to the sheet</button>
+            <button id="editCancel" data-i18n="editCancel">Cancel</button>
+            <small class="muted" data-i18n="editHint"></small>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+  <!-- 絵の候補を見くらべる（左にいまの絵・右に候補）。画面の文字のある枚は、候補の上にも文字を重ねる -->
+  <div id="candPanel" class="cand" role="dialog" aria-modal="true" aria-labelledby="candTitle" hidden>
+    <div class="cand-head"><strong id="candTitle"></strong><span class="grow"></span><button id="candClose" type="button" data-i18n="candClose">Close</button></div>
+    <div class="cand-pair">
+      <figure><figcaption data-i18n="candCurrent">The picture now</figcaption><div class="lay cand-stage"><img id="candCur" alt=""></div></figure>
+      <figure><figcaption id="candCap"></figcaption><div id="candStage" class="lay cand-stage"><img id="candImg" alt=""><div id="candBoxes"></div></div></figure>
+    </div>
+    <div class="cand-act">
+      <button id="candPrev" type="button" aria-label="previous">◀</button>
+      <button id="candNext" type="button" aria-label="next">▶</button>
+      <span class="grow"></span>
+      <button id="candNone" type="button" data-i18n="candNone">None of these</button>
+      <button id="candUse" class="primary" type="button"></button>
+    </div>
+    <p class="muted" data-i18n="candHint"></p>
+  </div>
+</body>
+</html>

@@ -1,0 +1,97 @@
+// Cloudflare Workers の設定。player/ を静的ページとして配り、/api/ice だけを src/worker.js が答える。
+// 秘密はここに書かない——ダッシュボードの Worker の「Settings → Variables and Secrets」に Secret として置く:
+//   TURN_KEY_ID・TURN_KEY_API_TOKEN（Realtime → TURN の鍵。認証情報を出すのにも、取り消すのにも使う）
+//   CF_ANALYTICS_TOKEN（中継の使用量を読む API トークン。権限は Account → Account Analytics → Read だけ）
+// 鍵が無い箱では中継を配らず（STUN だけ）、見張りも何もしない。
+{
+  "name": "kamishibai-room",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": {
+    "directory": "./player",
+    "binding": "ASSETS"
+  },
+  // /api/ice の回数制限（同じ IP から60秒に20回まで）。認証情報を他人に汲み出されて無料枠を食われないため
+  "ratelimits": [
+    {
+      "name": "ICE_LIMIT",
+      "namespace_id": "1001",
+      "simple": { "limit": 20, "period": 60 }
+    }
+  ],
+  // 中継の損失の天井: 5分おきに使用量を照会し（src/watch.js）、印を KV に置く。/api/ice は印を読むだけ。
+  // 印が30分以上新しくならなければ中継を配らない（見張りが止まった＝天井が効いているか分からない）
+  "triggers": { "crons": ["*/5 * * * *"] },
+  // 見張りの結果（「turn guard {...}」）をダッシュボードの Observability で後から読めるように残す
+  "observability": { "enabled": true },
+  // KV の id は書かない——初めてのデプロイで自動で作られる（Wrangler の automatic provisioning。名前は Worker の名前で始まる）
+  "kv_namespaces": [
+    { "binding": "TURN_GUARD" }
+  ],
+  "vars": {
+    // TURN の鍵を持つアカウント（使用量の照会先）。秘密ではない
+    "CF_ACCOUNT_ID": "3095160a5b602fc50dc24fee90472e03"
+    // 天井の数字（src/guard.js の readCaps）。書かなければ既定値:
+    //   TURN_CAP_CREDENTIAL_GB 20 ／ TURN_FREE_GB 1000 ／ TURN_YEARLY_USD 1000 ／ TURN_USD_PER_GB 0.05 ／ TURN_DAY_SHARE 0.1
+    //   → 月の枠 約2,667GB・1日の枠 約267GB
+  },
+  "env": {
+    // 公開用（本番）: npx wrangler deploy --env public → https://digitalkamishibai.org/
+    // 一番上の設定（開発用の箱・Workers Builds が main の push で配る）とは別の箱（Digital Kamishibai）に置く。
+    // 初回は箱の管理者が手で配る（KV と独自ドメインがそこで作られる）。2回目からは .github/workflows/ci.yml の deploy が main の push で配る。
+    // digitalkamishibai.com と www. は Worker に来ない——箱の Redirect Rules で本命へ転送する（静的ファイルは Worker を通らずに配られるため）
+    // ⚠️ vars・kv_namespaces・ratelimits は環境へ引き継がれないので、ここにもう一度書く
+    "public": {
+      "name": "kamishibai-room",
+      "account_id": "3095160a5b602fc50dc24fee90472e03",
+      "routes": [
+        { "pattern": "digitalkamishibai.org", "custom_domain": true }
+      ],
+      // workers.dev の素の URL は閉じる（入口を独自ドメインの1つにする。開発用の箱の URL とも紛れない）
+      "workers_dev": false,
+      "ratelimits": [
+        {
+          "name": "ICE_LIMIT",
+          "namespace_id": "1001",
+          "simple": { "limit": 20, "period": 60 }
+        }
+      ],
+      "triggers": { "crons": ["*/5 * * * *"] },
+      // KV は初回のデプロイで自動で作られた（kamishibai-room-turn-guard）。id を書くのは、Actions から配るたびに作り直させないため。id は秘密ではない
+      "kv_namespaces": [
+        { "binding": "TURN_GUARD", "id": "a3ca16025f524f8a8b13e650cf27e39e" }
+      ],
+      "vars": {
+        "CF_ACCOUNT_ID": "3095160a5b602fc50dc24fee90472e03"
+      }
+    },
+    // 試験用: npx wrangler deploy --env staging → kamishibai-room-staging.<サブドメイン>.workers.dev
+    // 天井をわざと小さくして、取り消し・止めが本当に効くかを実機で見る（認証情報ごと 1MB・月 50MB・1日 20MB）。
+    // TURN の鍵は本番と別のものを作る（取り消すのは自分の鍵の認証情報だけ。月と日の合計は箱全体で数える）。
+    // ⚠️ KV の書き込みの無料枠（1日1,000回）は箱全体で1つ。本番と並べて動かすのは確かめるあいだだけにする
+    "staging": {
+      "name": "kamishibai-room-staging",
+      "account_id": "3095160a5b602fc50dc24fee90472e03",
+      "ratelimits": [
+        {
+          "name": "ICE_LIMIT",
+          "namespace_id": "1002",
+          "simple": { "limit": 20, "period": 60 }
+        }
+      ],
+      // 見張りは確かめるときだけ動かす（いまは止めてある）。止めると印が30分で古くなり、試験用の Worker は中継を配らなくなる。
+      // 確かめ直すときは "*/5 * * * *" に戻して npx wrangler deploy --env staging
+      "triggers": { "crons": [] },
+      // 試験用の KV は初めてのデプロイで自動で作られた（kamishibai-room-staging-turn-guard）。id は秘密ではない
+      "kv_namespaces": [
+        { "binding": "TURN_GUARD", "id": "3a6f281970a543ab8672643f76583d3e" }
+      ],
+      "vars": {
+        "CF_ACCOUNT_ID": "3095160a5b602fc50dc24fee90472e03",
+        "TURN_CAP_CREDENTIAL_GB": "0.001",
+        "TURN_CAP_MONTH_GB": "0.05",
+        "TURN_DAY_SHARE": "0.4"
+      }
+    }
+  }
+}

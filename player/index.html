@@ -1,0 +1,35 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kamishibai Room Player</title>
+<link rel="icon" href="data:,">
+<link rel="stylesheet" href="css/app.css">
+<script type="module" src="js/checks.js"></script>
+</head>
+<body>
+<main>
+  <h1 data-i18n="appName">Kamishibai Room Player</h1>
+
+  <div class="modes">
+    <a class="big" href="narrator.html" data-i18n="narrate">Narrate</a>
+    <form id="listenForm">
+      <strong data-i18n="listen">Listen</strong>
+      <div class="row">
+        <input id="code" inputmode="numeric" autocomplete="off" maxlength="7" data-i18n-placeholder="codePlaceholder">
+        <button class="primary" data-i18n="join">Join</button>
+      </div>
+    </form>
+  </div>
+
+  <h2 data-i18n="checksTitle">What this device can do</h2>
+  <table id="checks"><tbody></tbody></table>
+
+  <p class="muted"><small>
+    No story, picture, video or sound is stored on this site. A story stays on the narrator's device and is sent
+    only to devices the narrator approves.
+  </small></p>
+</main>
+</body>
+</html>

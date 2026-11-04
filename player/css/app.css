@@ -1,0 +1,257 @@
+:root {
+  color-scheme: light dark;
+  --bg: #faf7f2; --fg: #222; --muted: #666; --card: #fff; --line: #ddd;
+  --ok: #1a7f37; --ng: #b42318; --accent: #9a3412; --cue: #1d4ed8; --warn-bg: #fef3c7;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #161616; --fg: #eee; --muted: #aaa; --card: #222; --line: #333;
+    --ok: #4ac26b; --ng: #ff7b72; --accent: #fdba74; --cue: #93c5fd; --warn-bg: #422006;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--fg); font-family: system-ui, sans-serif; line-height: 1.5; }
+main { max-width: 1100px; margin: 0 auto; padding: 24px 16px; }
+h1 { font-size: 1.5rem; margin: 0 0 16px; }
+h2 { font-size: 1.1rem; margin: 24px 0 8px; }
+button, input, label.file { font: inherit; }
+button, label.file {
+  padding: 10px 16px; border-radius: 8px; border: 1px solid var(--line);
+  background: var(--card); color: var(--fg); cursor: pointer; display: inline-block;
+}
+button.primary { background: var(--accent); border-color: var(--accent); color: #fff; }
+button:disabled { opacity: .5; cursor: default; }
+input[type="text"], input[type="number"], input:not([type]) {
+  padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--fg);
+}
+label.file input { display: none; }
+.card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px; margin: 12px 0; }
+.muted { color: var(--muted); }
+.error { color: var(--ng); }
+.row { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+[hidden] { display: none !important; }
+
+/* 入口 */
+.modes { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.modes a.big, .modes form { display: block; padding: 20px; border-radius: 8px; border: 1px solid var(--line); background: var(--card); color: var(--fg); text-decoration: none; }
+.modes a.big { font-size: 1.15rem; font-weight: 600; }
+.modes form .row { margin-top: 8px; }
+table { width: 100%; border-collapse: collapse; background: var(--card); border-radius: 8px; overflow: hidden; }
+td { padding: 8px 12px; border-top: 1px solid var(--line); vertical-align: top; overflow-wrap: anywhere; }
+tr:first-child td { border-top: none; }
+td.r { text-align: right; white-space: nowrap; font-weight: 600; }
+.ok { color: var(--ok); } .ng { color: var(--ng); }
+small { color: var(--muted); }
+
+/* 語り手 */
+.room { display: grid; grid-template-columns: auto 1fr; gap: 16px; align-items: start; }
+.code { font-size: 2.5rem; font-weight: 700; letter-spacing: .1em; font-variant-numeric: tabular-nums; }
+#qr svg { width: 160px; height: 160px; background: #fff; border-radius: 4px; }
+#joinUrl { overflow-wrap: anywhere; }
+ul.list { list-style: none; padding: 0; margin: 0; }
+ul.list li { padding: 8px 0; border-top: 1px solid var(--line); display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+ul.list li:first-child { border-top: none; }
+ul.list li span { flex: 1 1 200px; }
+li.over { background: var(--warn-bg); padding: 8px; border-radius: 6px; }
+.warn { flex-basis: 100%; color: var(--ng); font-weight: 600; }
+
+/* 上演の画面（U4・U7: PC の横長 1280px 以上が前提。狭いときは台本の下に聞き手の画面と札を回す） */
+/* 幅の上限は置かない——全画面で左右が余るのはもったいない（2026-10-27）。絵と台本の割合は境目で動かせる */
+body.narrator main { max-width: none; padding-top: 16px; }
+.tabs {
+  position: sticky; top: 0; z-index: 10; display: flex; gap: 6px; align-items: center; flex-wrap: wrap;
+  padding: 8px 16px; background: var(--bg); border-bottom: 1px solid var(--line);
+}
+.tabs .app { margin-right: 12px; }
+.tabs .grow { flex: 1; }
+.tabs .tab { padding: 8px 18px; }
+.tabs .tab[aria-current="page"] { background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 600; }
+.pill { padding: 4px 10px; border-radius: 999px; border: 1px solid var(--line); background: var(--card); font-variant-numeric: tabular-nums; }
+.pill.warn { background: var(--warn-bg); border-color: var(--ng); }
+.pill.off { visibility: hidden; }   /* 見えないだけで場所は取る（出し入れで画面を動かさない） */
+.toolbar .pill.warn { flex-basis: auto; }   /* 印は帯の中の1つ（.warn の「1行まるごと」を受けない＝空いた行を作らない） */
+
+.banner { position: sticky; top: 56px; z-index: 5; margin: 0 0 12px; }
+.banner .item {
+  display: flex; gap: 12px; align-items: center; flex-wrap: wrap; padding: 10px 14px; margin-bottom: 6px;
+  background: var(--warn-bg); border: 1px solid var(--ng); border-radius: 8px; font-weight: 600;
+}
+.banner .item span { flex: 1 1 240px; }
+
+/* 上演の画面（U4'・U8）: 左＝聞き手の画面と戻る／次へ、真ん中＝境目、右＝台本 */
+.show { display: grid; grid-template-columns: minmax(0, var(--split, 42%)) 16px minmax(0, 1fr); }
+.splitter { position: relative; cursor: col-resize; touch-action: none; outline: none; }
+.splitter::before { content: ''; position: absolute; top: 0; bottom: 0; left: 50%; width: 2px; transform: translateX(-50%); background: var(--line); border-radius: 2px; }
+.splitter:hover::before, .splitter.drag::before, .splitter:focus-visible::before { width: 4px; background: var(--accent); }
+/* 上の帯（U9）: 準備・設定・ときどき開くもの */
+.toolbar { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; margin: 0 0 12px; padding: 0 0 10px; border-bottom: 1px solid var(--line); }
+.toolbar button, .toolbar label.file { padding: 8px 14px; }
+.script #slideTitle { font-weight: 600; }
+.notes {
+  background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 16px 20px; margin-top: 6px;
+  font-size: 1.4rem; line-height: 1.7; height: calc(100vh - 250px); min-height: 360px; overflow-y: auto; white-space: pre-wrap;
+}
+.notes .cue { color: var(--cue); font-size: 1rem; font-style: italic; }
+.side .label { margin: 8px 0 4px; color: var(--muted); font-size: .9rem; }
+.side .label:first-child { margin-top: 0; }
+/* 聞き手の画面の枠（U2）: 聞き手の全画面と同じ 16:9・黒地 */
+.frame { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; border-radius: 6px; overflow: hidden; }
+.frame img, .frame video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: #000; display: block; }
+img.next { width: 45%; aspect-ratio: 16 / 9; object-fit: contain; background: #000; border-radius: 6px; display: block; }
+/* 聞き手の札（U3） */
+.chips { display: flex; flex-direction: column; gap: 6px; margin-top: 8px; }
+.chip { padding: 6px 10px; border: 1px solid var(--line); border-left-width: 6px; border-left-color: var(--ok); border-radius: 6px; background: var(--card); font-size: .95rem; }
+.chip.warn { background: var(--warn-bg); border-color: var(--ng); }
+.chip.unknown { border-left-color: var(--line); color: var(--muted); }
+.chip .bad { color: var(--ng); font-weight: 700; }
+/* 戻る／次へ（U4'）: 聞き手の画面の真下 */
+.nav { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
+.nav button { padding: 14px 20px; font-size: 1.1rem; }
+.nav #prev, .nav #nextBtn { flex: 1; }
+.nav .no { font-variant-numeric: tabular-nums; min-width: 5em; text-align: center; font-weight: 600; }
+#soundPanel { margin-top: 0; }
+/* 声（段階3） */
+.chip .dot { display: inline-block; width: .7em; height: .7em; border-radius: 50%; background: var(--line); margin-right: 4px; vertical-align: middle; }
+.chip .dot.on { background: var(--ok); box-shadow: 0 0 0 3px color-mix(in srgb, var(--ok) 30%, transparent); }
+button.mini { padding: 2px 10px; font-size: .85rem; margin-left: 4px; }
+.toolbar button.off { background: var(--warn-bg); border-color: var(--ng); }
+p.roll { white-space: pre-line; margin: 8px 0 0; }
+/* 1枚に動画が複数ある枚（W2） */
+.vpick { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.vpick button { padding: 4px 10px; font-size: .9rem; }
+.vpick button.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+/* 録画と練習 */
+.banner.practice { padding: 8px 12px; background: var(--card); border: 1px dashed var(--line); border-radius: 8px; color: var(--muted); font-weight: 600; }
+.script .row .grow { flex: 1; }
+.clock { color: var(--muted); font-variant-numeric: tabular-nums; font-size: .95rem; }
+.toolbar button.rec { background: var(--warn-bg); border-color: var(--ng); color: var(--ng); }
+.recinfo { color: var(--ng); font-variant-numeric: tabular-nums; font-size: .95rem; white-space: nowrap; }
+p.rec-note { margin: 6px 0 0; }
+
+/* 練習しながら直す（修正票。E1〜E10） */
+.banner.draft { position: static; padding: 8px 12px; background: var(--warn-bg); border: 1px dashed var(--ng); border-radius: 8px; font-weight: 600; }
+.edited-mark { color: var(--ng); font-size: .9rem; font-weight: 600; }
+.notes .edited { border-left: 4px solid var(--ng); padding-left: 8px; }
+.overlays { margin-top: 8px; padding: 8px 12px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); font-size: 1rem; max-height: 24vh; overflow-y: auto; }
+.overlays .box { white-space: pre-wrap; padding: 4px 0; border-top: 1px dotted var(--line); }
+.overlays .box:first-of-type { border-top: 0; }
+.overlays .box.edited { color: var(--ng); }
+.overlays .box.removed { text-decoration: line-through; color: var(--muted); }
+.edit { margin-top: 6px; }
+.edit-cols { display: grid; grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); gap: 12px; }
+.edit-notes { width: 100%; box-sizing: border-box; height: calc(100vh - 360px); min-height: 280px; font: inherit; font-size: 1.2rem; line-height: 1.6; padding: 10px; }
+.edit .ebox { border: 1px solid var(--line); border-radius: 8px; padding: 8px; margin-bottom: 8px; background: var(--card); }
+.edit .ebox.removed { opacity: .6; }
+.edit .ebox textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 1.05rem; margin-bottom: 4px; resize: vertical; }
+.edit-comment { display: flex; gap: 8px; align-items: center; margin: 8px 0; }
+.edit-old-comment { display: flex; gap: 8px; align-items: baseline; margin: 8px 0 0; }
+.edit-old-comment[hidden] { display: none; }
+.edit-comment input { flex: 1; }
+#sheetPanel .item-head { font-weight: 600; }
+#sheetPanel pre { white-space: pre-wrap; margin: 2px 0; font: inherit; font-size: .95rem; }
+#sheetPanel .st-reworded { color: var(--ng); font-weight: 600; }
+#sheetPanel .st-changed { color: var(--ng); font-weight: 600; }
+#sheetPanel .st-done { color: var(--muted); font-weight: 600; }
+/* 見出し（ボタンの数と同じ分け方。2026-10-27） */
+#sheetPanel li.sheet-group { margin-top: 14px; padding: 8px 12px; background: var(--card); border-left: 4px solid var(--accent); font-weight: 600; }
+#sheetPanel li.sheet-group:first-child { margin-top: 4px; }
+#sheetPanel pre.sheet-comment { color: var(--cue); }
+/* エンディング動画のコマ（M1）と絵コンテ（M2）。語り手の画面だけ */
+.seatbar { display: flex; flex-direction: column; gap: 4px; margin-top: 6px; font-size: .9rem; }
+.seat-now { color: var(--muted); overflow-wrap: anywhere; }
+.seat-act { display: flex; gap: 4px; align-items: center; }
+.seat-act input { flex: 1; min-width: 4em; }
+.seat-act button { white-space: nowrap; margin-left: 0; }
+.board { display: grid; grid-template-columns: repeat(auto-fill, minmax(120px, 1fr)); gap: 6px; margin-top: 6px; max-height: 40vh; overflow-y: auto; }
+.board .hint { grid-column: 1 / -1; margin: 0; }
+.board-card { display: flex; flex-direction: column; gap: 2px; padding: 3px; font-size: .8rem; text-align: left; }
+.board-card canvas { width: 100%; height: auto; aspect-ratio: 16 / 9; background: #000; display: block; }
+.board-card.on { outline: 3px solid var(--ng); }
+.board-card.now { border-color: var(--accent); background: var(--accent); color: #fff; }
+
+/* 絵の上で直す（overlay_layout）。⚠️ 枠の中の値は段階0で PowerPoint に合わせたもの——外すとずれる */
+.lay-pane { margin-bottom: 10px; }
+.lay { position: relative; width: 100%; aspect-ratio: 16 / 9; background: #000; overflow: hidden; outline: none; user-select: none; touch-action: none; }
+.lay:focus-visible { box-shadow: 0 0 0 3px var(--cue); }
+.lay img { position: absolute; inset: 0; width: 100%; height: 100%; pointer-events: none; }
+.lay .lay-pic { opacity: .5; z-index: 2; }
+.lay .b { position: absolute; box-sizing: border-box; display: flex; flex-direction: column; overflow: visible; cursor: move; z-index: 1; }
+.lay .b p { margin: 0; line-height: 1.2; position: relative; top: -0.045em; line-break: strict; }
+.lay .b.edited { box-shadow: inset 0 0 0 1px rgba(180, 35, 24, .6); }
+.lay-guide { position: absolute; z-index: 3; pointer-events: none; background: #ff2fd0; }
+.lay-guide.v { top: 0; bottom: 0; left: 50%; width: 1px; }
+.lay-guide.h { left: 0; right: 0; top: 50%; height: 1px; }
+.lay-sel { position: absolute; z-index: 4; box-sizing: border-box; border: 1px dashed #1d9bf0; pointer-events: none; }
+.lay-sel span { position: absolute; width: 12px; height: 12px; margin: -6px; background: #fff; border: 2px solid #1d9bf0; pointer-events: auto; }
+.lay-sel [data-corner="nw"] { left: 0; top: 0; cursor: nwse-resize; }
+.lay-sel [data-corner="ne"] { right: 0; top: 0; margin-right: -6px; cursor: nesw-resize; }
+.lay-sel [data-corner="sw"] { left: 0; bottom: 0; margin-bottom: -6px; cursor: nesw-resize; }
+.lay-sel [data-corner="se"] { right: 0; bottom: 0; margin-right: -6px; margin-bottom: -6px; cursor: nwse-resize; }
+.lay-tools { flex-wrap: wrap; gap: 8px; margin: 6px 0 2px; }
+.lay-fields { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lay-fields input { width: 5.2em; padding: 4px 6px; }
+.lay-colors { display: flex; flex-direction: column; gap: 4px; margin: 4px 0 2px; }
+.lay-color-row { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.lay-color-name { min-width: 5em; }
+.lay-sw { display: inline-flex; flex-wrap: wrap; gap: 4px; }
+.lay-sw button { width: 22px; height: 22px; padding: 0; border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.lay-sw button.on { outline: 2px solid var(--cue); outline-offset: 1px; }
+.lay-colors input[type="color"] { width: 32px; height: 24px; padding: 0; border: 1px solid var(--line); background: none; cursor: pointer; }
+.lay-colors button.mini.on { outline: 2px solid var(--cue); outline-offset: 1px; }
+.lay-contrast { font-size: .9em; }
+.lay-contrast.low { color: var(--ng); font-weight: 600; }
+
+@media (max-width: 1279px) {
+  /* 狭い画面は縦に積む（U10）: 絵 → 戻る／次へ → 札 → 台本。境目は出さない */
+  .show { grid-template-columns: 1fr; }
+  .splitter { display: none; }
+  .notes { height: auto; min-height: 40vh; max-height: 60vh; }
+  .edit-cols { grid-template-columns: 1fr; }
+  .edit-notes { height: 40vh; }
+}
+@media (max-width: 720px) {
+  .room { grid-template-columns: 1fr; }
+}
+
+/* 聞き手 */
+body.listener { background: #000; color: #eee; }
+body.listener main { max-width: 480px; }
+body.listener input { width: 100%; margin: 6px 0 12px; }
+body.listener button.primary { width: 100%; padding: 14px; font-size: 1.1rem; }
+#stage { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; background: #000; }
+#picture { width: 100vw; height: 100vh; height: 100dvh; object-fit: contain; }
+#overlay { position: fixed; left: 16px; right: 16px; bottom: 16px; text-align: center; color: #ddd; pointer-events: none; }
+#overlay button { pointer-events: auto; margin-top: 8px; }
+#overlay .diag { font-size: .75rem; color: #777; margin-top: 6px; overflow-wrap: anywhere; }
+#hint { position: fixed; top: 12px; left: 0; right: 0; text-align: center; color: #888; font-size: .85rem; pointer-events: none; }
+
+/* 動画（段階2） */
+pre.log { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: .85rem; white-space: pre-wrap; overflow-wrap: anywhere; }
+#lvideo, #lposter { width: 100vw; height: 100vh; height: 100dvh; object-fit: contain; background: #000; }
+#lposter { pointer-events: none; }
+
+/* 声（段階3）: 聞き手のマイクのボタン */
+#micBox { position: fixed; top: 10px; right: 10px; text-align: right; z-index: 3; }
+#micBox button { padding: 6px 12px; font-size: .85rem; background: rgba(0,0,0,.55); color: #ddd; border-color: #555; }
+#micBox button.on { border-color: #4ac26b; color: #b7f5c6; }
+#voiceNote { font-size: .75rem; color: #999; margin-top: 4px; max-width: 60vw; }
+#quietNote { font-size: .75rem; color: #e8c46a; margin: 6px 0 4px auto; max-width: 60vw; }
+#micBox #quietBtn { display: block; margin-left: auto; margin-top: 4px; }
+fieldset.mics { border: none; padding: 0; margin: 0 0 12px; display: flex; gap: 16px; flex-wrap: wrap; }
+body.listener fieldset.mics input { width: auto; margin: 0 4px 0 0; }
+
+/* 録画中（録画と練習 G4）: 聞き手の画面の左上に小さく */
+#recBadge { position: fixed; top: 10px; left: 10px; z-index: 3; padding: 3px 10px; border-radius: 12px; background: rgba(0,0,0,.55); color: #ff8a8a; border: 1px solid #a33; font-size: .8rem; pointer-events: none; }
+
+/* 絵の候補を見くらべる（§6 picture の Use）。画面いっぱいに、いまの絵と候補を並べる */
+.cand { position: fixed; inset: 0; z-index: 50; background: var(--bg); padding: 12px 16px; overflow: auto; display: flex; flex-direction: column; gap: 10px; }
+.cand[hidden] { display: none; }
+.cand .grow { flex: 1; }
+.cand-head, .cand-act { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.cand-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.cand-pair figure { margin: 0; min-width: 0; }
+.cand-pair figcaption { color: var(--muted); font-size: .9rem; margin-bottom: 4px; }
+.cand-stage img { object-fit: contain; }
+.cand-stage img.fill { object-fit: fill; }
+.cand-stage .b { cursor: default; }
+@media (max-width: 700px) { .cand-pair { grid-template-columns: 1fr; } }
