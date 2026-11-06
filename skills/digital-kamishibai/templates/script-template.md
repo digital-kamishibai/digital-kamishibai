@@ -98,7 +98,7 @@ A hole may stay empty: write the slide so that it stands without it, and delete 
 > [Text] place middle size 60pt bold
 > ⟨Title as shown on the screen⟩
 
-<!-- Hole: the child is there — something the child loves, in the picture or the music, not by name. -->
+<!-- Hole: the listener is there — something the listener loves (for a group, something the room shares), in the picture or the music, not by name. -->
 
 ⟨Narration. A question the story will answer near the end.⟩
 
@@ -108,7 +108,7 @@ A hole may stay empty: write the slide so that it stands without it, and delete 
 
 ⟨Narration.⟩
 
-<!-- Hole: the parent's own stumble — first person, unfinished, unflattering. Empty is fine. -->
+<!-- Hole: the maker's own stumble — first person, unfinished, unflattering. Empty is fine. -->
 
 ---
 

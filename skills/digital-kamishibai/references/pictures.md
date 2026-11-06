@@ -21,6 +21,8 @@ Keep the prompts in the plan, one per slide, under the markers `### [Prompt styl
 
 - **No real person's name** in a prompt. Describe them instead (age, hair, clothes), or leave them out of the picture.
   Faces of the family's own children are their parents' choice; a back view or a silhouette is often enough.
+  Anyone outside the family (a classmate, a friend's child, a colleague): ask that person first — for a child, their
+  parent or guardian — before their photo or likeness goes into a picture.
 - **No words in the picture.** Generators misspell, and in many languages invent characters. Write in every prompt
   that the picture has no letters, numbers or signs, and put the words in `[Text]` on the slide instead.
 - **Leave a calm band** (sky, wall, sea) where `[Text]` will sit, and say where in the prompt.

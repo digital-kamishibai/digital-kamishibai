@@ -25,8 +25,8 @@ on the spot). Keep the plan in the maker's folder for this work. Every section m
 
 | Hole | What fills it | Where | Status |
 |---|---|---|---|
-| The child is there | ⟨something the child loves — in a picture or a sound, not by name⟩ | ⟨slide⟩ | ⟨filled / empty⟩ |
-| The parent's own stumble | ⟨first person, unfinished, unflattering⟩ | | |
+| The listener is there | ⟨something the listener loves — or, for a group, something the room shares — in a picture or a sound, not by name⟩ | ⟨slide⟩ | ⟨filled / empty⟩ |
+| The maker's own stumble | ⟨first person, unfinished, unflattering⟩ | | |
 | The sounds of the house | ⟨a song the family plays, practises or recommended⟩ | | |
 | Loss and handing on | ⟨only if the maker brought it up; never asked for⟩ | | |
 | The family's record | ⟨photos and videos — usually the ending video⟩ | | |

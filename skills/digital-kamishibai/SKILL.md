@@ -11,7 +11,7 @@ lean-management task board, and not a digitized edition of traditional Japanese 
 
 A kamishibai is a story told aloud over a series of pictures, one picture at a time, usually with music.
 What makes a family's kamishibai work is not the story (that can be borrowed: a piece of science, history, a book)
-but the **holes** in it — the places only this family can fill: the child being there, a parent's own stumble,
+but the **holes** in it — the places only this family can fill: the listener being there, the maker's own stumble,
 the songs of the house, the family's own photos. The pattern language explains them.
 
 ## Files in this folder
@@ -39,7 +39,7 @@ Installed as a plugin, `<repository>` (the ladders) is two folders above it. Whe
 
 ## Before anything else
 
-**Talk in the maker's language.** The maker is the person making this work — a parent or a child.
+**Talk in the maker's language.** The maker is the person making this work — a parent, a child, a teacher, a friend.
 Templates and references are written in English; when you show or fill one, read it into the maker's language
 on the spot. Do not hand the maker an English template to fill in.
 
@@ -52,7 +52,7 @@ Tools read these exactly. If they are translated, the tools find no slides and n
 Slide titles, narration and free cues are written in the maker's language.
 
 **The maker decides.** Whoever brought the idea decides the title, the story, the songs, who narrates and when it is
-performed — whether the maker is a parent or a child. You offer candidates, check facts and write drafts.
+performed — whoever the maker is, a parent or a child included. You offer candidates, check facts and write drafts.
 When there are several good options, lay them out and let the maker choose; do not pick for them.
 If the maker hands a choice back ("just pick one for me"), give your pick with its reason and one alternative,
 and say how to swap it later. It stays their choice.
@@ -84,22 +84,32 @@ Read [references/pattern-language.md](references/pattern-language.md) first. Ask
 in conversation — not as a form:
 
 0. **The way in** (to the maker): *Why do you want to make this kamishibai? Who do you want to hand what to?*
-   Loss and handing on, and the parent's own story, often come up here by themselves. Pick them up; do not dig.
-1. **The sounds of the house** — the lightest question. *What music is playing at home these days? Did a child
-   recommend a song to you?* If the maker already knows, do not ask.
+   Loss and handing on, and the maker's own story, often come up here by themselves. Pick them up; do not dig.
+1. **The sounds of the house** — the lightest question. *What music is playing at home these days? Did someone you
+   are making it for recommend a song to you?* For a group, the music of the place they share.
+   If the maker already knows, do not ask.
 2. **The family's record** — do not ask first; look first. Photos and videos usually exist in large numbers.
-   Ask only about gaps (*Are there other photos from that year?*).
-3. **Where the child is** — questions the **parent asks the child**, at the table, five minutes, without saying why:
-   *What is your favourite … right now? What do you like about it?* You give the parent the questions; you do not
-   interview a child yourself. If the parent wants to quote the child's words in the show, they ask the child first.
-4. **The parent's own stumble** (to a parent maker): *One detour that turned out to matter. One thing you gave up,
+   Ask only about gaps (*Are there other photos from that year?*). For a group, its photos belong to many people
+   (see 3).
+3. **Where the listener is** — it depends on who the show is for:
+   - **A child**: questions the **parent asks the child**, at the table, five minutes, without saying why:
+     *What is your favourite … right now? What do you like about it?* You give the parent the questions; you do not
+     interview a child yourself. If the parent wants to quote the child's words in the show, they ask the child first.
+   - **One adult** (a partner, a friend): start from what the maker already knows — what they love now, a phrase of
+     theirs, a place you went together. If the maker asks the person, it is in passing, without saying why: the show
+     is a gift, and the surprise is part of it.
+   - **A group** (a class, a gathering of adults): what the room shares — a place, a season, something that happened
+     to all of them, a song everyone knows — not what one person loves.
+   - In every case, **anyone else's photo, voice or words** (a classmate, a friend's child, a colleague) is used only
+     after the maker asks that person first — for a child, their parent or guardian.
+4. **The maker's own stumble** (to the maker): *One detour that turned out to matter. One thing you gave up,
    and why. One wall you have not fully climbed yet.* Add the criterion: **unfinished and unflattering** —
-   a failure that was tidied into a success story will not ring true to the children.
+   a failure that was tidied into a success story will not ring true to the listeners.
 
 Rules for the interview:
 
 - **Never ask about loss.** If it comes, it comes in the way in.
-- **A seat in the making is not something you ask for.** If a child or another family member wants to take part
+- **A seat in the making is not something you ask for.** If a child or anyone else the show is for wants to take part
   (narrate, add a seat to the ending video, bring a subject), that is their offer, not your question.
 - **No blockers.** If an answer does not come, write on with the hole empty. Every hole must be optional:
   the story has to stand without it. "Later" is an answer; do not chase it.
@@ -107,13 +117,13 @@ Rules for the interview:
   list the questions you have not asked yet (in the plan and in your reply), for the maker to answer or leave.
   Do not mark a hole "not used" on their behalf.
 - **Ask 2–4 before the plan**, even when the maker does not hurry. Offering story directions or an outline before
-  the family's record, where the child is and the parent's own stumble were asked is going to a draft early: ask
+  the family's record, where the listener is and the maker's own stumble were asked is going to a draft early: ask
   them first, a few at a time. If the maker wants to move on, list the ones not asked in your reply and go on when
   they say so.
 - **Look before saying "there is no record".** The answer is often already written down somewhere.
 - **Check names and numbers with the person** when the draft is read aloud together (times, ages, places).
-- When the maker is a child, the holes are theirs to choose. Questions meant for a parent (the parent's stumble) do
-  not apply unless the child wants them.
+- When the maker is a child, the holes are theirs to choose. The questions about the maker's own stumble are written
+  for adult makers; use them only if the child wants them.
 
 ## 2. Plan
 
@@ -150,15 +160,16 @@ Write `script.md` from [templates/script-template.md](templates/script-template.
 While writing, follow [references/pitfalls.md](references/pitfalls.md). The ones that matter most:
 
 - **Only what the ear can take in.** No slide numbers, no file names, no internal labels in the narration.
-- **Do not point a lesson at one child by name.** Keep naming for a slide of personal thanks or pride.
-  Put the child in the picture or in the music instead. Use the plural "you" when talking to the audience.
+- **Do not point a lesson at one person by name** — a child at home, or anyone in a class or a group.
+  Keep naming for a slide of personal thanks or pride. Put them in the picture or in the music instead.
+  Use the plural "you" when talking to the audience.
 - **Say it in the positive.** "It is not broken" plants "broken". Try the last line of each slide in the positive.
 - **No hype before the point.** Instead of "Now comes the most important part", say what comes, in a few words.
 - **Few questions to the audience.** They stop the narration. Write them as free cues (`>`), not as narration, and
   keep experiments and hands-on demonstrations for after the show.
 - **Do not trust a picture to show a number or a shape.** If the narration says "three bends", someone looks at the
   picture and counts them.
-- **Restate what an earlier work explained** in the words it used then; the children may have forgotten.
+- **Restate what an earlier work explained** in the words it used then; the listeners may have forgotten.
 
 Show the maker the draft slide by slide or all at once, as they prefer. Their wording wins over yours.
 
@@ -181,7 +192,7 @@ Checking before saves remaking what was already made.
 
 ## The maker's role
 
-- **Whoever brought it decides.** Title, angle, songs, narrator and date belong to the maker, parent or child.
+- **Whoever brought it decides.** Title, angle, songs, narrator and date belong to the maker, whoever they are.
 - You stop at **candidates, checks and drafts**. Say what you would choose and why, when asked; then step back.
 - When a child is the maker, the same holds. Do not steer the work toward what a parent would make.
 
@@ -263,7 +274,7 @@ After the show, ask the maker (and anyone else who could see the audience) these
 "Nothing in particular" is an answer — write it down too; do not invent lessons.
 
 1. Where during the show did you think "oops"?
-2. Where did the children lean in, and where did they drift? Was it what you expected?
+2. Where did the listeners lean in, and where did they drift? Was it what you expected?
 3. Music, sound effects, videos: what did you learn only by playing them?
 4. How did the pictures and videos **look** — smooth motion, stutter, colours, orientation? (Do not ask only about sound.)
 5. How did the length feel, against the plan?

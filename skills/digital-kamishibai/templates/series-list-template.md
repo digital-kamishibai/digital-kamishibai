@@ -18,7 +18,7 @@ When:
 | ⟨title⟩ | | | | | |
 
 - **What people and things were called**: the same person or thing keeps the same name across works (a grandparent,
-  a pet, a nickname for a machine), so the children recognise it.
+  a pet, a nickname for a machine), so the listeners recognise it.
 - **Songs**: a family often comes to hear one artist or one song as "the sound of" a person or a moment. Note it, so a
   later work can use it on purpose — or avoid it on purpose.
 - A hint that a later work paid off: mark it as paid, with the work that did it.

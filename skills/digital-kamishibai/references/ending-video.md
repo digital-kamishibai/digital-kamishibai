@@ -8,14 +8,16 @@ It is optional, like every hole. Offer it; do not push it.
 ## Choosing
 
 - **The form**: the family's record × one song. After the story, not inside it.
-- **The song**: one the family already lives with — a song a child recommended, one that plays at home. The maker
+- **The song**: one the family already lives with — a song someone the show is for recommended, one that plays at home. The maker
   chooses. Songs with lyrics are fine here: nobody is narrating.
 - **The seats**: think of the song as a row of seats (a few seconds each) and the photos as who sits where. A quiet
   intro wants one picture held long; a chorus can carry many quick ones. Line the biggest moment of the song up with
   the picture that matters most.
 - **The same material works again** in another work with another song. Do not think "we already used those".
-- **Leave room for a child to add a seat** (their own photo, their own clip) — only if they want to. Do not ask.
+- **Leave room for a listener to add a seat** (their own photo, their own clip) — only if they want to. Do not ask.
 - **Whose photos**: the parent decides which photos of the children are used; a child decides about their own.
+  Photos and clips of anyone outside the family (a class, a group of friends) are used only after asking each person
+  first — for a child, their parent or guardian.
 
 ## Checking the material
 

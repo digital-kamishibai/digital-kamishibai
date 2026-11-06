@@ -14,7 +14,7 @@ Most of these were found only after the work was finished — which is why they 
 | [No designed emotional curve](#no-designed-emotional-curve) | plan |
 | [A negative plants what it denies](#a-negative-plants-what-it-denies) | script |
 | [Hype instead of a heading](#hype-instead-of-a-heading) | script |
-| [Pointing the lesson at one child](#pointing-the-lesson-at-one-child) | plan, script |
+| [Pointing the lesson at one listener](#pointing-the-lesson-at-one-listener) | plan, script |
 | [Trusting the picture to show what the narration says](#trusting-the-picture-to-show-what-the-narration-says) | plan, pictures |
 | [Walking on eggshells](#walking-on-eggshells) | plan, script |
 | [Music](#music) | plan |
@@ -57,7 +57,7 @@ Most of these were found only after the work was finished — which is why they 
 
 ## Too many questions to the audience
 
-- **What happens**: questions to the children are scattered through the narration, then cut just before or after the show.
+- **What happens**: questions to the listeners are scattered through the narration, then cut just before or after the show.
 - **Why**: a question looks good on the page but **stops the narration** in the room. Nobody counted them.
 - **What to do**: set a maximum in the plan, with where each goes and who answers. Write them as free cues (`>`),
   not as narration. **Experiments and hands-on demonstrations go after the show**, all in one place.
@@ -81,7 +81,7 @@ Most of these were found only after the work was finished — which is why they 
 
 - **What happens**: a work "pays off" a hint from an earlier work that the earlier work never contained. Or it explains
   something again in new words, so there are two versions. Or it only points ("remember from last time?") and the
-  children have forgotten, so nothing after it makes sense.
+  listeners have forgotten, so nothing after it makes sense.
 - **Why**: nobody keeps a list of what earlier works said. Writing from memory pays off the work in the writer's head.
 - **What to do**: keep a short list of what each work introduced (ideas, comparisons, hints). **Open the earlier work
   and find the hint before paying it off.** When an earlier idea is needed again, **say it again, in the words used
@@ -123,17 +123,18 @@ Most of these were found only after the work was finished — which is why they 
   - **Shorten words, never steps of a cause.** "Hitting a wall makes you stronger" is false; *getting over* it does.
     Read the shortened sentence alone and ask: is this true?
 
-## Pointing the lesson at one child
+## Pointing the lesson at one listener
 
-- **What happens**: on the slide meant for one particular child, the narration names that child.
-- **Why**: the writer wants to be sure it reaches them. But **pointed at, a child hears an explanation; not pointed at,
-  the child makes a discovery.** Nothing breaks when this goes wrong — the effect just quietly disappears.
+- **What happens**: on the slide meant for one particular listener — a child at home, or one person in a class or a
+  group — the narration names them.
+- **Why**: the writer wants to be sure it reaches them. But **pointed at, a listener hears an explanation; not pointed
+  at, they make a discovery.** In a group it weighs more: they are singled out in front of people who are not family. Nothing breaks when this goes wrong — the effect just quietly disappears.
 - **What to do**:
   1. Save naming for a slide of personal messages (recognition, not a lesson).
-  2. Do not deny a premise about the child (see above).
+  2. Do not deny a premise about them (see above).
   3. **No singular "you"** in the room: it singles someone out. Use the plural.
-  4. Something a child is practising is **played or shown**, not talked about.
-  Whether something singles a child out depends on who is in the room, so no tool can check it: read those slides once
+  4. Something they are practising is **played or shown**, not talked about.
+  Whether something singles someone out depends on who is in the room, so no tool can check it: read those slides once
   with the room in mind.
 
 ## Trusting the picture to show what the narration says
@@ -150,14 +151,14 @@ Most of these were found only after the work was finished — which is why they 
 
 ## Walking on eggshells
 
-- **What happens**: a subject touches something tender for one child (a low score, a weak point, a hard time), so
+- **What happens**: a subject touches something tender for one listener (a low score, a weak point, a hard time), so
   the plan grows a list of things not to mention, then another, and the work turns timid. It loses what made it worth
   watching.
 - **Why**: each caution looks harmless on its own. Nobody counts them; an AI helping with the plan tends to add more.
 - **What to do**: draw **one line** — the one that really matters (for example: that child's own answers and the
   family's story about them are not told on stage). Everything else is told straight, as science or as a story.
   When "do not touch" items start to multiply, take it as the sign of too much care, not too little.
-  What a parent wants to reach one child indirectly travels best in the parent's own first-person story
+  What the maker wants to reach one listener indirectly travels best in the maker's own first-person story
   (`pattern-language.md`), not in more cautions.
 
 ## Music
