@@ -15,6 +15,10 @@ You may share and adapt them for any purpose, including commercially, as long
 as you give credit ("Digital Kamishibai, by Fast Focus Technologies") and a
 link to this repository, and say whether you changed them.
 
+The images and animations under docs/images/ (screenshots and previews for the
+README) are dedicated to the public domain under CC0 1.0
+(https://creativecommons.org/publicdomain/zero/1.0/).
+
 Everything else (the player, the worker, the scripts and the tests) is under
 the MIT License in LICENSE.
 

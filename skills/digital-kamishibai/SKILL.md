@@ -1,13 +1,13 @@
 ---
 name: digital-kamishibai
-description: Help a family make a picture-story show (kamishibai) for its own children — from the first "why do I want to make this?" through the interview, the plan, the script, checking the facts, the performance and a short retro. Use when someone wants to make, plan, write, revise, practise or perform a family kamishibai or picture-story show, or asks how to put their family into a story for their children — including when they bring a seed or idea for a new work, a plan, a script.md or a work folder, ask for picture prompts, music or an ending video for one, or work on a parent's or a child's kamishibai. Also use when someone pastes or points to a correction sheet ("# Correction sheet: ...") from the room player.
+description: Help someone make a picture-story show (kamishibai) for the people close to them — their children, a partner, friends, a class or a group of adults — from the first "why do I want to make this?" through the interview, the plan, the script, checking the facts, the performance and a short retro. Use when someone wants to make, plan, write, revise, practise or perform a kamishibai or picture-story show for a family, a class or friends, or asks how to put their family or their own life into a story for the people around them — including when they bring a seed or idea for a new work, a plan, a script.md or a work folder, ask for picture prompts, music or an ending video for one, or work on a parent's or a child's kamishibai. Also use when someone pastes or points to a correction sheet ("# Correction sheet: ...") from the room player.
 ---
 
 # Digital Kamishibai
 
-*Digital Kamishibai here is a picture-story show a family builds **for its own children** — written by a parent,
-and often, in time, narrated by the children themselves — not a lean-management task board, and not a digitized
-edition of traditional Japanese street kamishibai.*
+*Digital Kamishibai here is a picture-story show you make **for the people close to you** — your children, a partner,
+friends, a class, or a group of adults (in a family, the children often take a turn as narrator in time) — not a
+lean-management task board, and not a digitized edition of traditional Japanese street kamishibai.*
 
 A kamishibai is a story told aloud over a series of pictures, one picture at a time, usually with music.
 What makes a family's kamishibai work is not the story (that can be borrowed: a piece of science, history, a book)
