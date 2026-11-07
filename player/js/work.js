@@ -135,6 +135,24 @@ function layoutErrors(s) {
   return errors;
 }
 
+/** showDirectoryPicker で選んだフォルダの中身を、<input webkitdirectory> と同じ形（path は選んだフォルダの名前から）にする */
+export async function dirEntries(dir, base = dir.name) {
+  const out = [];
+  for await (const [name, h] of dir.entries()) {
+    const path = base + '/' + name;
+    if (h.kind === 'file') out.push({ path, file: await h.getFile() });
+    else out.push(...await dirEntries(h, path));
+  }
+  return out;
+}
+
+/** findWorkJson の base（選んだフォルダの名前から始まる）が指すフォルダ。親のフォルダを選んだときは、work.json のあるフォルダまで下りる */
+export async function workDirOf(dir, base) {
+  let d = dir;
+  for (const name of base.split('/').slice(1)) d = await d.getDirectoryHandle(name);
+  return d;
+}
+
 /** 選ばれたファイル群から「基準フォルダからの相対パス → File」の表を作る。
  *  base: 相対パスの起点（work.json のあるフォルダ。素材フォルダだけを選んだときは選んだフォルダ）。 */
 export function fileMap(entries, base) {

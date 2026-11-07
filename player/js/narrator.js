@@ -2,7 +2,7 @@
 // 画面は「準備・受付・上演」の3つを同じページの中で切り替える（語り手の画面の作り直し U1。ページを移ると接続が切れる）。
 import './https.js';
 import { t, applyI18n } from './i18n.js';
-import { validateWork, fileMap, findWorkJson, resolvePictures, resolveVideos, resolveAudio, resolveBases, resolveCandidates, videoId, uniqueById, seatAt, toSource } from './work.js';
+import { validateWork, fileMap, findWorkJson, dirEntries, workDirOf, resolvePictures, resolveVideos, resolveAudio, resolveBases, resolveCandidates, videoId, uniqueById, seatAt, toSource } from './work.js';
 import {
   createSession, onHello, approve, reject, onGot, onGone, goTo, approvedCount, wouldExceed,
   mayOpenBulk, onHave, onVideoFail, playVideo, onSync,
@@ -38,6 +38,7 @@ const $ = (id) => document.getElementById(id);
 let work = null;
 let workMap = new Map();
 let mediaMap = new Map();
+let workDir = null;                // 作品フォルダそのもの（showDirectoryPicker で選べたときだけ）。修正票の保存先の最初の場所
 let pictures = new Map();          // 番号 → { key, file, mime, size }
 let videos = [];                   // [{ id, kind: 'video', n, key, file, size, mime, problem }]
 let audios = [];                   // [{ id, kind: 'audio', key, file, size, mime, problem }]（BGM・効果音。段階4）
@@ -112,10 +113,39 @@ function entriesOf(input) {
   return [...input.files].map((file) => ({ path: file.webkitRelativePath || file.name, file }));
 }
 
-/** 選んだフォルダから work.json を読んで検査する → { work, map } か、読めなければ null（理由は出す） */
-async function readWorkFolder(input) {
+function takeEntries(input) {
   const entries = entriesOf(input);
   input.value = '';
+  return entries;
+}
+
+/** 作品フォルダの選び方。showDirectoryPicker があればそれで選ぶ（フォルダそのものが手に入り、修正票の保存画面を作品フォルダで開ける。
+ *  <input webkitdirectory> ではファイルしか受け取れず、保存画面がブラウザの前に使った場所で開いて、作品の外に保存された。2026-11-07 実機で）。
+ *  無いブラウザ・キャンセルできない場面では、いままでどおり input の change で受け取る */
+function pickFolder(input, open) {
+  input.addEventListener('click', async (e) => {
+    if (typeof window.showDirectoryPicker !== 'function') return;
+    e.preventDefault();
+    let dir;
+    try {
+      dir = await window.showDirectoryPicker({ id: 'dk-work' });
+    } catch (err) {
+      if (!(err && err.name === 'AbortError')) showLoadError([String((err && err.message) || err)]);
+      return;
+    }
+    let entries;
+    try {
+      entries = await dirEntries(dir);
+    } catch (err) {
+      return showLoadError([String((err && err.message) || err)]);
+    }
+    await open(entries, dir);
+  });
+  input.addEventListener('change', (e) => open(takeEntries(e.target), null));
+}
+
+/** 選んだフォルダから work.json を読んで検査する → { work, map, dir } か、読めなければ null（理由は出す） */
+async function readWorkFolder(entries, dir) {
   const found = findWorkJson(entries.map((x) => x.path));
   if (!found) { showLoadError([t('noWorkJson')]); return null; }
   let json;
@@ -127,17 +157,20 @@ async function readWorkFolder(input) {
   }
   const { work: w, errors } = validateWork(json);
   if (errors.length) { showLoadError([t('badWork'), ...errors]); return null; }
-  return { work: w, map: fileMap(entries, found.base) };
+  let d = null;
+  if (dir) { try { d = await workDirOf(dir, found.base); } catch { d = null; } }
+  return { work: w, map: fileMap(entries, found.base), dir: d };
 }
 
-$('pickWork').addEventListener('change', async (e) => {
+pickFolder($('pickWork'), async (entries, dir) => {
   // 受付中に作品を選び直すと、聞き手へ配った絵・動画の一覧と食い違う（E10）
-  if (peer) { e.target.value = ''; return showLoadError([t('workLocked')]); }
-  const r = await readWorkFolder(e.target);
+  if (peer) return showLoadError([t('workLocked')]);
+  const r = await readWorkFolder(entries, dir);
   if (!r) return;
   closeEditor({ type: 'cancel' });
   work = r.work;
   workMap = r.map;
+  workDir = r.dir;
   mediaMap = new Map();
   sheet = loadSheet(work);
   // 開いたときも、修正票を作品と照らし合わせる（反映済みは消す）。読み直すときだけだと、ページを開き直して選んだ作品に
@@ -155,9 +188,9 @@ $('pickWork').addEventListener('change', async (e) => {
 });
 
 // 作品を読み直す（E10）: 練習中だけ。今の画面にとどまり、今の枚を保つ。修正票を読み直した作品と比べる
-$('reloadWork').addEventListener('change', async (e) => {
-  if (!mayReload({ hasWork: !!work, roomOpen: !!peer })) { e.target.value = ''; return note2(t('workLocked')); }
-  const r = await readWorkFolder(e.target);
+pickFolder($('reloadWork'), async (entries, dir) => {
+  if (!mayReload({ hasWork: !!work, roomOpen: !!peer })) return note2(t('workLocked'));
+  const r = await readWorkFolder(entries, dir);
   if (!r) return setScreen('prep'); // 読めなかった理由は準備の画面に出ている（今の作品はそのまま）
   await reloadWith(r);
 });
@@ -171,6 +204,7 @@ async function reloadWith(r) {
   const oldTitle = work.title;
   work = r.work;
   workMap = r.map; // 素材フォルダを別に選んでいたら、それはそのまま使う
+  workDir = r.dir;
   let msg = '';
   if (sheetEnabled(work)) {
     const rv = resolveVideos(work, [workMap, mediaMap]);
@@ -1483,7 +1517,9 @@ $('sheetSave').addEventListener('click', async () => {
   const name = sheetName(work.title, new Date());
   try {
     if (typeof window.showSaveFilePicker === 'function') {
-      const h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }] });
+      // 作品フォルダで開く（直下に置くと、書き戻す人が作品の隣で見つけられる）。録画は大きいので作品フォルダへ寄せない
+      const h = await window.showSaveFilePicker({ suggestedName: name, ...(workDir ? { startIn: workDir } : {}),
+        types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }] });
       const w = await h.createWritable();
       await w.write(text);
       await w.close();

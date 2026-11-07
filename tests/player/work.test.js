@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { validateWork, fileMap, findWorkJson, resolvePictures, resolveVideos, resolveAudio, resolveBases, resolveCandidates, uniqueById, seatAt, toSource } from '../../player/js/work.js';
+import { validateWork, fileMap, findWorkJson, resolvePictures, resolveVideos, resolveAudio, resolveBases, resolveCandidates, uniqueById, seatAt, toSource, dirEntries, workDirOf } from '../../player/js/work.js';
 
 const sample = JSON.parse(readFileSync(new URL('../../examples/sample-story/work.json', import.meta.url), 'utf8'));
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -327,4 +327,25 @@ test('絵の候補: pictures/_candidates/NN-K を新しい K から・ほかの�
   assert.deepEqual(list.map((c) => c.mime), ['image/webp', 'image/png', 'image/jpeg', 'image/png']);
   assert.deepEqual(resolveCandidates(12, [work]), []);
   assert.deepEqual(resolveCandidates(6, [work]).map((c) => c.key), ['pictures/_candidates/06-1.png']);
+});
+
+// showDirectoryPicker の代わり（フォルダ＝{ 名前: 中身 }、ファイル＝文字列）
+const fakeDir = (name, tree) => ({
+  kind: 'directory', name,
+  async *entries() {
+    for (const [k, v] of Object.entries(tree)) {
+      yield [k, typeof v === 'string' ? { kind: 'file', name: k, getFile: async () => ({ name: k, text: async () => v }) } : fakeDir(k, v)];
+    }
+  },
+  async getDirectoryHandle(k) { if (typeof tree[k] !== 'object') throw new Error('NotFound'); return fakeDir(k, tree[k]); },
+});
+
+test('選んだフォルダの中身は webkitdirectory と同じ形のパスになる', async () => {
+  const d = fakeDir('works', { a: { 'work.json': '{}', pictures: { '01.png': 'x' } } });
+  const entries = await dirEntries(d);
+  assert.deepEqual(entries.map((x) => x.path).sort(), ['works/a/pictures/01.png', 'works/a/work.json']);
+  const found = findWorkJson(entries.map((x) => x.path));
+  assert.equal(found.base, 'works/a');
+  assert.equal((await workDirOf(d, found.base)).name, 'a', '親を選んでも、修正票の保存先は work.json のあるフォルダ');
+  assert.equal((await workDirOf(d, 'works')).name, 'works');
 });

@@ -436,6 +436,8 @@ a chat AI, which then edits the source. The work is built again and opened again
 The player keeps the sheet in the browser, keyed by the work's `title`, and reads or writes it **only for a draft**
 (so a family member practising the handed-out version of the same work never sees unfinished corrections).
 It never leaves the narrator's device except when the narrator copies it or saves it to a file.
+Where the browser lets the player open the work folder itself (`showDirectoryPicker`), the save dialog starts in the
+work folder (the one with `work.json`), so the sheet lands next to the source, where the person writing it back looks for it.
 
 ```````markdown
 # Correction sheet: The Lighthouse Keeper's Lamp (2026-10-25 21:04)
