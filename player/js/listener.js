@@ -12,6 +12,7 @@ import { openStore, freeSpace } from './store.js';
 import { createEngine } from './engine.js';
 import { makeView, viewChanged } from './view.js';
 import { beep, measure } from './tone.js';
+import { LinkPlayer, loadApi, atEnd, isCaptions } from './ytlink.js';
 
 applyI18n();
 const $ = (id) => document.getElementById(id);
@@ -37,6 +38,11 @@ let main = null;          // 語り手との合図用の接続
 let narrator = '';        // 語り手の peer ID
 let prepared = false;     // 動画の申告を済ませたか
 const vEl = $('lvideo');
+// リンクの動画（YouTube の埋め込み）。ファイルは受け取らず、この端末が YouTube から流す
+const links = new Map();  // id → { id, n, yt, start, end }
+const lp = new LinkPlayer($('llinkFrame'), { follow: true });
+let linkOn = false;       // 埋め込みを見せている（語り手がリンクの動画を始めている）
+let playTimer = 0;        // 流せと言われたのに流れない（自動再生を止められた）のを見る
 // 音（段階4）
 const engine = createEngine();
 let lastA = null;         // 最後に届いた BGM の合図
@@ -298,6 +304,7 @@ function handle(conn, msg, narratorId) {
       // 当日の音量つまみ（L5）。⚠️ iPhone の Safari は動画の音量（volume）を無視する——家族に iPhone は無い（2026-10-24）
       engine.setMusic(Number(msg.music));
       vEl.volume = Math.min(1, Math.max(0, Number(msg.video)));
+      lp.volume = vEl.volume;
       break;
     case 'bye':
       lost(conn, t('showEnded'));
@@ -330,6 +337,15 @@ function handle(conn, msg, narratorId) {
       for (const v of Array.isArray(msg.videos) ? msg.videos : []) {
         vids.set(String(v.id), { id: String(v.id), kind: 'video', n: v.n, size: Number(v.size) || 0, mime: String(v.mime || 'video/mp4'), mode: null, bytes: 0, url: null });
       }
+      links.clear();
+      for (const l of Array.isArray(msg.links) ? msg.links : []) {
+        if (l && typeof l.id === 'string' && typeof l.yt === 'string') {
+          links.set(l.id, { id: l.id, n: Number(l.n), yt: l.yt, start: Number(l.start) || 0, end: Number.isFinite(l.end) ? l.end : null,
+            captions: isCaptions(l.captions) ? l.captions : null });
+        }
+      }
+      // 埋め込みを使う作品なら、API を先に読む。読めない端末（ネットに出られない・遮られている）は語り手に知らせる
+      if (links.size) loadApi().catch(() => tellLink('*', 'api'));
       $('tapSound').hidden = engine.unlocked || ![...vids.values()].some((v) => v.kind === 'audio');
       welcomed = true;
       $('micBox').hidden = false;
@@ -337,6 +353,7 @@ function handle(conn, msg, narratorId) {
       lastView = null; // 承認し直した（入り直した）ときは、語り手の記録が新しいので必ず送る
       showStatus();
       maybePrepare();
+      prepareLink();
       break;
     case 'pic': {
       if (!Number.isInteger(msg.n) || !msg.data) break;
@@ -351,7 +368,7 @@ function handle(conn, msg, narratorId) {
       break;
     }
     case 'slide':
-      if (Number.isInteger(msg.n)) { slide = msg.n; show(); }
+      if (Number.isInteger(msg.n)) { slide = msg.n; show(); prepareLink(); }
       break;
     case 'vmode': {
       const v = vids.get(String(msg.id));
@@ -382,7 +399,7 @@ function handle(conn, msg, narratorId) {
 function show() {
   const u = pics.get(slide);
   const img = $('picture');
-  if (u && vEl.hidden) { img.src = u; img.hidden = false; $('hint').hidden = !!document.fullscreenElement; }
+  if (u && vEl.hidden && !linkOn) { img.src = u; img.hidden = false; $('hint').hidden = !!document.fullscreenElement; }
   else if (!u) img.hidden = true;
   showPoster();
   report();
@@ -392,7 +409,7 @@ function show() {
  *  保存済みの動画がある端末だけ。まだ届いていない・「その場で流す」の端末は黒のまま */
 function showPoster() {
   const el = $('lposter');
-  const v = !picSlides.has(slide) && vEl.hidden
+  const v = !picSlides.has(slide) && vEl.hidden && !linkOn
     ? [...vids.values()].find((x) => x.kind === 'video' && x.n === slide && x.url) : null;
   if (!v) {
     if (!el.hidden) { el.hidden = true; el.removeAttribute('src'); el.dataset.src = ''; }
@@ -408,7 +425,7 @@ $('lposter').addEventListener('loadedmetadata', () => { $('lposter').currentTime
  *  ⚠️ 中身は状態の名前と数だけ。画面を映像で送り返すと回線と電池を食い、子供の端末の画面を語り手が覗く形にもなる */
 function report() {
   if (!welcomed || !main || !main.open) return;
-  const playingVideo = !vEl.hidden && (vEl.dataset.src || vEl.srcObject);
+  const playingVideo = linkOn || (!vEl.hidden && (vEl.dataset.src || vEl.srcObject));
   const media = [...vids.values()].filter((v) => v.mode !== 'stream' && store);
   const hasAudio = [...vids.values()].some((v) => v.kind === 'audio');
   // 保存できない端末（store＝null）・音を「その場で流す」に回された端末は鳴らない。保存先を開く前（undefined）は鳴る見込みとして扱う
@@ -418,7 +435,8 @@ function report() {
     // 絵の無い枚（動画だけの枚）で再生前に黒い画面なのは、届いていないのではなく、それが正しい見え方（札を色つきにしない）。
     // 保存済みの動画がある端末は最初のコマを出す（showPoster）。届いていない端末は黒で、それも正しい見え方
     picture: (!$('picture').hidden && pics.has(slide)) || !picSlides.has(slide),
-    video: playingVideo ? { local: !!vEl.dataset.src && !vEl.srcObject, stream: !!vEl.srcObject, playing: !vEl.paused } : null,
+    video: !playingVideo ? null : linkOn ? { local: true, stream: false, playing: !lp.paused }
+      : { local: !!vEl.dataset.src && !vEl.srcObject, stream: !!vEl.srcObject, playing: !vEl.paused },
     waiting: !!(lastV && lastV.id) && !playingVideo,
     sound: !audioOk ? 'none' : engine.unlocked ? 'on' : 'tap',
     mic: micState,
@@ -456,6 +474,9 @@ function resetVideos() {
   vEl.removeAttribute('src');
   vEl.srcObject = null;
   vEl.hidden = true;
+  links.clear();
+  lp.unload();
+  hideLink();
   showPoster();
 }
 
@@ -564,6 +585,8 @@ $('tapSound').addEventListener('click', (e) => { e.stopPropagation(); unlockSoun
 
 function refreshVideo() {
   const m = lastV;
+  if (m && m.id && links.has(m.id)) return refreshLink(m);
+  hideLink();
   if (!m || !m.id) {
     if (!vEl.hidden) { vEl.pause(); vEl.hidden = true; }
     $('tapPlay').hidden = true;
@@ -607,6 +630,86 @@ function refreshVideo() {
   report();
 }
 
+// ---------- リンクの動画（YouTube の埋め込み。work-format §2.4） ----------
+// 合図はファイルの動画と同じ（vstate）。違うのは、動画を受け取らず、この端末が YouTube から流すことだけ
+
+/** いまの枚のリンクの動画を、流す前に読み込んでおく（流せない端末なら、語り手が押す前に分かる） */
+function prepareLink() {
+  if (!welcomed || linkOn) return;
+  const first = [...links.values()].find((l) => l.n === slide);
+  if (first) lp.load(first);
+  else lp.unload();
+}
+
+/** 語り手へ、リンクの動画を流せるかを知らせる（id＝'*' は埋め込みそのもの） */
+function tellLink(id, reason) {
+  if (main && main.open) main.send({ t: 'link', id, ok: !reason, reason: reason || undefined });
+}
+lp.addEventListener('ready', () => { tellLink('*', null); if (lp.item) tellLink(lp.item.id, null); refreshVideo(); });
+lp.addEventListener('error', () => {
+  if (lp.error === 'api') tellLink('*', 'api');
+  else if (lp.item) tellLink(lp.item.id, lp.error);
+  refreshVideo();
+});
+lp.addEventListener('play', () => {
+  clearTimeout(playTimer);
+  $('tapPlay').hidden = true;
+  if (lp.item && lp.told === 'stall') { lp.told = null; tellLink(lp.item.id, null); } // 始まらなかったのが始まった
+  report();
+  refreshVideo();
+});
+// 流せと言われたのに始まらない（広告・読み込みで止まった）。語り手の画面にも出す
+lp.addEventListener('stall', () => {
+  if (!lp.item) return;
+  lp.told = 'stall';
+  tellLink(lp.item.id, 'stall');
+  $('tapPlay').hidden = false;
+});
+lp.addEventListener('pause', report);
+
+function hideLink() {
+  if (!linkOn) return;
+  linkOn = false;
+  clearTimeout(playTimer);
+  lp.pause();
+  $('llink').classList.add('off');
+  $('tapPlay').hidden = true;
+  show();
+}
+
+function refreshLink(m) {
+  if (!vEl.hidden) { vEl.pause(); vEl.hidden = true; }
+  const item = links.get(m.id);
+  if (!lp.item || lp.item.id !== item.id) lp.load(item);
+  if (lp.error) {
+    // 流せない（埋め込みを禁じられた・ネットに出られない）。絵のまま、わけを1行出す。語り手の画面にも出ている
+    if (linkOn) hideLink();
+    status(t('linkCannot', t('linkWhy_' + lp.error)));
+    report();
+    return;
+  }
+  if (!lp.ready) { status(t('videoNotYet')); report(); return; } // 読み込めたら 'ready' でもう一度来る
+  if (!linkOn) {
+    linkOn = true;
+    $('llink').classList.remove('off');
+    $('picture').hidden = true;
+    $('hint').hidden = true;
+    showPoster();
+  }
+  const now = m.playing ? { ...m, pos: m.pos + (performance.now() - m.at) / 1000 } : m;
+  const a = apply({ pos: lp.currentTime, paused: lp.paused }, now);
+  if (a.seek != null) lp.currentTime = a.seek;
+  // 止める秒に着いたあとの合図で、頭から流し直さない（この端末が語り手より少し先に着いたとき）
+  if (a.play === true && !atEnd(now.pos, lp.cut)) {
+    lp.play();
+    clearTimeout(playTimer);
+    playTimer = setTimeout(() => { if (lp.paused && lastV && lastV.playing && linkOn) $('tapPlay').hidden = false; }, 4000);
+  }
+  if (a.play === false) lp.pause();
+  status('');
+  report();
+}
+
 // 再生が始まった（頭出しの読み込みが済んだ）ら、もう一度位置を合わせる。読み込みのあいだに語り手は先へ進んでいる。
 // 2回目の頭出しは読み込み済みなので速い。ずれが1秒未満なら何もしないので、繰り返しにはならない
 vEl.addEventListener('playing', () => { if (lastV && lastV.playing && vEl.src) refreshVideo(); });
@@ -618,7 +721,11 @@ function tryPlay() {
 }
 
 // iPhone などは、画面をタップしたあとでないと音つきで再生できない
-$('tapPlay').addEventListener('click', (e) => { e.stopPropagation(); tryPlay(); refreshVideo(); });
+$('tapPlay').addEventListener('click', (e) => {
+  e.stopPropagation();
+  if (linkOn) lp.play(); else tryPlay();
+  refreshVideo();
+});
 
 // 上演が終わったら消せる（r13。保存が日をまたいで残ることは当てにしない）
 $('clearVideos').addEventListener('click', async (e) => {
@@ -640,4 +747,4 @@ $('stage').addEventListener('click', () => {
 document.addEventListener('fullscreenchange', () => { $('hint').hidden = !!document.fullscreenElement || $('picture').hidden; });
 
 // 自動テスト用（?test のときだけ）
-if (TEST) window.__dkl = { audio: () => engine.state(), view: () => lastView, fakeHeard: null, voiceStream: () => voiceEl.srcObject };
+if (TEST) window.__dkl = { link: () => ({ on: linkOn, id: lp.item && lp.item.id, ready: lp.ready, error: lp.error, playing: !lp.paused, pos: lp.currentTime, state: lp.state(), captions: lp.captionsNow(), tap: !$('tapPlay').hidden }), audio: () => engine.state(), view: () => lastView, fakeHeard: null, voiceStream: () => voiceEl.srcObject };

@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createSession, onHello, approve, reject, goTo, onGot, wouldExceed, welcomeMessage,
   mayOpenBulk, onHave, onVideoFail, playVideo, onSync,
-  knownToken, staleTwins, startShow, slideAudio, videoAudio, talkMessage, audioTick, setVolume,
+  knownToken, staleTwins, startShow, slideAudio, videoAudio, talkMessage, audioTick, setVolume, onLink,
 } from '../../player/js/protocol.js';
 
 const work = {
@@ -64,7 +64,7 @@ test('R1: 聞き手へ出ていくものに台本・合図・パスが含まれ�
   assert.ok(!text.includes('draft'));
   assert.ok(!text.includes('sounds/'));
   assert.ok(!text.includes('pictures/'));
-  assert.deepEqual(Object.keys(welcomeMessage(work, pictures)).sort(), ['audio', 'count', 'pictures', 't', 'title', 'videos']);
+  assert.deepEqual(Object.keys(welcomeMessage(work, pictures)).sort(), ['audio', 'count', 'links', 'pictures', 't', 'title', 'videos']);
 });
 
 test('R1: エンディング動画の席・写真の名前・元の動画の区間は聞き手へ出ていかない（work-format §3.3）', () => {
@@ -319,4 +319,51 @@ test('入り直した端末と同じ合い札の古い記録を見つける（�
   onHello(s, 'new', { token: tok });
   assert.deepEqual(staleTwins(s, 'new', tok), ['old']);
   assert.deepEqual(staleTwins(s, 'new', 'q'.repeat(32)), []);
+});
+
+// ---------- リンクの動画（work-format §2.4・§3.3） ----------
+
+const linkWork = {
+  format: 'digital-kamishibai/work', version: 1, title: 'T', language: 'en',
+  slides: [
+    { number: 1, title: 'A', picture: 'pictures/01.jpg', notes: 'SECRET NOTES', cues: [] },
+    { number: 2, title: 'B', picture: 'pictures/02.jpg', notes: '', cues: [
+      { type: 'video', file: 'videos/SECRET_FILE.mp4' },
+      { type: 'video', url: 'https://www.youtube.com/watch?v=8KkKuTCFvzI&list=SECRETLIST', start: 351, end: 369, captions: 'ja' },
+    ] },
+    { number: 3, title: 'C', picture: null, notes: '', cues: [{ type: 'video', url: 'https://youtu.be/dCVlRFWOjgE' }] },
+  ],
+};
+
+test('リンクの動画は、YouTube の ID と流す範囲だけが聞き手へ届く（リンクの文字そのものは送らない）', () => {
+  const s = createSession(1);
+  const out = [...onHello(s, 'a', {}), ...approve(s, 'a', linkWork, new Map())];
+  const welcome = out.find((o) => o.msg.t === 'welcome').msg;
+  assert.deepEqual(welcome.links, [
+    { id: 'link-2-2', n: 2, yt: '8KkKuTCFvzI', start: 351, end: 369, captions: 'ja' },
+    { id: 'link-3-1', n: 3, yt: 'dCVlRFWOjgE', start: 0, end: null, captions: null },
+  ]);
+  const text = everything(out);
+  for (const secret of ['SECRETLIST', 'youtube.com', 'youtu.be', 'SECRET_FILE', 'SECRET NOTES']) assert.ok(!text.includes(secret), secret);
+});
+
+test('リンクの動画を流せるかの知らせは、承認済みの端末のものだけ受ける（R7）', () => {
+  const s = createSession(2);
+  onHello(s, 'a', {}); approve(s, 'a', linkWork, new Map());
+  onHello(s, 'b', {}); // 承認しない
+  assert.equal(onLink(s, 'b', { t: 'link', id: 'link-2-2', ok: false, reason: 'blocked' }), false);
+  assert.equal(s.peers.get('b').links, undefined);
+  assert.equal(onLink(s, 'a', { t: 'link', id: 'link-2-2', ok: false, reason: 'blocked' }), true);
+  assert.equal(onLink(s, 'a', { t: 'link', id: '*', ok: false, reason: 'no-such-reason' }), true); // 知らない理由は 'player'
+  assert.deepEqual(s.peers.get('a').links, { 'link-2-2': 'blocked', '*': 'player' });
+  assert.equal(onLink(s, 'a', { t: 'link', id: 'link-2-2', ok: true }), true); // 流せるようになった
+  assert.equal(s.peers.get('a').links['link-2-2'], null);
+  assert.equal(onLink(s, 'a', { t: 'link', id: 'x'.repeat(41), ok: true }), false); // 長すぎる id は受けない
+});
+
+test('リンクの動画でも、再生の合図はファイルの動画と同じ形', () => {
+  const s = createSession(1);
+  onHello(s, 'a', {}); approve(s, 'a', linkWork, new Map());
+  const out = playVideo(s, 'play', { id: 'link-2-2', pos: 351, now: 1000 });
+  assert.deepEqual(out, [{ to: 'a', msg: { t: 'vstate', id: 'link-2-2', playing: true, pos: 351 } }]);
 });

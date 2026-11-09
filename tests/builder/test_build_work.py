@@ -281,6 +281,81 @@ def test_missing_media_and_large_video_warn(media, monkeypatch):
     assert 'over 300 MB' in text and 'file not found: sounds/none.mp3' in text and 'c.mov is not MP4' in text
 
 
+# ---------- linked videos (§2.4, §3.3) ----------
+
+TED = 'https://www.youtube.com/watch?v=8KkKuTCFvzI'
+
+
+def test_a_youtube_link_is_a_linked_video_with_its_stretch(media):
+    r = ok(script(f'## [Slide 1] A\n\n> [Video] {TED} start 5:51 end 6:09\n\na\n',
+                  '## [Slide 2] B\n\n> [Video] https://youtu.be/dCVlRFWOjgE start 45.5\n\nb\n',
+                  '## [Slide 3] C\n\n> [Video] https://www.youtube.com/embed/dCVlRFWOjgE?start=45&end=158\n\nc\n',
+                  '## [Slide 4] D\n\n> [Video] https://youtu.be/dCVlRFWOjgE?t=1m5s end 1:30\n'
+                  '> [Video] videos/v.mp4\n\nd\n'), media)
+    cues = [s['cues'] for s in r.work['slides']]
+    assert cues[0] == [{'type': 'video', 'url': TED, 'start': 351, 'end': 369}]
+    assert cues[1] == [{'type': 'video', 'url': 'https://www.youtube.com/watch?v=dCVlRFWOjgE', 'start': 45.5}]
+    assert cues[2] == [{'type': 'video', 'url': 'https://www.youtube.com/watch?v=dCVlRFWOjgE', 'start': 45, 'end': 158}]
+    assert cues[3] == [{'type': 'video', 'url': 'https://www.youtube.com/watch?v=dCVlRFWOjgE', 'start': 65, 'end': 90},
+                       {'type': 'video', 'file': 'videos/v.mp4'}]
+    # ファイルが無いことを警告しない（各端末が YouTube から流す）
+    assert not any('not found' in w or 'not MP4' in w for w in r.warnings), r.warnings
+
+
+def test_a_linked_video_slide_without_picture_has_null_and_after_video_music_waits_for_it(media):
+    r = ok(script('## [Slide 1] A\n\na\n',
+                  f'## [Slide 2] B\n\n> [BGM after video] sounds/x.mp3\n> [Video] {TED} start 351 end 369\n\nb\n'), media)
+    assert r.work['slides'][1]['picture'] is None
+    assert r.work['slides'][1]['cues'][0]['start'] == 'after-video'
+
+
+def test_a_linked_video_passes_check_and_the_player_reads_it(tmp_path):
+    (tmp_path / 'script.md').write_text(script(f'## [Slide 1] A\n\n> [Video] {TED} start 5:51 end 6:09\n\na\n'),
+                                        encoding='utf-8')
+    (tmp_path / 'pictures').mkdir()
+    (tmp_path / 'pictures' / '01.jpg').write_bytes(b'x')
+    import subprocess
+    r = subprocess.run([sys.executable, str(ROOT / 'skills' / 'digital-kamishibai' / 'scripts' / 'build_work.py'),
+                        str(tmp_path), '--check'], capture_output=True, text=True, encoding='utf-8')
+    assert r.returncode == 0 and 'warning' not in (r.stdout + r.stderr).lower(), r.stdout + r.stderr
+
+
+def test_linked_video_mistakes_are_errors():
+    def err(line):
+        return errors(script(f'## [Slide 1] A\n\n> [Video] {line}\n\na\n'))
+    assert 'YouTube link only' in err('https://vimeo.com/12345678')
+    assert 'YouTube link only' in err('https://www.youtube.com/watch?v=short')
+    assert 'is not a time' in err(f'{TED} start five')
+    assert 'is not a time' in err(f'{TED} start 5:75')
+    assert 'once each' in err(f'{TED} begin 5:51')
+    assert 'once each' in err(f'{TED} start 1 start 2')
+    assert '"start <time>"' in err(f'{TED} start')
+    assert 'end must come after start' in err(f'{TED} start 6:09 end 5:51')
+    assert 'both in the link and after it' in err('https://youtu.be/8KkKuTCFvzI?t=351 start 351')
+    assert 'is not a language' in err(f'{TED} captions Japanese!')
+    assert 'once each' in err(f'{TED} captions ja captions en')
+
+
+def test_a_linked_video_may_show_captions_from_the_start():
+    w = ok(script(f'## [Slide 1] A\n\n> [Video] {TED} start 5:51 end 6:09 captions ja\n\na\n',
+                  '## [Slide 2] B\n\n> [Video] https://youtu.be/dCVlRFWOjgE captions pt-BR start 45\n\nb\n')).work
+    assert w['slides'][0]['cues'] == [{'type': 'video', 'url': TED, 'start': 351, 'end': 369, 'captions': 'ja'}]
+    assert w['slides'][1]['cues'] == [{'type': 'video', 'url': 'https://www.youtube.com/watch?v=dCVlRFWOjgE', 'start': 45, 'captions': 'pt-BR'}]
+
+
+def test_youtube_ids_and_times_read_like_the_player():
+    for url in ('https://www.youtube.com/watch?v=8KkKuTCFvzI', 'https://youtu.be/8KkKuTCFvzI?t=3',
+                'https://m.youtube.com/watch?v=8KkKuTCFvzI', 'https://www.youtube-nocookie.com/embed/8KkKuTCFvzI',
+                'https://www.youtube.com/shorts/8KkKuTCFvzI', 'https://www.youtube.com/live/8KkKuTCFvzI'):
+        assert bw.youtube_id(url) == '8KkKuTCFvzI', url
+    for url in ('https://www.youtube.com.evil.example/watch?v=8KkKuTCFvzI', 'https://vimeo.com/1',
+                'https://www.youtube.com/channel/UCAuUUnT6oDeKwE6v1NGQxug', 'videos/v.mp4'):
+        assert bw.youtube_id(url) is None, url
+    assert [bw.seconds(t) for t in ('351', '351.5', '5:51', '1:05:51', '5:60', '1:60:00', 'x')] == \
+        [351, 351.5, 351, 3951, None, None, None]
+    assert [bw.link_seconds(t) for t in ('351', '351s', '5m51s', '1h', 'x')] == [351, 351, 351, 3600, None]
+
+
 # ---------- language ----------
 
 def test_language_from_header_or_guessed():

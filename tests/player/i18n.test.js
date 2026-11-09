@@ -24,3 +24,14 @@ test('聞き手への案内: 同じ Wi-Fi なら入れることを言う（「�
   }
   assert.equal(pair('noSuchKey'), null);
 });
+
+test('リンクの動画の言葉: 流せない理由はどれも英日がそろう・語り手には「流せないときの語り」へ進むよう言う', () => {
+  for (const why of ['api', 'blocked', 'gone', 'bad-link', 'referrer', 'player', 'stall']) {
+    const p = pair('linkWhy_' + why);
+    assert.ok(p && p[0] && p[1], why);
+  }
+  assert.match(pair('linkHereNo', 'x')[1], /動画を流せないときの語り/);
+  assert.match(pair('linkHereNo', 'x')[0], /cannot be played/);
+  for (const key of ['chipLinkNo', 'linkPrepNo', 'linkStall']) assert.ok(pair(key)[0] && pair(key)[1], key);
+  for (const key of ['linkPeersNo', 'linkPeerNo', 'linkCannot', 'linkName']) assert.ok(pair(key, 'x')[0] && pair(key, 'x')[1], key);
+});

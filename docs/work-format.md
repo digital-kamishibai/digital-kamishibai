@@ -12,7 +12,7 @@ Three tools follow it and nothing else:
 To change the format, change this file first, then the tools.
 All three are tested against the same example, [`examples/sample-story/`](../examples/sample-story/).
 
-Status: **v1, first edition (2026-10-22)**; `[BGM once]` added 2026-10-24 (player stage 4). Several `[Video]` on one slide allowed 2026-10-24 (the narrator picks which one to play). `overlays`, `draft` and the correction sheet (§6) added 2026-10-25 (practising and correcting in the player). `slide_size`, `overlay_base`, `overlay_layout` and the `layout` correction added 2026-10-25 (moving the words on the picture). `[Text]` (words on the screen, written in `script.md`, §2.6) added 2026-10-25, and drawn into the picture by the builder the same day. `role`, `seats` and `source_segments` of a video (§3.3) and the `picture`, `video K` and `ending seat N` corrections (§6) added 2026-10-26 (pointing at pictures and videos while practising). `[BGM after video]` added 2026-10-29 (music that the old works start by a click once the video is over). `Use` of a `picture` correction (choosing a candidate in the player) added 2026-10-29. `color` and `fill` of a `layout` correction, the colour of a box and the light-against-dark guide (§3.2) added 2026-10-30 (correcting the colours of the words on the picture). `picture_source` of a slide (§3.2) added 2026-11-01 (a picture correction was taken as changed after a rebuild). Covers what stage 1 of the player needs (pictures, slide order, narrator notes)
+Status: **v1, first edition (2026-10-22)**; `[BGM once]` added 2026-10-24 (player stage 4). Several `[Video]` on one slide allowed 2026-10-24 (the narrator picks which one to play). `overlays`, `draft` and the correction sheet (§6) added 2026-10-25 (practising and correcting in the player). `slide_size`, `overlay_base`, `overlay_layout` and the `layout` correction added 2026-10-25 (moving the words on the picture). `[Text]` (words on the screen, written in `script.md`, §2.6) added 2026-10-25, and drawn into the picture by the builder the same day. `role`, `seats` and `source_segments` of a video (§3.3) and the `picture`, `video K` and `ending seat N` corrections (§6) added 2026-10-26 (pointing at pictures and videos while practising). `[BGM after video]` added 2026-10-29 (music that the old works start by a click once the video is over). `Use` of a `picture` correction (choosing a candidate in the player) added 2026-10-29. `color` and `fill` of a `layout` correction, the colour of a box and the light-against-dark guide (§3.2) added 2026-10-30 (correcting the colours of the words on the picture). `picture_source` of a slide (§3.2) added 2026-11-01 (a picture correction was taken as changed after a rebuild). `[Video]` with a YouTube link — a **linked video** (§2.4, §3.3) — added 2026-11-09, and its `captions` the same day (listeners cannot choose captions themselves), (a work handed out to other families shows published videos without packing them, and listeners on their own devices see them too). Covers what stage 1 of the player needs (pictures, slide order, narrator notes)
 and fixes the shape of sound and video cues. Size limits for video are provisional until stage 2 measures them.
 
 **Not in v1** (decided, not forgotten): sound effects the narrator triggers by tapping, and music volume per slide.
@@ -34,6 +34,9 @@ Files are matched by the relative paths written in `work.json`.
 
 Why split: family photos and videos should never have to be uploaded anywhere — not to a chat AI to be packed,
 not to a server to be shown. A chat AI only ever needs to produce text.
+
+A **linked video** (§2.4) is the one exception to "media are files": it is a link to a video already published on
+YouTube, written in the text. It is not a file at all, so nothing is sent between devices for it.
 
 ### Folder layout (recommended, not required)
 
@@ -118,11 +121,42 @@ Paths are relative to the media folder and use `/`.
 | `> [BGM stop]` | fade the music out when the slide opens |
 | `> [Sound] sounds/bell.mp3` | play once when the slide opens |
 | `> [Video] videos/ending.mp4` | this slide has a video. It starts when the **narrator presses play** — never by itself. Music fades out when it starts and does not come back after it (the next `[BGM]` starts music again). A slide may have **several** (see below) |
+| `> [Video] https://www.youtube.com/watch?v=ID start 5:51 end 6:09 captions ja` | a **linked video**: a video published on YouTube, played from YouTube on every device (below). `start`, `end` and `captions` are optional |
 | `> [Text] place top size 54pt bold` | words drawn on the picture. The `>` lines that follow are the words. See §2.6 |
 
 - At most one `[Picture]` and one `[BGM]`/`[BGM once]`/`[BGM after video]`/`[BGM stop]` per slide. Any number of `[Sound]`, `[Video]` and `[Text]`.
 - Several `[Video]` on one slide: the narrator's screen lists them **in the order written** and the narrator picks which one to play. Nothing plays the next one by itself — to show two videos one after the other, the narrator presses play on each.
 - A slide with `[Video]` may have no picture; before the video is played, the player shows the first frame of the slide's first video (on a device that has not received the video yet, the screen stays black).
+
+**Linked videos.** `[Video]` followed by a YouTube link (a line whose argument starts with `http://` or `https://`)
+is a linked video. Use it for a video someone else published, which the work may point at but not pack (a talk, a
+broadcast). It plays and stops like a video file: the narrator presses play, pause and seeks, every listener's
+device follows, music fades out when it starts, and `[BGM after video]` starts when it reaches its end.
+
+```markdown
+> [Video] https://www.youtube.com/watch?v=8KkKuTCFvzI start 5:51 end 6:09
+```
+
+- The link: `youtube.com/watch?v=`, `youtu.be/`, `youtube.com/embed/`, `youtube.com/shorts/` or
+  `youtube-nocookie.com/embed/`. Only YouTube. Copy it from the video's **Share** button.
+- After the link, optionally `start <time>` and `end <time>`, in that order of words or the other; each at most once.
+  A time is seconds (`351`, `351.5`) or minutes and seconds (`5:51`, `1:05:51`). The video plays from `start`
+  (missing: from the beginning) and **stops at `end`** (missing: at the end of the video).
+- Optionally `captions <language>` (a language code: `ja`, `en`, `pt-BR`): every device shows that language's
+  captions from the start. Listeners' devices have no buttons on the video, so this is the only way they get captions;
+  the narrator can still change them on the narrator's screen. Nothing shows when the video has no captions in that
+  language, and YouTube does not always obey (check it once before the show).
+- A link may carry its own start and end (`?t=351`, `&start=351&end=369`, as YouTube's share and embed links do).
+  They are read too, but a time may not be both in the link and after it.
+- It stops at `end` and stays on that frame; it never runs on into YouTube's suggestions. Only one stretch per line:
+  to skip a part in the middle, write two `[Video]` lines with the same link and two stretches.
+- **Every device needs the internet** to play it, and plays it from YouTube itself. It does not work when the owner
+  of the video does not allow it to be played on other sites, when the video is taken down (links often stop
+  working within a few years), or on a device that cannot reach YouTube. The narrator's screen says so, for this
+  device and for each listener, and the narrator goes on with words: **write in the slide what to say when the video
+  cannot be played.**
+- YouTube may show an advertisement before the video, and its own title and buttons when the video is paused.
+- A chat AI can write a linked video (it is text), but it should take the link from the person, not guess one.
 
 ### 2.5 Pictures without `[Picture]`
 
@@ -345,7 +379,7 @@ never stops the narrator from choosing a colour. A tool that checks a work with 
 | `"bgm"` | `file`, and `loop: false` for `[BGM once]` (missing means it loops). `[BGM after video]` is `loop: false` with `start: "after-video"` (missing `start` means it starts when the slide opens) |
 | `"bgm-stop"` | — |
 | `"sound"` | `file` |
-| `"video"` | `file`, and optionally `role`, `seats`, `source_segments` (below) |
+| `"video"` | `file`, and optionally `role`, `seats`, `source_segments` (below). A linked video has `url` instead of `file`, and optionally `start` and `end` (below) |
 
 `[Picture]` is not a cue in `work.json`; it becomes the slide's `picture`.
 
@@ -367,6 +401,25 @@ own picture is the one mostly seen.
             { "n": 2, "from": 6, "to": 12, "label": "pictures/03.png" },
             { "n": 3, "from": 12, "to": 18, "label": "pictures/01.jpg", "pin": "the title at the end of the song" }] }
 ```
+
+**A linked video** (§2.4) has no `file`. The builder writes the link in one form, whatever form was written
+(`https://www.youtube.com/watch?v=ID`), and whole seconds as integers:
+
+```json
+{ "type": "video", "url": "https://www.youtube.com/watch?v=8KkKuTCFvzI", "start": 351, "end": 369 }
+```
+
+| Field | Meaning |
+|---|---|
+| `url` | a YouTube link (the forms of §2.4). Not with `file` |
+| `start` | seconds into the YouTube video where it starts, `>= 0`. Missing means `0` |
+| `end` | seconds into the YouTube video where it stops, after `start`. Missing means the end of the video |
+| `captions` | a language code (`ja`, `en`, `pt-BR`): show captions in that language from the start on every device. Missing means YouTube's own default |
+
+A linked video has no `role`, `seats` or `source_segments`. It counts in the order of the slide's videos like any
+other (`video K`, §6), but the narrator cannot point at a stretch of it while practising (change `start` and `end`
+in `script.md` instead). A player sends listeners **only the video's YouTube id, `start`, `end` and `captions`** — not the link
+as written (it can carry more, such as a playlist). Times in the playback messages are seconds into the YouTube video.
 
 A seat holds the times `from <= t < to` (so a time on the line between two seats belongs to the later one). A time
 between two seats or outside every seat (an opening or a closing) belongs to no seat.
@@ -391,6 +444,7 @@ Sounds and videos of earlier slides are not replayed.
 | Video | MP4 with H.264 video and AAC audio (`.mp4`) | **≤ 1080p. ≤ 300 MB per file and ≤ 1 GB per work (provisional — set in player stage 2)** |
 
 - **iPhone photos (HEIC) are not accepted.** Export them as JPEG first.
+- A linked video (§2.4) is not a file: it has no format or size limit here, and nothing is sent for it.
 - **A video over the limit is not sent to listeners.** The player tells the narrator to make a lighter copy.
   The player never re-encodes. Who makes the lighter copy:
   - a family making its own video: export again from the editing app at 720p or 1080p;
@@ -414,6 +468,9 @@ Sounds and videos of earlier slides are not replayed.
 | Unknown `format` or `version` | — | error, with a message |
 | Media file missing | warning, if it can see the media folder | lists missing files **by name** before the show |
 | Video over the limit, or not MP4 | warning | not sent; shown to the narrator |
+| `[Video]` with a link that is not a YouTube link, a time that is not seconds or `m:ss`, an unknown word after the link, `captions` not a language code, `end` not after `start`, or a time both in the link and after it (§2.4) | error, stop | — |
+| `url` not a YouTube link, both `url` and `file`, `start < 0`, `end` not after `start`, `captions` not a language code, or `role`/`seats`/`source_segments` on a linked video (§3.3) | — | error |
+| Linked video that cannot be played (the owner does not allow other sites, gone, no internet) | — (it cannot see YouTube) | shown to the narrator, for this device and for each listener; never an error window |
 | Picture is HEIC | error | error |
 | `overlays` not boxes → paragraphs → lines of text (§3.2) | — | error |
 | `draft` other than `true` | — | error |

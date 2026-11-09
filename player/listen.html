@@ -32,6 +32,9 @@
 <div id="stage" hidden>
   <img id="picture" alt="" hidden>
   <video id="lvideo" playsinline hidden></video>
+  <!-- リンクの動画（YouTube の埋め込み）。語り手が流し始めるまでは見せない（読み込みだけ先に済ませる）。
+       上の覆いは、聞き手が埋め込みに触って止めたり YouTube へ移ったりしないように（タップは全画面へ） -->
+  <div id="llink" class="ylink off"><div id="llinkFrame" class="ylink"></div><div class="shield"></div></div>
   <!-- 絵の無い動画の枚で、再生前に出す最初のコマ（work-format §2.4・2026-10-25 D4）。再生用とは別の要素（札を誤らせない） -->
   <video id="lposter" muted playsinline preload="auto" hidden></video>
   <div id="hint" data-i18n="tapFull" hidden></div>

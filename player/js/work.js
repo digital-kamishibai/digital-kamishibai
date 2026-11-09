@@ -1,6 +1,8 @@
 // 作品（work.json＋素材）の読み込みと検査。定義は docs/work-format.md だけ——ここはそれに従う。
 // DOM にも通信にも触らない純粋な関数だけを置く（node --test で守る）。
 
+import { youtubeId, isLink, isCaptions } from './ytlink.js';
+
 export const FORMAT = 'digital-kamishibai/work';
 export const VERSION = 1;
 export const PICTURE_EXTS = ['.jpg', '.jpeg', '.png', '.webp'];
@@ -34,6 +36,7 @@ export function validateWork(json) {
     if (!Array.isArray(s.cues)) { errors.push(`${where}: cues must be a list`); return; }
     for (const c of s.cues) {
       if (!c || !CUE_TYPES.has(c.type)) errors.push(`${where}: unknown cue type ${JSON.stringify(c && c.type)}`);
+      else if (c.type === 'video' && c.url !== undefined) for (const e of linkCueErrors(c)) errors.push(`${where}: ${e}`);
       else if (c.type !== 'bgm-stop' && typeof c.file !== 'string') errors.push(`${where}: ${c.type} cue needs a file`);
       else if (c.type === 'bgm' && c.loop !== undefined && typeof c.loop !== 'boolean') errors.push(`${where}: bgm loop must be true or false`);
       else if (c.type === 'bgm' && c.start !== undefined && c.start !== 'after-video') errors.push(`${where}: bgm start must be "after-video" when present`);
@@ -86,6 +89,18 @@ function videoCueErrors(c) {
       if (!g || !isTime(g.start) || !isTime(g.dur) || g.start < 0 || g.dur <= 0) errors.push(`source segment ${k + 1}: needs start >= 0 and dur > 0 (seconds)`);
     });
   }
+  return errors;
+}
+
+/** リンクの動画の合図（work-format §3.3）: url（YouTube のリンク）と、流す範囲 start・end（秒） */
+function linkCueErrors(c) {
+  const errors = [];
+  if (typeof c.url !== 'string' || !youtubeId(c.url)) errors.push(`video url must be a YouTube link (got ${JSON.stringify(c.url)})`);
+  if (c.file !== undefined) errors.push('a video has a file or a url, not both');
+  if (c.start !== undefined && !(isTime(c.start) && c.start >= 0)) errors.push('video start must be seconds (>= 0)');
+  if (c.end !== undefined && !(isTime(c.end) && c.end > (isTime(c.start) ? c.start : 0))) errors.push('video end must be seconds after start');
+  if (c.captions !== undefined && !isCaptions(c.captions)) errors.push('video captions must be a language code, like "ja"');
+  if (c.role !== undefined || c.seats !== undefined || c.source_segments !== undefined) errors.push('a linked video has no role, seats or source_segments');
   return errors;
 }
 
@@ -247,6 +262,7 @@ export function resolveVideos(work, maps) {
     for (const c of s.cues) {
       if (!c || c.type !== 'video') continue;
       k += 1;
+      if (isLink(c)) continue; // リンクの動画はファイルを持たない（resolveLinks）
       const hit = maps.find((m) => m.has(c.file));
       if (!hit) { if (!missing.includes(c.file)) missing.push(c.file); continue; }
       const file = hit.get(c.file);
@@ -254,6 +270,24 @@ export function resolveVideos(work, maps) {
     }
   }
   return { videos, missing };
+}
+
+/** リンクの動画の一覧（work-format §2.4）。ファイルは無く、各端末が YouTube から流す。
+ *  id は枚と何本目か（link-N-K）——パスも題も入らないので、そのまま聞き手へ渡せる。
+ *  戻り値: [{ id, kind: 'link', n, k, key, yt, start, end, captions }]（key＝リンク。語り手の画面だけで使う） */
+export function resolveLinks(work) {
+  const out = [];
+  for (const s of work.slides) {
+    let k = 0;
+    for (const c of s.cues) {
+      if (!c || c.type !== 'video') continue;
+      k += 1;
+      if (!isLink(c)) continue;
+      out.push({ id: `link-${s.number}-${k}`, kind: 'link', n: s.number, k, key: c.url, yt: youtubeId(c.url),
+        start: isTime(c.start) ? c.start : 0, end: isTime(c.end) ? c.end : null, captions: isCaptions(c.captions) ? c.captions : null });
+    }
+  }
+  return out;
 }
 
 /** 聞き手へ配る素材の一覧（同じ id は1つにまとめる。最初に出てきたものを残す）。

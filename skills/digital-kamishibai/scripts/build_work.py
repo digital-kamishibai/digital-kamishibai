@@ -7,6 +7,9 @@
     python build_work.py <work folder> --draft      # a version for practising and correcting in the player
     python build_work.py <work folder> --skip-text  # leave the words on the screen ([Text]) out
 
+A [Video] may be a YouTube link instead of a file (`> [Video] https://youtu.be/<id> start 5:51 end 6:09`, §2.4):
+nothing is checked in the media folder for it, and each device plays it from YouTube.
+
 The format is defined in docs/work-format.md of the Digital Kamishibai repository (§2 script.md, §3 work.json,
 §5 checks). This file follows it and nothing else. Standard library only.
 
@@ -26,6 +29,7 @@ import re
 import sys
 from dataclasses import dataclass, field
 from pathlib import Path
+from urllib.parse import parse_qs, urlsplit
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import burn  # noqa: E402  (burn.py, next to this file)
@@ -42,6 +46,15 @@ WORK_VIDEO_MAX_BYTES = 1024 * 1024 * 1024
 
 CUE_KEYWORDS = ('Picture', 'Text', 'BGM', 'BGM once', 'BGM after video', 'BGM stop', 'Sound', 'Video')
 BGM_KEYWORDS = ('BGM', 'BGM once', 'BGM after video', 'BGM stop')
+
+# a linked video (§2.4): a YouTube link instead of a file, with the stretch to play
+YOUTUBE_HOSTS = {'youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com',
+                 'youtu.be'}
+YOUTUBE_ID = re.compile(r'^[A-Za-z0-9_-]{11}$')
+SECONDS = re.compile(r'^(?:(?:(\d+):)?(\d+):)?(\d+(?:\.\d+)?)$')         # 351, 351.5, 5:51, 1:05:51
+LINK_TIME = re.compile(r'^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s?)?$')  # t=351, t=351s, t=5m51s
+LINK = re.compile(r'^https?://', re.IGNORECASE)
+CAPTIONS = re.compile(r'^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$')       # ja, en, pt-BR
 
 HEADING = re.compile(r'^## \[Slide (\d+)\][ \t]*(.*?)[ \t]*$')
 NEAR_HEADING = re.compile(r'^##\s*\[')              # looks like a slide heading but is not one
@@ -229,6 +242,10 @@ def read_slide(number: int, title: str, body: list[Line], result: Result) -> dic
                             else {'type': 'bgm', 'file': arg, 'loop': False, 'start': 'after-video'}
                             if keyword == 'BGM after video'
                             else {'type': 'bgm', 'file': arg})
+            elif keyword == 'Video' and LINK.match(arg):
+                cue = link_cue(arg, b.number, result)
+                if cue:
+                    cues.append(cue)
             else:
                 cues.append({'type': keyword.lower(), 'file': arg})
     if len(pictures) > 1:
@@ -241,6 +258,112 @@ def read_slide(number: int, title: str, body: list[Line], result: Result) -> dic
 
     return {'number': number, 'title': title, 'picture': pictures[0] if pictures else None,
             'notes': make_notes(notes, removed), 'cues': cues, '_texts': texts}
+
+
+def youtube_id(url: str) -> str | None:
+    """The 11-character id of a YouTube link (watch?v=, youtu.be/, embed/, shorts/, live/), or None.
+    The room player reads links the same way (player/js/ytlink.js youtubeId)."""
+    try:
+        u = urlsplit(url)
+        host = (u.hostname or '').lower()
+    except ValueError:
+        return None
+    if u.scheme not in ('http', 'https') or host not in YOUTUBE_HOSTS:
+        return None
+    parts = [p for p in u.path.split('/') if p]
+    if host == 'youtu.be':
+        vid = parts[0] if parts else None
+    elif parts[:1] == ['watch']:
+        vid = (parse_qs(u.query).get('v') or [None])[0]
+    elif parts[:1] and parts[0] in ('embed', 'shorts', 'live', 'v') and len(parts) > 1:
+        vid = parts[1]
+    else:
+        vid = None
+    return vid if vid and YOUTUBE_ID.match(vid) else None
+
+
+def seconds(text: str) -> float | None:
+    """351 / 351.5 / 5:51 / 1:05:51 -> seconds, or None."""
+    m = SECONDS.match(text)
+    if not m:
+        return None
+    h, mi, sec = m.group(1), m.group(2), float(m.group(3))
+    if (mi is not None and sec >= 60) or (h is not None and int(mi) >= 60):
+        return None
+    return int(h or 0) * 3600 + int(mi or 0) * 60 + sec
+
+
+def link_seconds(text: str) -> float | None:
+    """t=351 / t=351s / t=5m51s / start=351 in a link -> seconds, or None."""
+    m = LINK_TIME.match(text)
+    if not m or not text:
+        return None
+    return int(m.group(1) or 0) * 3600 + int(m.group(2) or 0) * 60 + float(m.group(3) or 0)
+
+
+def plain(value: float) -> int | float:
+    return int(value) if float(value).is_integer() else round(value, 3)
+
+
+def link_cue(arg: str, line: int, result: Result) -> dict | None:
+    """`[Video] <YouTube link> start 5:51 end 6:09 captions ja` -> {'type': 'video', 'url', 'start', 'end', 'captions'} (§2.4).
+    start and end may also come from the link itself (t=, start=, end=), but not from both."""
+    words = arg.split()
+    url, rest = words[0], words[1:]
+    vid = youtube_id(url)
+    if not vid:
+        result.errors.append(f'line {line}: [Video] can play a YouTube link only (got {url}). '
+                             'For another video, save it as MP4 and write its path')
+        return None
+    said: dict[str, float] = {}
+    if len(rest) % 2:
+        result.errors.append(f'line {line}: after the link, [Video] takes "start <time>", "end <time>" and '
+                             f'"captions <language>" (got: {" ".join(rest)})')
+        return None
+    captions = None
+    for key, value in zip(rest[::2], rest[1::2]):
+        if key not in ('start', 'end', 'captions') or key in said or (key == 'captions' and captions):
+            result.errors.append(f'line {line}: after the link, [Video] takes "start <time>", "end <time>" and '
+                                 f'"captions <language>", once each (got "{key}")')
+            return None
+        if key == 'captions':
+            if not CAPTIONS.match(value):
+                result.errors.append(f'line {line}: captions {value} is not a language (write a code, like ja or en)')
+                return None
+            captions = value
+            continue
+        sec = seconds(value)
+        if sec is None:
+            result.errors.append(f'line {line}: {key} {value} is not a time (write seconds, like 351, or m:ss, like 5:51)')
+            return None
+        said[key] = sec
+    query = parse_qs(urlsplit(url).query)
+    in_link: dict[str, float] = {}
+    for key, names in (('start', ('start', 't')), ('end', ('end',))):
+        for name in names:
+            if name in query:
+                sec = link_seconds(query[name][0])
+                if sec is None:
+                    result.errors.append(f'line {line}: {name}={query[name][0]} in the link is not a time')
+                    return None
+                in_link[key] = sec
+    both = set(said) & set(in_link)
+    if both:
+        result.errors.append(f'line {line}: [Video] has {" and ".join(sorted(both))} both in the link and after it. '
+                             'Write it once (after the link is easier to read)')
+        return None
+    cut = {**in_link, **said}
+    if 'end' in cut and cut['end'] <= cut.get('start', 0):
+        result.errors.append(f'line {line}: [Video] end must come after start')
+        return None
+    cue = {'type': 'video', 'url': f'https://www.youtube.com/watch?v={vid}'}
+    if cut.get('start'):
+        cue['start'] = plain(cut['start'])
+    if 'end' in cut:
+        cue['end'] = plain(cut['end'])
+    if captions:
+        cue['captions'] = captions
+    return cue
 
 
 def text_box(attrs: dict, words: list[str], language: str) -> tuple[list, dict]:
@@ -499,7 +622,7 @@ def add_seats(work: dict, folder: Path | None, result: Result) -> None:
     by_file = ending_seats(folder, result)
     for slide in work['slides']:
         for cue in slide['cues']:
-            if cue['type'] == 'video' and cue['file'] in by_file:
+            if cue['type'] == 'video' and cue.get('file') in by_file:
                 cue['role'] = 'ending'
                 cue['seats'] = by_file[cue['file']]
 

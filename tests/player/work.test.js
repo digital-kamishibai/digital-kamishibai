@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { validateWork, fileMap, findWorkJson, resolvePictures, resolveVideos, resolveAudio, resolveBases, resolveCandidates, uniqueById, seatAt, toSource, dirEntries, workDirOf } from '../../player/js/work.js';
+import { validateWork, fileMap, findWorkJson, resolvePictures, resolveVideos, resolveAudio, resolveBases, resolveCandidates, resolveLinks, uniqueById, seatAt, toSource, dirEntries, workDirOf } from '../../player/js/work.js';
 
 const sample = JSON.parse(readFileSync(new URL('../../examples/sample-story/work.json', import.meta.url), 'utf8'));
 const clone = (o) => JSON.parse(JSON.stringify(o));
@@ -258,6 +258,44 @@ test('動画の情報は無くても、正しい形なら有っても通る', ()
   assert.deepEqual(validateWork(withCue(ending())).errors, []);
   assert.deepEqual(validateWork(withCue({ type: 'video', file: 'videos/e.mp4', role: 'ending' })).errors, [], '編集アプリで作ったエンディング動画には席が無い');
   assert.deepEqual(validateWork(withCue({ type: 'video', file: 'videos/a.mp4', source_segments: [{ start: 82, dur: 74 }, { start: 278, dur: 105 }] })).errors, []);
+});
+
+test('リンクの動画: YouTube のリンクと、開始・止める秒（work-format §2.4・§3.3）', () => {
+  const ok = { type: 'video', url: 'https://www.youtube.com/watch?v=8KkKuTCFvzI', start: 351, end: 369 };
+  assert.deepEqual(validateWork(withCue(ok)).errors, []);
+  assert.deepEqual(validateWork(withCue({ type: 'video', url: 'https://youtu.be/8KkKuTCFvzI' })).errors, [], '範囲は無くてもよい');
+  assert.deepEqual(validateWork(withCue({ type: 'video', url: 'https://youtu.be/8KkKuTCFvzI', start: 45.5 })).errors, []);
+  const bad = (cue, re) => assert.match(validateWork(withCue(cue)).errors.join(), re, JSON.stringify(cue));
+  bad({ type: 'video', url: 'https://vimeo.com/1234' }, /must be a YouTube link/);
+  bad({ type: 'video', url: 'videos/a.mp4' }, /must be a YouTube link/);
+  bad({ ...ok, file: 'videos/a.mp4' }, /a file or a url, not both/);
+  bad({ ...ok, start: -1 }, /start must be seconds/);
+  bad({ ...ok, start: '5:51' }, /start must be seconds/);
+  bad({ ...ok, end: 300 }, /end must be seconds after start/);
+  bad({ type: 'video', url: ok.url, end: 0 }, /end must be seconds after start/);
+  assert.deepEqual(validateWork(withCue({ ...ok, captions: 'ja' })).errors, []);
+  assert.deepEqual(validateWork(withCue({ ...ok, captions: 'pt-BR' })).errors, []);
+  bad({ ...ok, captions: 'Japanese!' }, /captions must be a language code/);
+  bad({ ...ok, captions: true }, /captions must be a language code/);
+  bad({ ...ok, role: 'ending' }, /no role, seats or source_segments/);
+  bad({ ...ok, source_segments: [{ start: 0, dur: 1 }] }, /no role, seats or source_segments/);
+});
+
+test('リンクの動画は手元のファイルに結びつけない・足りない素材に数えない・何本目かはファイルの動画と通しで数える', () => {
+  const w = clone(sample);
+  w.slides[1].cues = [{ type: 'video', file: 'videos/a.mp4' }, { type: 'video', url: 'https://youtu.be/8KkKuTCFvzI', start: 351, end: 369 }];
+  w.slides[2].picture = null;
+  w.slides[2].cues = [{ type: 'video', url: 'https://www.youtube.com/watch?v=dCVlRFWOjgE' }];
+  w.slides[3].cues = []; w.slides[3].picture = 'pictures/04.jpg'; // 見本のエンディング動画は外す
+  assert.deepEqual(validateWork(w).errors, [], '絵の無い枚でも、リンクの動画があればよい');
+  const rv = resolveVideos(w, [new Map([['videos/a.mp4', { size: 5 }]])]);
+  assert.deepEqual(rv.missing, []);
+  assert.deepEqual(rv.videos.map((v) => [v.n, v.k, v.key]), [[2, 1, 'videos/a.mp4']]);
+  assert.deepEqual(resolveLinks(w), [
+    { id: 'link-2-2', kind: 'link', n: 2, k: 2, key: 'https://youtu.be/8KkKuTCFvzI', yt: '8KkKuTCFvzI', start: 351, end: 369, captions: null },
+    { id: 'link-3-1', kind: 'link', n: 3, k: 1, key: 'https://www.youtube.com/watch?v=dCVlRFWOjgE', yt: 'dCVlRFWOjgE', start: 0, end: null, captions: null },
+  ]);
+  assert.deepEqual(resolveLinks(sample), []);
 });
 
 test('role は ending だけ・seats は ending だけ・source_segments は role の無い動画だけ', () => {

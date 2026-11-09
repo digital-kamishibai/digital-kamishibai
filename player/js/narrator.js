@@ -2,11 +2,11 @@
 // 画面は「準備・受付・上演」の3つを同じページの中で切り替える（語り手の画面の作り直し U1。ページを移ると接続が切れる）。
 import './https.js';
 import { t, applyI18n } from './i18n.js';
-import { validateWork, fileMap, findWorkJson, dirEntries, workDirOf, resolvePictures, resolveVideos, resolveAudio, resolveBases, resolveCandidates, videoId, uniqueById, seatAt, toSource } from './work.js';
+import { validateWork, fileMap, findWorkJson, dirEntries, workDirOf, resolvePictures, resolveVideos, resolveAudio, resolveBases, resolveCandidates, resolveLinks, videoId, uniqueById, seatAt, toSource } from './work.js';
 import {
   createSession, onHello, approve, reject, onGot, onGone, goTo, approvedCount, wouldExceed,
   mayOpenBulk, onHave, onVideoFail, playVideo, onSync,
-  knownToken, staleTwins, startShow, slideAudio, videoAudio, videoEndAudio, talkMessage, audioTick, setVolume, onView, onHeard, setRecording,
+  knownToken, staleTwins, startShow, slideAudio, videoAudio, videoEndAudio, talkMessage, audioTick, setVolume, onView, onHeard, onLink, setRecording,
 } from './protocol.js';
 import { chipState, nextScreen, bannerFor, videosOn, pickVideo, mustStopFor, videoName, clampSplit, splitAt, SPLIT_DEFAULT, SPLIT_MIN, SPLIT_MAX, SPLIT_STEP } from './view.js';
 import { createVoice, heardFrom, routes, voiceMessages, rollOrder, judgeRollCall } from './voice.js';
@@ -31,6 +31,7 @@ import { boxElement } from './overlay-dom.js';
 import { openRoom, keepSignaling, keepAwake, iceState, iceLine, relayOffered, relayPaused, routeState } from './net.js';
 import { whyBlocked, isAndroid, relayNote } from './ice.js';
 import qrcode from '../vendor/qrcode.mjs';
+import { LinkPlayer, loadApi } from './ytlink.js';
 
 applyI18n();
 const $ = (id) => document.getElementById(id);
@@ -42,6 +43,7 @@ let workDir = null;                // 作品フォルダそのもの（showDirec
 let pictures = new Map();          // 番号 → { key, file, mime, size }
 let videos = [];                   // [{ id, kind: 'video', n, key, file, size, mime, problem }]
 let audios = [];                   // [{ id, kind: 'audio', key, file, size, mime, problem }]（BGM・効果音。段階4）
+let links = [];                    // [{ id, kind: 'link', n, k, key, yt, start, end }]（リンクの動画。ファイルは無く、配らない）
 const audioUrls = new Map();       // 音の id → 語り手の端末で鳴らす object URL
 // 配る素材。**音を先に**（開演直後から要る。動画は枚に来るまで要らない＝P7）
 const media = () => uniqueById([...audios, ...videos]); // 同じ動画を2つの枚で使っても、配るのは1回
@@ -247,6 +249,10 @@ async function resolve(opts = {}) {
   videos = await Promise.all(rv.videos.map(async (v) => ({
     ...v, kind: 'video', id: await videoId(work.title, v.key, v.size, v.file.lastModified), problem: sendable(v),
   })));
+  links = resolveLinks(work);
+  // 埋め込みの API を先に読む。読めなければ準備の画面に出す（上演の枚に来てからでは、流せないと分かるのが遅い）
+  $('linkWarn').hidden = true;
+  if (links.length) loadApi().catch(() => { $('linkWarn').textContent = t('linkPrepNo'); $('linkWarn').hidden = false; renderLinkNote(); });
   for (const u of baseUrls.values()) URL.revokeObjectURL(u);
   baseUrls.clear();
   for (const [n, b] of resolveBases(work, [workMap, mediaMap])) baseUrls.set(n, URL.createObjectURL(b.file));
@@ -402,6 +408,9 @@ function accept(conn) {
       const p = session.peers.get(id);
       if (p && p.status === 'approved') { if (msg.on) voice.quiet.add(id); else voice.quiet.delete(id); updateVoice(); }
       return;
+    } else if (msg.t === 'link') {
+      // 聞き手の端末で、リンクの動画を流せるか（埋め込みを禁じられた・ネットに出られない）
+      if (onLink(session, id, msg)) { renderLinkNote(); renderChips(); }
     } else if (msg.t === 'heard') {
       const h = onHeard(session, id, msg);
       if (h) gotHeard(id, h);
@@ -636,7 +645,22 @@ function audioLine(p) {
   return ` · ${t('audioProgress', fmtMB(sts.reduce((a, x) => a + x.acked, 0)), fmtMB(size))}${unlocked}`;
 }
 
+/** リンクの動画を流せない端末の理由（全部・'*'＝埋め込みそのもの）。流せるか分からないものは入れない */
+function linkProblems(p, id = null) {
+  const got = p.links || {};
+  const why = new Set();
+  if (got['*']) why.add(got['*']);
+  for (const l of links) if ((!id || l.id === id) && got[l.id]) why.add(got[l.id]);
+  return [...why];
+}
+
 function videoLine(p) {
+  const bad = links.length ? linkProblems(p) : [];
+  const link = bad.length ? ` · ${t('linkPeerNo', bad.map((w) => t('linkWhy_' + w)).join('、'))}` : '';
+  return fileVideoLine(p) + link;
+}
+
+function fileVideoLine(p) {
   if (!p.plan) return videos.length ? ` · ${t('videoWaiting')}` : '';
   return p.plan.filter((x) => !audios.some((a) => a.id === x.id)).map((x) => {
     if (calls.has(p.id) && vCurrent && x.id === vCurrent.id) return ` · ${t('videoStreaming')}`;
@@ -756,6 +780,9 @@ function renderChips() {
       if (audios.length) parts.push(part(v.sound === 'on' ? t('soundOn') : v.sound === 'tap' ? t('soundTap') : t('chipSoundNone'), c.sound));
       if (c.receiving) parts.push(part(t('chipReceiving', fmtMB(v.recv.got), fmtMB(v.recv.all))));
     }
+    // いまの枚のリンクの動画を、この端末では流せない（埋め込みを禁じられた・ネットに出られない）
+    const linkBad = vCurrent && vCurrent.kind === 'link' ? linkProblems(p, vCurrent.id) : [];
+    if (linkBad.length) { parts.push(part(t('chipLinkNo'), true)); chip.className = 'chip warn'; chip.dataset.level = 'warn'; }
     if (p.received < pictures.size) parts.push(part(t('pictures', p.received, pictures.size)));
     // 声（V10）: マイクの状態・届いているか・話しているかの印。届ける／届けないは語り手の側だけを変える（V5）
     const h = heardFrom(p, voice, voiceCtx());
@@ -1618,14 +1645,22 @@ let vCurrent = null;          // いまの枚の動画
 let captured = null;          // 予備の「その場で流す」用の映像（captureStream）
 let chosenVideo = null;       // 1枚に動画が複数あるとき、語り手が選んだ1本の id（W2。null＝1本目）
 let tick = 0;
+// リンクの動画（YouTube の埋め込み）の再生口。<video> と同じ形なので、合図は同じ道で配る
+const linkP = new LinkPlayer($('nlink'));
+/** いまの動画の再生口（ファイルなら <video>、リンクなら埋め込み） */
+const cur = () => (vCurrent && vCurrent.kind === 'link' ? linkP : vEl);
+/** 枠に出す動画の一覧（ファイルとリンクを、書いた順に） */
+const panelVideos = () => [...videos, ...links].sort((a, b) => a.n - b.n || a.k - b.k);
 
 /** 聞き手の画面の枠（U2）。動画の枚では、枠そのものが動画の再生つまみになる。
  *  再生を始めるまでは、聞き手の端末と同じく絵を出しておく（poster） */
 function renderVideoPanel() {
-  const list = videosOn(videos, session.slide);
+  const list = videosOn(panelVideos(), session.slide);
   const v = pickVideo(list, chosenVideo);
   renderVideoPick(list, v);
-  vEl.hidden = !v;
+  const isLink = !!v && v.kind === 'link';
+  vEl.hidden = !v || isLink;
+  $('nlink').hidden = !isLink;
   $('current').hidden = !!v;
   // 絵の無い枚は、動画の最初のコマ（聞き手の端末も、動画を受け取っていれば最初のコマを出す。work-format §2.4・2026-10-25 D4）
   if (v && urls.has(session.slide)) vEl.poster = urls.get(session.slide);
@@ -1636,7 +1671,10 @@ function renderVideoPanel() {
   captured = null;
   if (vUrl) { URL.revokeObjectURL(vUrl); vUrl = null; }
   $('videoNote').textContent = v && v.problem ? t('videoAllStream', t('why_' + v.problem)) : '';
-  if (!v) { vEl.removeAttribute('src'); vEl.load(); renderMediaBars(); return; }
+  if (!isLink) linkP.unload();
+  if (!v || isLink) { vEl.removeAttribute('src'); vEl.load(); }
+  if (isLink) { linkP.load(v); renderLinkNote(); }
+  if (!v || isLink) { renderMediaBars(); return; }
   vUrl = URL.createObjectURL(v.file);
   vEl.src = vUrl;
   renderMediaBars();
@@ -1648,7 +1686,7 @@ function renderVideoPick(list, cur) {
   box.hidden = list.length < 2;
   if (box.hidden) { box.replaceChildren(); return; }
   box.replaceChildren(...list.map((x, i) => {
-    const b = button(t('videoPick', i + 1, videoName(x.key)), () => chooseVideo(x.id));
+    const b = button(t('videoPick', i + 1, x.kind === 'link' ? t('linkName', fmtCut(x)) : videoName(x.key)), () => chooseVideo(x.id));
     b.dataset.video = x.id;
     b.title = x.key;
     if (cur && x.id === cur.id) { b.setAttribute('aria-pressed', 'true'); b.className = 'on'; }
@@ -1658,7 +1696,7 @@ function renderVideoPick(list, cur) {
 
 /** 別の1本を選んだ。流している途中なら止めて聞き手の画面を絵へ戻し、選んだ1本を枠に出す（再生は語り手が押す） */
 function chooseVideo(id) {
-  const next = pickVideo(videosOn(videos, session.slide), id);
+  const next = pickVideo(videosOn(panelVideos(), session.slide), id);
   if (mustStopFor(next, session.playback.id)) stopVideo();
   chosenVideo = next ? next.id : null;
   renderVideoPanel();
@@ -1668,7 +1706,7 @@ function chooseVideo(id) {
 function control(action) {
   // 再生を始める前の頭出し・止めたあとに遅れて届く pause は合図にしない
   if (!vCurrent || (action !== 'play' && !session.playback.id)) return;
-  send(playVideo(session, action, { id: vCurrent.id, pos: vEl.currentTime, now: Date.now() }));
+  send(playVideo(session, action, { id: vCurrent.id, pos: cur().currentTime, now: Date.now() }));
   if (session.playback.playing) {
     // 動画を流し始めたら BGM を止める・動画のあとも鳴らし直さない（2026-10-26 練習の修正票）
     // ⚠️ 聞き手がいなくても（練習）この端末の BGM は止める——合図の数（承認済みの聞き手の数）で決めない
@@ -1681,22 +1719,54 @@ function control(action) {
   renderChips();
   clearInterval(tick);
   if (session.playback.playing) {
-    tick = setInterval(() => send(playVideo(session, 'seek', { pos: vEl.currentTime, now: Date.now() })), TICK_MS);
+    tick = setInterval(() => send(playVideo(session, 'seek', { pos: cur().currentTime, now: Date.now() })), TICK_MS);
     for (const id of conns.keys()) streamTo(id);
   }
 }
 
-vEl.addEventListener('play', () => control('play'));
+// ⚠️ 2つの再生口のできごとは、いまの動画の口のものだけ受ける（切り替えた直後に、前の口の pause が遅れて届く）
+const mine = (el, fn) => () => { if (cur() === el) fn(); };
+vEl.addEventListener('play', mine(vEl, () => control('play')));
 vEl.addEventListener('playing', () => { if (recorder) recorder.setVideo(vEl); }); // 録画に動画の音をつなぐ（動画ごとに流れが変わる）
-vEl.addEventListener('pause', () => control('pause'));
+vEl.addEventListener('pause', mine(vEl, () => control('pause')));
 // 動画が最後まで流れたら、その枚の [BGM after video] を鳴らす（2026-10-29 実際の作品の修正票。途中で止めたときは鳴らさない）
-vEl.addEventListener('ended', () => {
+function onEnded() {
   if (!work || !vCurrent || vCurrent.n !== session.slide) return;
   const before = session.audio;
   send(videoEndAudio(session, work, idOf, Date.now()));
   if (session.audio !== before) playHere(false);
-});
-vEl.addEventListener('seeked', () => control(vEl.paused ? 'pause' : 'seek'));
+}
+vEl.addEventListener('ended', mine(vEl, onEnded));
+vEl.addEventListener('seeked', mine(vEl, () => control(vEl.paused ? 'pause' : 'seek')));
+// リンクの動画も同じ合図にする。止める秒で止まったら 'ended'（[BGM after video] もファイルの動画と同じに鳴る）
+linkP.addEventListener('play', mine(linkP, () => control('play')));
+linkP.addEventListener('pause', mine(linkP, () => control('pause')));
+linkP.addEventListener('ended', mine(linkP, onEnded));
+linkP.addEventListener('seeked', mine(linkP, () => control(linkP.paused ? 'pause' : 'seek')));
+linkP.addEventListener('error', renderLinkNote);
+linkP.addEventListener('ready', renderLinkNote);
+linkP.addEventListener('stall', renderLinkNote);
+linkP.addEventListener('play', renderLinkNote); // 始まらなかったのが、押し直して始まった
+
+/** 流す範囲の短い表示（5:51–6:09） */
+function fmtCut(x) {
+  const m = (v) => `${Math.floor(v / 60)}:${String(Math.floor(v % 60)).padStart(2, '0')}`;
+  return x.end != null ? `${m(x.start)}–${m(x.end)}` : `${m(x.start)}–`;
+}
+
+/** リンクの動画の枠の下: この端末で流せない・流せない聞き手がいる。例外の窓は出さず、ここに書く */
+function renderLinkNote() {
+  if (!vCurrent || vCurrent.kind !== 'link') return;
+  const lines = [];
+  if (linkP.error) lines.push(t('linkHereNo', t('linkWhy_' + linkP.error)));
+  else if (linkP.stalled) lines.push(t('linkStall'));
+  const bad = [...session.peers.values()].filter((p) => p.status === 'approved')
+    .map((p) => [p, linkProblems(p, vCurrent.id)]).filter(([, w]) => w.length);
+  if (bad.length) lines.push(t('linkPeersNo', bad.map(([p, w]) => `${who(p)}（${w.map((x) => t('linkWhy_' + x)).join('、')}）`).join('・')));
+  const note = $('videoNote');
+  note.textContent = lines.join(' ');
+  note.classList.toggle('bad', lines.length > 0);
+}
 
 // ---------- エンディング動画のコマを指す（M1）・絵コンテ（M2） ----------
 // 止めた位置のコマを「差し替えたい」と修正票に入れる。新しい写真を選ぶのは作り手（絵コンテのページで）。
@@ -1747,7 +1817,7 @@ function renderMediaBars() { renderSeatBar(); renderCutBar(); }
 
 /** いまの動画が上演中の動画（role の無い動画）なら、その合図 */
 function showCueOf(v) {
-  const cue = v && work && work.slides[v.n - 1] ? videoCueOf(work.slides[v.n - 1], v.k) : null;
+  const cue = v && v.kind !== 'link' && work && work.slides[v.n - 1] ? videoCueOf(work.slides[v.n - 1], v.k) : null;
   return cue && cue.role === undefined ? cue : null;
 }
 const cutItem = (v) => (sheet ? sheet.items.find((x) => x.kind === 'video' && x.slide === v.n && x.at === v.k) : null);
@@ -1859,6 +1929,7 @@ $('boardBtn').addEventListener('click', () => (board ? closeBoard() : openBoard(
 function stopVideo() {
   clearInterval(tick);
   if (!vEl.paused) vEl.pause();
+  if (!linkP.paused) linkP.pause();
   send(playVideo(session, 'stop', { now: Date.now() }));
   engine.duck(false);
   updateVoice();
@@ -1869,7 +1940,8 @@ function stopVideo() {
 /** 予備: 保存で受け取れていない端末には、語り手の動画の映像をそのまま流す */
 function streamTo(id) {
   const p = session.peers.get(id);
-  if (!vCurrent || !peer || !p || p.status !== 'approved' || !p.plan || calls.has(id)) return;
+  // リンクの動画は各端末が自分で流す（この画面の映像は送らない。埋め込みの中身は取り出せない）
+  if (!vCurrent || vCurrent.kind === 'link' || !peer || !p || p.status !== 'approved' || !p.plan || calls.has(id)) return;
   const x = p.plan.find((v) => v.id === vCurrent.id);
   const st = (xfer.get(id) || new Map()).get(vCurrent.id);
   if (x && x.mode === 'stored' && st && st.done) return; // 保存済みの端末は自分で再生する
@@ -2178,6 +2250,7 @@ function onVolume() {
   $('volVideoVal').textContent = `${$('volVideo').value}%`;
   engine.setMusic(music);
   vEl.volume = video;
+  linkP.volume = video;
   if (recorder) recorder.setVideoVolume(video);
   clearTimeout(volTimer);
   volTimer = setTimeout(() => send(setVolume(session, music, video)), 150);
@@ -2205,7 +2278,8 @@ setInterval(renderClock, 500);
 function drawStage(put) {
   const img = $('current');
   const src = stageSource({
-    videoStarted: !!(vCurrent && session.playback.id),
+    // リンクの動画は録れない（埋め込みの映像は取り出せない）ので、その枚の絵を録る
+    videoStarted: !!(vCurrent && vCurrent.kind !== 'link' && session.playback.id),
     videoReady: vEl.readyState >= 2 && vEl.videoWidth > 0,
     pictureReady: !!img.getAttribute('src') && img.complete && img.naturalWidth > 0,
   });
@@ -2337,7 +2411,10 @@ window.addEventListener('pagehide', () => {
 renderVoiceButtons();
 
 // 自動テスト用の入口（?test のときだけ。同じページの中からだけ呼べる。外から作品を渡す道ではない）
-if (TEST) window.__dk = { loadForTest: (w, files) => { work = validateWork(w).work; workMap = files; mediaMap = new Map(); sheet = loadSheet(work); return resolve(); }, session: () => session,
+if (TEST) window.__dk = { link: () => ({ id: vCurrent && vCurrent.kind === 'link' ? vCurrent.id : null, ready: linkP.ready, error: linkP.error, stalled: linkP.stalled, playing: !linkP.paused, pos: linkP.currentTime, state: linkP.state(), captions: linkP.captionsNow(), note: $('videoNote').textContent }),
+  // 語り手が YouTube の再生つまみを押したのと同じこと（埋め込みの中は外から押せないので、API の口から押す）
+  linkPlayer: () => linkP,
+  linkPress: (what, at) => { const p = linkP.p; if (what === 'play') p.playVideo(); else if (what === 'pause') p.pauseVideo(); else p.seekTo(at, true); return true; }, loadForTest: (w, files) => { work = validateWork(w).work; workMap = files; mediaMap = new Map(); sheet = loadSheet(work); return resolve(); }, session: () => session,
   reloadForTest: (w, files) => reloadWith({ work: validateWork(w).work, map: files }), sheet: () => sheet, editing: () => editing, screen: () => screen, voice: () => ({ heard: routes(session.peers, voice, voiceCtx()).narrator, levels: mixer ? mixer.levels() : {}, calls: [...voiceCalls.keys()], state: { ...voice, held: [...voice.held], sameRoom: [...voice.sameRoom], quiet: [...voice.quiet] }, narratorTo: mixer ? mixer.narratorGains() : {} }), audio: () => engine.state(), audioId: (f) => idOf(f),
   rec: () => ({ on: !!recorder, mime: recMime, status: recorder ? recorder.status() : null, last: window.__dkRecLast || null, name: window.__dkRecName || null, recording: session.recording }),
   // 録ったファイル（OPFS）を base64 で少しずつ取り出す（確認スクリプトが ffprobe にかける）

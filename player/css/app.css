@@ -104,6 +104,7 @@ img.next { width: 45%; aspect-ratio: 16 / 9; object-fit: contain; background: #0
 .chip.warn { background: var(--warn-bg); border-color: var(--ng); }
 .chip.unknown { border-left-color: var(--line); color: var(--muted); }
 .chip .bad { color: var(--ng); font-weight: 700; }
+#videoNote.bad { color: var(--ng); font-weight: 700; }
 /* 戻る／次へ（U4'）: 聞き手の画面の真下 */
 .nav { display: flex; gap: 12px; align-items: center; margin-top: 10px; }
 .nav button { padding: 14px 20px; font-size: 1.1rem; }
@@ -229,6 +230,13 @@ body.listener button.primary { width: 100%; padding: 14px; font-size: 1.1rem; }
 pre.log { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-size: .85rem; white-space: pre-wrap; overflow-wrap: anywhere; }
 #lvideo, #lposter { width: 100vw; height: 100vh; height: 100dvh; object-fit: contain; background: #000; }
 #lposter { pointer-events: none; }
+/* リンクの動画（YouTube の埋め込み）。読み込み中・流す前は見えないだけで、場所は取っておく（display: none だと読み込まない端末がある） */
+.ylink iframe { position: absolute; inset: 0; width: 100%; height: 100%; border: 0; display: block; background: #000; }
+.frame .ylink { position: absolute; inset: 0; }
+#llink { position: fixed; inset: 0; }
+#llink.off { visibility: hidden; pointer-events: none; }
+#llink .shield { position: absolute; inset: 0; z-index: 1; }
+#llinkFrame { position: absolute; inset: 0; }
 
 /* 声（段階3）: 聞き手のマイクのボタン */
 #micBox { position: fixed; top: 10px; right: 10px; text-align: right; z-index: 3; }

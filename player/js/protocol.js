@@ -6,13 +6,15 @@ import { planTransfers } from './transfer.js';
 import { createPlayback, command, vstate } from './playback.js';
 import { createAudio, start, retune, cutForVideo, afterVideo, astate, soundMessages } from './audio.js';
 import { cleanView } from './view.js';
+import { resolveLinks } from './work.js';
 
 export const PROTOCOL = 1;
 
 // 語り手 → 聞き手
 //   { t: 'wait' }                                   承認待ち
 //   { t: 'reject' }                                 断られた
-//   { t: 'welcome', title, count, pictures:[{n, mime, size}], videos:[{id, n, size, mime}] }
+//   { t: 'welcome', title, count, pictures:[{n, mime, size}], videos:[{id, n, size, mime}], links:[{id, n, yt, start, end, captions}] }
+//                                                   links＝リンクの動画（YouTube の ID と流す範囲だけ。各端末が埋め込みで流す）
 //   { t: 'pic', n, mime, data }                     絵1枚（data は通信の層が詰める）
 //   { t: 'slide', n }                               いまの枚
 //   { t: 'vmode', id, mode, reason }                この端末への動画の運び方（'stored' | 'stream'）
@@ -39,6 +41,7 @@ export const PROTOCOL = 1;
 //                                                   いま自分の画面に出しているもの（view.js。画面が変わったときだけ。絵そのものは送らない）
 //   { t: 'quiet', on }                              この端末で語り手の声を鳴らさない（on）／鳴らす（音の点呼の判定を本人が直す）
 //   { t: 'heard', round, level }                    音の点呼で、確かめの音をどれだけ拾ったか（dB。マイクが無ければ null）
+//   { t: 'link', id, ok, reason }                   リンクの動画をこの端末で流せるか（id＝'*' は埋め込みそのもの。reason は ytlink.js の理由）
 // 声の通話（段階3 V2。PeerJS の call・metadata { kind: 'voice' }）: 承認したときに語り手から張る。
 //   語り手 → 聞き手: 語り手の声＋その聞き手以外の聞き手の声（語り手の PC で混ぜる）／聞き手 → 語り手: その聞き手のマイク
 // 荷物用の2本目の接続（label 'bulk'・serialization 'raw'。承認済みの端末からだけ受ける）
@@ -58,6 +61,8 @@ export function welcomeMessage(work, pictures, media = []) {
       .map(([n, p]) => ({ n, mime: String(p.mime), size: Number(p.size) || 0 })),
     videos: videos.map((v) => ({ id: String(v.id), n: Number(v.n), size: Number(v.size) || 0, mime: String(v.mime || 'video/mp4') })),
     audio: audio.map((a) => ({ id: String(a.id), size: Number(a.size) || 0, mime: String(a.mime || 'audio/mpeg') })),
+    // ⚠️ リンクそのもの（語り手が書いた URL）は渡さず、ID と範囲だけ（合図の項目を名指しで拾う）
+    links: resolveLinks(work).map((l) => ({ id: l.id, n: l.n, yt: l.yt, start: l.start, end: l.end, captions: l.captions })),
   };
 }
 
@@ -247,6 +252,18 @@ export function onView(s, id, msg) {
   const v = cleanView(msg);
   if (!v) return false;
   p.view = v;
+  return true;
+}
+
+export const LINK_REASONS = ['api', 'blocked', 'gone', 'bad-link', 'referrer', 'player', 'stall'];
+
+/** 聞き手が、リンクの動画を流せるかを知らせてきた。承認済みの端末のものだけ受ける（R7）。
+ *  p.links[id] = null（流せる）| 理由。受けたら true（語り手は一覧と動画の枠の下を書き直す） */
+export function onLink(s, id, msg) {
+  const p = s.peers.get(id);
+  if (!p || p.status !== 'approved' || !msg || typeof msg.id !== 'string' || !msg.id || msg.id.length > 40) return false;
+  const why = msg.ok ? null : LINK_REASONS.includes(msg.reason) ? msg.reason : 'player';
+  p.links = { ...(p.links || {}), [msg.id]: why };
   return true;
 }
 

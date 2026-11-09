@@ -35,6 +35,7 @@
     <div id="loadError" class="card error" hidden></div>
     <div id="missing" class="card error" hidden></div>
     <div id="videoWarn" class="card error" hidden></div>
+    <div id="linkWarn" class="card error" hidden></div>
     <div id="mediaRow" class="row" hidden>
       <label class="file"><span data-i18n="pickMedia">Choose the media folder</span>
         <input id="pickMedia" type="file" webkitdirectory multiple>
@@ -150,6 +151,8 @@
         <div id="stageFrame" class="frame">
           <img id="current" alt="">
           <video id="nvideo" controls playsinline preload="metadata" hidden></video>
+          <!-- リンクの動画（YouTube の埋め込み。work-format §2.4）。ここにある YouTube の再生つまみが、そのまま合図になる -->
+          <div id="nlink" class="ylink" hidden></div>
         </div>
         <!-- 戻る／次へ（U4'）: 聞き手の画面の真下。上演中にいちばんよく押す -->
         <div class="nav">
