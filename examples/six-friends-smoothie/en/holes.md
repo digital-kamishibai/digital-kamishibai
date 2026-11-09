@@ -93,6 +93,10 @@ For playing to your family, music you already own, such as songs copied from you
 This sample uses music without words, so it doesn't get in the way of the narration. A song with words can work too if
 it is in a language your listeners don't use every day. Which music to use is up to you.
 
+**If you swap in your own music, its volume is evened out.** Before the show, the narrator's player measures each
+piece and plays any that is too loud at a level that sits under the voice (the files are not changed, and quiet pieces
+are not made louder).
+
 ---
 
 ## Hole 4: The ending video (after slide 5)
