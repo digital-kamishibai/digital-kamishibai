@@ -18,6 +18,7 @@ Copy the seed **as it is** into the plan, under `## Seed`. Do not reword it. The
 | **A pasted conversation with another AI** | speaker lines ("You:", "ChatGPT:"), a long back-and-forth | Separate **what the maker said or chose** (decided) from **what the AI only offered** (candidates), in a small table. Use what is decided; offer candidates only for what is left open |
 | **A plan, ready to use** | a title, a structure, slides | No candidates. Hold it against `templates/plan-template.md` and list **only the empty sections**; ask whether to go on to round 2 |
 | **A seed with wishes** | a book to build on, who it is for, a song, the ending video's song and photos | Every wish is **decided**. Check the facts it brings (step 3.5) and show the maker only what does not fit. Offer candidates only for what is left open |
+| **A sample** | a finished work folder with `holes.md` in it (for example `six-friends-smoothie-ja`), or "use the sample to make our own" | No candidates and no round 1. Go through its holes instead: [Starting from a sample](#starting-from-a-sample) below |
 
 - **What is written is decided; fill only what is empty.** The maker's words win. Do not overwrite a wish with a
   candidate.
@@ -57,6 +58,49 @@ Then, in one go:
 6. Show the maker the main points (title, structure, slides and length, what the fact check changed) and the questions,
    and ask them to open the work in the player and read it. From here it is the usual loop: practise → correction
    sheet → write back.
+
+## Starting from a sample
+
+A sample is a finished work published to be remade. Its `holes.md` lists the places a maker replaces with their own
+(the holes), how the sample's maker filled each one, and other ways to fill it. The story's frame is already there;
+the work becomes the maker's own through the holes.
+
+1. **Read `holes.md` first**, then `script.md`, then `plan.md` if there is one (the sample's picture prompts). With a
+   chat AI the maker may have given only these three text files; that is enough. The pictures, sounds and videos stay
+   on the maker's computer.
+2. If the folder is there, copy it to a new work folder first, so that the sample stays as it was.
+3. **Go through the holes one at a time**, in the order of `holes.md`, in the maker's language. For each hole, say in
+   a line or two what it is and how the sample filled it, give one or two of the other ways from `holes.md`, and ask
+   one short question. A hole that touches the people around the maker (who narrates, who is asked the question) is
+   theirs to decide; do not choose for them.
+4. **A hole the maker does not fill stays as the sample has it.** That is a finished choice, not something left
+   undone. Do not come back to it unless the maker does.
+5. Start `plan.md` (keep the sample's prompts below it if they are there) with a short table: each hole, and either
+   the maker's own words or "as in the sample".
+6. **The pictures** are a hole like any other. Offer the ways in `holes.md` easiest first: photos of the real thing,
+   a child's drawing, a chat AI that makes pictures, or the sample's pictures as they are. If the maker changes the
+   characters and paints with an AI, the sample's prompts follow slide 2's picture: paint slide 2 first and attach it
+   for the rest (`gen_images.py --anchor 2` on the picture ladder). If the recipe changes but the pictures stay,
+   tell the maker that the pictures still show the sample's ingredients, and let them choose. Write new prompts in
+   `plan.md` only when the maker chooses an AI, and with no real person's name (`references/pictures.md`).
+   **Rewrite a slide's `[Prompt N]` where it stands**, below the table: a second `[Prompt N]` for the same slide stops
+   the picture ladder. The slides not redrawn keep the sample's prompts.
+   **A new picture must be the one the script names.** The sample's `script.md` names each picture
+   (`> [Picture] pictures/02.jpg`): a new picture saved beside it under another name or extension (a chat AI's
+   `02.png`) is not shown until that line names it. Change the line, or save the new picture under the old name
+   (keep the sample's picture somewhere outside `pictures/`). The builder warns when two pictures share a name.
+   A phone photo is usually 4:3: the player shows it with dark bands at the sides, and words on the screen near the
+   edge (the recipe on the last slide) can land on them or on a busy part of the photo — look at the built slide, and
+   offer the maker a `fill` behind the words or a photo cut to 16:9.
+7. **Rewrite only what the holes change** in `script.md`, in the maker's words, and keep the markers and the frame.
+   A hole can reach past the slides `holes.md` names for it (the narrator is named again near the end; a new recipe
+   changes the title, the slides that explain how the ingredients help each other, and sounds such as a mixer):
+   before building, read the whole script once for what still belongs to the sample, and show the maker the list.
+   New facts the holes bring (a new ingredient's "special skill") go through step 3.5 before they go into the script.
+   Read `holes.md`'s notes on what the sample was careful about, and keep to them.
+8. Build for practising (`build_work.py <work folder> --draft`) and go on as usual: practise → correction sheet.
+9. If the maker means to give the work out beyond the family, point them to the rights notes in `holes.md` (the credit
+   the sample's licence asks for, the music, the people in photos and videos). Give no legal judgement of your own.
 
 ## What not to do
 

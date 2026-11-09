@@ -32,7 +32,7 @@ Installed as a plugin, `<repository>` (the ladders) is two folders above it. Whe
 | [scripts/build_work.py](scripts/build_work.py) | to turn `script.md` into `work.json`, the file the room player opens (Python 3.10+, no other installs) |
 | [scripts/doctor.py](scripts/doctor.py) | to see what a computer lacks for the tools (it installs nothing): `--for basic`, `ending-video`, `pictures`, `claude`, `codex` |
 | [references/correction-sheet.md](references/correction-sheet.md) | when the maker brings a correction sheet from practising in the room player |
-| [references/starting-from-a-seed.md](references/starting-from-a-seed.md) | when the maker brings a seed (a line, a pasted chat with another AI, a ready plan) and wants a first draft to practise with |
+| [references/starting-from-a-seed.md](references/starting-from-a-seed.md) | when the maker brings a seed (a line, a pasted chat with another AI, a ready plan) and wants a first draft to practise with — or starts from a sample (a folder with `holes.md`) |
 | [scripts/draft_boards.py](scripts/draft_boards.py) | for a first draft: a plain board on every slide that has no picture yet |
 | [templates/series-list-template.md](templates/series-list-template.md) | optional, from the second work on — what each earlier work said |
 | [scripts/check_sheet.py](scripts/check_sheet.py) | after writing a correction sheet back — checks that nothing is left |
@@ -73,6 +73,8 @@ If the maker stops for a while, that is fine; pick up where they left off when t
 
 A maker who brings a **seed** and wants something to practise with soon can take a shorter way through steps 1–3:
 candidates, then a whole first draft at once ([references/starting-from-a-seed.md](references/starting-from-a-seed.md)).
+A maker who starts from a **sample** (a work folder with `holes.md`) goes through its holes one at a time instead;
+a hole they do not fill stays as the sample has it (same file, "Starting from a sample").
 
 Steps 4 and 5 rest on two sets of manners that apply throughout: **the maker's role** and **joining in** (below).
 Keep the plan and the script in the maker's own folder for this work. Family photos, videos and music stay on the

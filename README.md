@@ -33,7 +33,7 @@ each other like players on a football team. It was performed for the family on t
 4. Read the story aloud from the narrator's screen and move through the slides. The listener's screen follows.
 
 `holes.md` in the folder shows the places you replace with your own — the narrator and why they started, the
-recipe, the music, the ending video, the one question — and how the sample's maker filled them.
+recipe, the music, the ending video, the one question, the pictures — and how the sample's maker filled them.
 
 ### What it takes
 
@@ -44,6 +44,20 @@ recipe, the music, the ending video, the one question — and how the sample's m
 - The sample took about three hours of recorded work, all on one day, from the first plan to the finished ending video
   (the talk about the recipe came earlier and is not counted). See
   [How the sample was made](docs/how-the-sample-was-made.md) for each step.
+
+### Music, videos and rights
+
+**For showing to your family, songs copied from your own CDs and videos you took yourself are generally thought to be
+fine to use as you like** (in Japan this counts as private use; it differs from country to country, and this is not
+legal advice).
+
+- Things you can use only by breaking their copy protection — tracks downloaded from a streaming service, video taken
+  off a DVD — are safer left out, even at home.
+- If you give the work out, or send it through the room player to people outside your family, it is safer to use music
+  whose rights have expired, and to link to videos rather than include them.
+- If you give out a work made from the sample, add "Digital Kamishibai, by Fast Focus Technologies" and say what you
+  changed (the sample's text is under CC BY 4.0).
+- If you give out photos or videos with your family in them, it is kind to ask the people in them first.
 
 ## Why
 
@@ -123,6 +137,8 @@ call the skill, and say:
 
 The AI reads the sample and its holes, then asks you a few questions — which dish, who makes it, why you want to tell
 it — before planning anything with you.
+With a chat AI (claude.ai, ChatGPT), three text files from the folder are enough: `holes.md`, `script.md` and
+`plan.md`. The pictures, sounds and videos can stay in your folder.
 
 ## Why it is safe for anyone to open the player
 

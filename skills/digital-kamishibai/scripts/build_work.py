@@ -352,6 +352,13 @@ def default_picture(number: int) -> str:
     return f'pictures/{number:02d}.jpg'
 
 
+def same_name_pictures(media: Path, picture: str) -> list[str]:
+    """Other pictures with the same name and another extension (pictures/02.png beside pictures/02.jpg)."""
+    path = Path(picture)
+    return [path.with_suffix(ext).as_posix() for ext in PICTURE_EXTS
+            if ext != path.suffix.lower() and (media / path.with_suffix(ext)).is_file()]
+
+
 def resolve_media(work: dict, media: Path | None, result: Result) -> None:
     video_total = 0
     for slide in work['slides']:
@@ -376,8 +383,16 @@ def resolve_media(work: dict, media: Path | None, result: Result) -> None:
                     result.warnings.append(f'{where}: picture not found: {base} (or .jpeg/.png/.webp)')
         else:
             if media is not None and not (media / slide['picture']).is_file():
-                result.warnings.append(f'{where}: picture not found: {slide["picture"]}')
+                others = same_name_pictures(media, slide['picture'])
+                result.warnings.append(f'{where}: picture not found: {slide["picture"]}'
+                                       + (f' ({others[0]} is there: write "> [Picture] {others[0]}")' if others else ''))
         picture = slide['picture']
+        if picture and media is not None and (media / picture).is_file():
+            # a new picture saved next to the old one under another extension (a chat AI's PNG beside a sample's
+            # JPEG) would otherwise be left out without a word
+            for other in same_name_pictures(media, picture):
+                result.warnings.append(f'{where}: shows {picture}, but {other} is there too (to show it, write '
+                                       f'"> [Picture] {other}" or move {picture} out of the folder)')
         if picture:
             ext = Path(picture).suffix.lower()
             if ext in HEIC_EXTS:

@@ -233,6 +233,30 @@ def test_missing_picture_keeps_the_default_name_and_warns(media):
     assert any('slide 2: picture not found' in w for w in r.warnings)
 
 
+def test_a_new_picture_beside_the_named_one_is_pointed_out(media):
+    # 見本から作り替えるとき: 台本が pictures/02.jpg を名指ししていて、チャット AI の絵を 02.png で隣に置いた
+    (media / 'pictures' / '02.jpg').write_bytes(b'x')
+    (media / 'pictures' / '02.png').write_bytes(b'x')
+    r = ok(script('## [Slide 1] A\n\na\n', '## [Slide 2] B\n\n> [Picture] pictures/02.jpg\n\nb\n'), media)
+    assert r.work['slides'][1]['picture'] == 'pictures/02.jpg'
+    assert any('slide 2' in w and 'pictures/02.png is there too' in w and '> [Picture] pictures/02.png' in w
+               for w in r.warnings)
+
+
+def test_a_new_picture_beside_the_default_one_is_pointed_out(media):
+    (media / 'pictures' / '01.jpg').write_bytes(b'x')
+    r = ok(script('## [Slide 1] A\n\na\n'), media)
+    assert r.work['slides'][0]['picture'] == 'pictures/01.jpg'
+    assert any('slide 1' in w and 'pictures/01.png is there too' in w for w in r.warnings)
+
+
+def test_a_named_picture_that_moved_to_another_extension_names_it(media):
+    # 絵のはしごの --use は、02.jpg を _replaced/ へ動かし 02.png を置く
+    r = ok(script('## [Slide 1] A\n\n> [Picture] pictures/01.jpg\n\na\n'), media)
+    assert any('slide 1: picture not found: pictures/01.jpg' in w and 'pictures/01.png is there' in w
+               for w in r.warnings)
+
+
 def test_video_slide_without_picture_has_null(media):
     r = ok(script('## [Slide 1] A\n\na\n', '## [Slide 2] B\n\n> [Video] videos/v.mp4\n'), media)
     assert r.work['slides'][1]['picture'] is None

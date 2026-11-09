@@ -7,6 +7,7 @@ import copy
 import importlib.util
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -248,8 +249,20 @@ def test_cross_fades_keep_the_total_length():
     assert total == pytest.approx(12.0)
 
 
-def test_frames_are_rounded_up():
-    assert bev.segment_frames(6.219) == 187 and bev.segment_frames(1.0) == 30
+def test_seats_are_counted_on_the_song_clock():
+    # seats of 5.12 s end to end: rounding each length by itself (154 frames) would put the 10th seat 4 frames late
+    seats, at = [], 0.0
+    for i in range(1, 11):
+        seats.append({'i': i, 'at': round(at, 3), 'dur': 5.12, 'xfade': 0.0})
+        at += 5.12
+    starts = [0]
+    for f in seats:
+        starts.append(starts[-1] + bev.seat_frames(f))
+    assert starts[:-1] == [bev.frame_at(f['at']) for f in seats]
+    assert starts[-1] == bev.frame_at(51.2)
+    assert bev.frame_at(0.05) == 2 and bev.frame_at(1 / 60) == 1          # halves go up
+    # a cross-fade gets one frame to spare (the cross-fade drops what it does not use)
+    assert bev.seat_frames({'at': 0.0, 'dur': 4.0, 'xfade': 0.6}) == 139
 
 
 # ---------- commands ----------
@@ -274,7 +287,9 @@ def test_held_clip_reads_only_what_plays():
     f = dict(definition()['frames'][2], clip_hold_sec=1.5)
     cmd = bev.build_clip_command('in.mp4', f, 'out.mp4')
     assert cmd[cmd.index('-t') + 1] == '2.500' and cmd.index('-t') < cmd.index('-i')
-    assert 'tpad=stop_mode=clone:stop_duration=1.500' in ' '.join(cmd)
+    # the hold, and two frames more so a video that runs out early still fills the seat; then cut to the seat's frames
+    assert 'tpad=stop_mode=clone:stop_duration=1.567' in ' '.join(cmd)
+    assert cmd[cmd.index('-frames:v') + 1] == str(bev.seat_frames(f)) and cmd.index('-frames:v') > cmd.index('-i')
     assert bev.clip_thumb_sec(f) == pytest.approx(1.0 + 2.0)
 
 
@@ -563,6 +578,38 @@ def test_the_sample_definition_is_valid():
     assert all(f.get('root') == 'work' for f in data['frames'])
 
 
+SMOOTHIE = ROOT / 'examples' / 'six-friends-smoothie'
+
+
+@pytest.mark.parametrize('lang', ['ja', 'en'])
+def test_the_smoothie_definition_remakes_on_its_finished_video(lang):
+    """The example made to be re-made: the finished videos/ending.mp4 is the template the untouched seats are cut from,
+    so a build must never write over it, and nothing may point outside the work folder."""
+    text = (SMOOTHIE / lang / 'ending_video.json').read_text(encoding='utf-8')
+    data = json.loads(text)
+    assert bev.validate_config(data) == []
+    assert data['output'] != 'ending.mp4'
+    assert data['audio'] == 'sounds/ending.mp3' and 'font' not in data['final_still']
+    frames = data['frames']
+    assert not re.search(r'\b[A-Za-z]:[\\/]', text)                     # no drive letters anywhere, notes included
+    assert all('\\' not in p and not p.startswith('/') for p in [data['audio']] + [f['src'] for f in frames])
+    assert all(f['root'] == 'work' and f['zoom'] == 1.0 for f in frames)
+    *clips, final = frames
+    assert final['kind'] == 'final' and final['src'] == 'videos/key_26.png'
+    for f in clips:
+        assert f['kind'] == 'clip' and f['src'] == 'videos/ending.mp4'
+        # the seat really starts 0-3 frames after `at` in the finished video (cut at `at`, it opens on the seat before)
+        assert 0 <= f['clip_start_sec'] - f['at'] < 4 / bev.FPS
+
+
+def test_the_smoothie_seats_are_the_same_in_both_languages():
+    ja, en = (json.loads((SMOOTHIE / lang / 'ending_video.json').read_text(encoding='utf-8')) for lang in ('ja', 'en'))
+    keys = ('i', 'at', 'dur', 'xfade', 'zoom', 'kind', 'src', 'clip_start_sec', 'clip_hold_sec')
+    assert [[f.get(k) for k in keys] for f in ja['frames']] == [[f.get(k) for k in keys] for f in en['frames']]
+    for key in ('audio', 'audio_sha256', 'duration_sec', 'output'):
+        assert ja[key] == en[key]
+
+
 # ---------- a real build (ffmpeg) ----------
 
 def make_work(tmp_path):
@@ -608,6 +655,32 @@ def test_build_storyboard_replace_rebuild_and_measure(tmp_path, capsys):
     assert ng == 0 and measured >= 1
     html = (work / 'ending' / 'storyboard.html').read_text(encoding='utf-8')
     assert html.count('class="card') == 3 and '--replace' in html
+
+
+@needs_ffmpeg
+def test_seats_joined_end_to_end_stay_on_the_song(tmp_path):
+    # eight seats of 1.707 s without cross-fades, each a different grey: every cut must be at the frame nearest
+    # its `at` (rounding each seat's length by itself put the last cut 3 frames late)
+    work = tmp_path / 'work'
+    (work / 'pictures').mkdir(parents=True)
+    (work / 'sounds').mkdir()
+    frames, at = [], 0.0
+    for i in range(1, 9):
+        Image.new('RGB', (320, 180), (i * 28,) * 3).save(work / 'pictures' / f'{i}.png')
+        frames.append({'i': i, 'at': round(at, 3), 'dur': 1.707, 'xfade': 0.0, 'zoom': 1.0, 'root': 'work',
+                       'src': f'pictures/{i}.png', 'status': 'picked'})
+        at += 1.707
+    total = round(at, 3)
+    subprocess.check_call(['ffmpeg', '-v', 'error', '-y', '-f', 'lavfi', '-i', f'sine=frequency=440:duration={total}',
+                           '-c:a', 'libmp3lame', str(work / 'sounds' / 'song.mp3')])
+    (work / 'ending_video.json').write_text(json.dumps(
+        {'audio': 'sounds/song.mp3', 'duration_sec': total, 'output': 'ending.mp4', 'frames': frames}), encoding='utf-8')
+    assert bev.main([str(work)]) == 0
+    raw = subprocess.run(['ffmpeg', '-v', 'error', '-i', str(work / 'videos' / 'ending.mp4'), '-vf', 'scale=8:8,format=gray',
+                          '-f', 'rawvideo', '-'], capture_output=True, check=True).stdout
+    grey = [round(raw[k * 64 + 27] / 28) for k in range(len(raw) // 64)]
+    cuts = [k for k in range(1, len(grey)) if grey[k] != grey[k - 1]]
+    assert cuts == [bev.frame_at(f['at']) for f in frames[1:]]
 
 
 @needs_ffmpeg

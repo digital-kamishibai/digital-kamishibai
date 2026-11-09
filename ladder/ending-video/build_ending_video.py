@@ -582,10 +582,23 @@ def zoom_center_of(frame):
 SUBPIXEL_TAG = 'subpixel1'          # the drawing generation, part of a moving seat's signature
 
 
-def segment_frames(length):
-    """Frames needed for `length` seconds. Rounded up, like ffmpeg's -t (6.219 s -> 187 frames): rounding to the
-    nearest would make some seats one frame short and leave the cross-fade short."""
-    return max(1, int(math.ceil(length * FPS - 1e-9)))
+SEAT_FRAMES_TAG = 'frames1'         # how a segment's frames are counted, part of every seat's signature
+
+
+def frame_at(sec):
+    """The frame nearest to `sec` seconds (halves go up, never to the even one)."""
+    return int(math.floor(sec * FPS + 0.5 + 1e-9))
+
+
+def seat_frames(frame):
+    """Frames of a seat's segment: from the frame nearest its `at` to the frame nearest its end (dur + xfade).
+    Counted on the song's clock, not from dur alone: rounding each seat's length by itself adds up, and seats joined
+    end to end (no cross-fade) drift late against the song (measured on a real work: 5 frames by the 27th seat).
+    A seat that cross-fades into the next gets one frame more: the cross-fade starts at the next seat's `at` and
+    must not run short; what it does not use is dropped."""
+    start = float(frame['at'])
+    n = frame_at(start + segment_length(frame)) - frame_at(start)
+    return max(1, n + (1 if float(frame.get('xfade', 0.0) or 0.0) > 0 else 0))
 
 
 def ease_at(p, ease='linear'):
@@ -660,14 +673,13 @@ ENCODE = ['-c:v', 'libx264', '-crf', '18', '-preset', 'veryfast', '-pix_fmt', 'y
 def build_photo_command(img, frame, dst):
     """A still seat from a picture prepared at 3840x2160. Returns (command, frame feeder or None).
     A moving seat is drawn by Pillow (ken_burns_frames); a still one (zoom 1.0) is left to ffmpeg."""
-    length = segment_length(frame)
-    nframes = segment_frames(length)
+    nframes = seat_frames(frame)
     zoom = float(frame.get('zoom', ZOOM_MAX))
     z_from = frame.get('zoom_from')
     head = ['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error']
     if z_from is None and zoom <= 1.0:
         return head + ['-loop', '1', '-i', img, '-vf', f'scale={OUT_W}:{OUT_H},setsar=1,fps={FPS},format=yuv420p',
-                       '-t', f'{length:.3f}', '-an', *ENCODE, dst], None
+                       '-frames:v', str(nframes), '-an', *ENCODE, dst], None
     if z_from:
         z0, (cx, cy), ease = float(z_from), zoom_center_of(frame), frame.get('ease', 'linear')
     else:
@@ -676,7 +688,7 @@ def build_photo_command(img, frame, dst):
     def feed():
         return ken_burns_frames(img, nframes, z0, zoom, cx, cy, ease)
 
-    return head + [*rawvideo_input(), '-vf', 'setsar=1,format=yuv420p', '-t', f'{length:.3f}', '-an',
+    return head + [*rawvideo_input(), '-vf', 'setsar=1,format=yuv420p', '-frames:v', str(nframes), '-an',
                    *ENCODE, dst], feed
 
 
@@ -742,10 +754,12 @@ def clip_thumb_sec(frame):
 
 def build_clip_command(src, frame, dst):
     """A video seat: seek before -i (fast), always silent, autorotation left on (rotate only on top of it).
-    A held seat reads only the seconds that play, then repeats the last frame (tpad)."""
+    A held seat reads only the seconds that play, then repeats the last frame (tpad). The segment is cut to
+    seat_frames; two more frames are always cloned at the end, so a video that runs out a frame early still fills it."""
     length = segment_length(frame)
+    nframes = seat_frames(frame)
     hold = clip_hold(frame)
-    pad = f',tpad=stop_mode=clone:stop_duration={hold:.3f}' if hold > 0 else ''
+    pad = f',tpad=stop_mode=clone:stop_duration={hold + 2.0 / FPS:.3f}'
     head = ['ffmpeg', '-y', '-hide_banner', '-loglevel', 'error']
     parts = clip_parts(frame)
     if parts:
@@ -755,11 +769,11 @@ def build_clip_command(src, frame, dst):
             chains.append(fit_filter(f'{k}:v', f'{k}:v', tag=str(k)) + f'[p{k}];')
             labels.append(f'[p{k}]')
         chain = ''.join(chains) + ''.join(labels) + f'concat=n={len(parts)}:v=1:a=0,fps={FPS}{pad},format=yuv420p'
-        return head + [*inputs, '-t', f'{length:.3f}', '-an', '-filter_complex', chain, *ENCODE, dst]
+        return head + [*inputs, '-frames:v', str(nframes), '-an', '-filter_complex', chain, *ENCODE, dst]
     pre, bg_in, fg_in = rotate_chain(frame.get('rotate'))
     play = ['-t', f'{length - hold:.3f}'] if hold > 0 else []
     return head + ['-ss', f'{float(frame.get("clip_start_sec", 0)):.3f}', *play, '-i', src,
-                   '-t', f'{length:.3f}', '-an',
+                   '-frames:v', str(nframes), '-an',
                    '-filter_complex', pre + fit_filter(bg_in, fg_in) + f',fps={FPS}{pad},format=yuv420p',
                    *ENCODE, dst]
 
@@ -1279,11 +1293,13 @@ def moves_camera(frame):
 def signature(frame, src_path, final_still_=None):
     """When a segment must be made again: its file, seconds and kind. Keys are added only when present, so that
     seats nobody touched keep their signature (and are not re-made). A moving seat carries the drawing generation:
-    a segment drawn on whole pixels must never be reused."""
+    a segment drawn on whole pixels must never be reused. Every seat carries how its frames are counted (seat_frames):
+    a segment counted the old way would put the seats after it off the song."""
     st = os.stat(src_path)
     sig = [frame.get('kind', 'photo'), frame['src'], round(frame['dur'], 3),
            round(float(frame.get('xfade', 0.0)), 3), round(float(frame.get('clip_start_sec', 0)), 3),
            float(frame.get('zoom', ZOOM_MAX)), int(st.st_size), int(st.st_mtime), frame.get('rotate')]
+    sig += [SEAT_FRAMES_TAG, seat_frames(frame)]
     if moves_camera(frame):
         sig += [SUBPIXEL_TAG]
     if clip_hold(frame) > 0:

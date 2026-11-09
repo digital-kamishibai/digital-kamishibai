@@ -10,17 +10,19 @@ other) works for any favourite dish.
 
 | Hole | Where | What you can change |
 |---|---|---|
-| 1 | Slide 1 | The narrator, and why they started |
-| 2 | Slides 2 and 5 | Your own recipe |
+| 1 | Slide 1 (and the ends of slides 4 and 5) | The narrator, and why they started |
+| 2 | Slides 2 to 5 | Your own recipe |
 | 3 | All five slides | The music |
 | 4 | After slide 5 | The ending video |
 | 5 | Slide 2 | The question |
+| 6 | All five slides | The pictures |
 
 ---
 
 ## Hole 1: The narrator, and why they started (slide 1)
 
 **Where**: all of slide 1, from "Every morning, Mom makes a smoothie." to "Today's story is about…".
+The narrator comes up again at the end of slide 4 and in the last line of slide 5: if you change the narrator, change those too.
 
 **What**: the narrator, and why they started making the dish.
 
@@ -40,9 +42,10 @@ has the examples this sample fixed).
 
 ---
 
-## Hole 2: Your own recipe (slides 2 and 5)
+## Hole 2: Your own recipe (slides 2 to 5)
 
-**Where**: the ingredients on slide 2, and the method and amounts on slide 5.
+**Where**: the ingredients on slide 2, the combinations (the passes) on slide 3, the talk about the body on slide 4,
+and the method and amounts on slide 5.
 
 **What**: **your own favourite dish** — a "special skill" for each ingredient, and what happens when they are put together.
 
@@ -61,6 +64,12 @@ Three combinations were kept (the tomato's red × the nuts' oil, iron from plant
 with an AI. The answers didn't go straight into the story: **the AI was asked for sources, and they were checked** first
 (see "What this sample shows").
 
+**What changes along with the dish**:
+- The title: the first line of the script and the `[Text]` on slide 1. If you remake the ending video, also `title` under
+  `final_still` and `page` in `ending_video.json`
+- The blender sound on slide 5 (`sounds/mixer.mp3`): a sound that fits your dish, or delete that line and its stage direction
+- Slide 4 need not be about the body ("cooked together, the flavours come together" keeps the same frame)
+
 ---
 
 ## Hole 3: The music (all five slides)
@@ -74,6 +83,7 @@ in your kitchen, or one your listeners love.
 
 **How the maker filled it**: a film theme from the 1960s. In this public version it is replaced by a recording
 anyone may use (a Schubert piano sonata).
+For playing to your family, music you already own, such as songs copied from your own CDs, is generally thought to be fine (in Japan this counts as private use; it differs from country to country, and this is not legal advice). It was replaced here only because the work is given out beyond the family. Music you can use only by breaking its copy protection, such as tracks downloaded from a streaming service, is safer left out even at home.
 
 **Other ways to fill it**:
 - The music you always put on while cooking
@@ -104,6 +114,33 @@ and the clips are re-timed to it (the music shortened by leaving out its middle)
 - Photos of the dish from different days, in order
 - No video at all: end on the picture of slide 5 (that works too)
 
+**Putting your own photos into the example's video**: this example comes with the definition of its ending video,
+[ending_video.json](ending_video.json), and its song, `sounds/ending.mp3`. The video is cut into 27 "seats" on the
+beats of the song, and the seats never move. Put your own photos or videos into only the seats you want to change; the
+seats you leave alone are re-made just as they are in the example. You could, say, replace only the seats where the six
+friends come in with photos of the ingredients in your own kitchen.
+
+```
+python ladder/ending-video/build_ending_video.py <work folder> --storyboard                 # a page of every seat (ending/storyboard.html), to choose the ones to change
+python ladder/ending-video/build_ending_video.py <work folder> --replace 9=photos/kitchen.jpg   # a photo in seat 9 (a video from its 3rd second: photos/cooking.mp4@3)
+python ladder/ending-video/build_ending_video.py <work folder>                               # makes videos/my_ending.mp4
+```
+
+- The tool is in the Digital Kamishibai repository, under `ladder/ending-video/` (it needs Python, Pillow and ffmpeg;
+  its README has the details). Like the picture tool, it is optional: the kamishibai works without it. If you are
+  making the work with an AI, asking "put this photo in seat 9" is often the quickest way
+- Keeping the photos and videos you put in inside the work folder means nothing gets lost when the folder moves
+- The re-made video is `videos/my_ending.mp4`. The example's `videos/ending.mp4` is the template the untouched seats
+  are cut from, so it is worth keeping. To play your version in the show, change the `[Video]` on slide 5 of the
+  script to `videos/my_ending.mp4`
+- The closing seat (27) is the picture without a title, `videos/key_26.png`, with the title drawn on it. To change the
+  title, change `title` under `final_still` in `ending_video.json`. The closing picture is the smoothie in the blender:
+  with another dish, `--replace 27=<a photo of the finished dish>` puts yours there (the title is drawn on it)
+- You can also make an ending video without this tool: a phone's photo app or a free video editor will put photos to
+  a song. The example's song, `sounds/ending.mp3`, is yours to use as well (it is a recording anyone may use)
+
+For showing to your family, your own videos and a favourite song you own are generally thought to be fine (in Japan this counts as private use; it differs from country to country). If you give the work out, or send it through the room player to people outside the family, it is safer to use music whose rights have expired, and to ask the people in the video first.
+
 ---
 
 ## Hole 5: The question (slide 2)
@@ -123,6 +160,43 @@ went on without correcting it.
 - "Which one do you think is the strongest?"
 
 This sample has just one question, so the story keeps moving. How many to ask is up to you.
+
+---
+
+## Hole 6: The pictures (all five slides)
+
+**Where**: the five pictures in `pictures/`. The title and the amounts are laid on top later from `[Text]` in the script,
+so the pictures need no words.
+
+**What**: one picture per slide. If you change the recipe in hole 2, the ingredients in the pictures change too.
+
+**Why**: with a photo of the real ingredients, listeners know at once: "that's the one we always have". Repainting in the
+sample's style tends to make the work look like the sample. Keeping the same style is not a step you need for your own version.
+
+**How the maker filled it**: all five were painted in one style by an AI that makes pictures (Gemini). The prompts are in
+[plan.md](plan.md).
+
+**Other ways to fill it** (easiest first):
+- Phone photos of the real ingredients, or of the finished dish (landscape; with the top 15% or so left clear, the
+  title fits there). Phone photos are usually 4:3, so dark bands show at the sides. On slide 5 the amounts sit on the
+  right: leave the right third clear too, or add a `fill` (a band of colour behind the words) to the amounts' `[Text]`
+- A drawing by your child, photographed in good light
+- Pictures from a chat AI that makes pictures: you paste `[Prompt style]` and `[Prompt N]` from plan.md together.
+  **If you change the characters, slide 2 comes first** (the other prompts are written to follow slide 2's picture);
+  the new slide 2 then goes with each request for the rest. To rewrite a prompt for your own ingredients, rewrite that
+  `[Prompt N]` in plan.md where it is (two prompts with the same number stop the picture tool)
+- The sample's pictures as they are (even with different ingredients, the frame of the story — together they help each other — still works)
+
+Photos and pictures can be mixed: a family photo on slide 1 and the sample's pictures for the rest also works.
+
+**After adding a new picture, look at the script's `[Picture]` line.** The script names each picture, like `> [Picture] pictures/02.jpg`.
+If your new picture has another name (`02.png`, `IMG_1234.jpg`), change that slide's `[Picture]` line to it
+(otherwise the sample's picture keeps showing; the builder tells you when two pictures share a number).
+
+---
+
+If you give out a work made from this sample, add the credit "Digital Kamishibai, by Fast Focus Technologies" and say what
+you changed (the sample's text is under CC BY 4.0; see [CREDITS.md](CREDITS.md)).
 
 ---
 
