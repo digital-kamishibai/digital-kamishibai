@@ -61,6 +61,8 @@ NEAR_HEADING = re.compile(r'^##\s*\[')              # looks like a slide heading
 TITLE = re.compile(r'^# (.+?)[ \t]*$')
 LANGUAGE = re.compile(r'^>[ \t]*Language:[ \t]*(\S+)[ \t]*$')
 CUE = re.compile(r'^>[ \t]*\[([^\]]+)\][ \t]*(.*?)[ \t]*$')
+HOLE = '~ '                                          # a hole's narration (§2.3): read aloud, the maker may replace it
+NEAR_HOLE = re.compile(r'^(?:[～〜][ \t　]|~(?=[^ ~]))')  # a full-width tilde or wave dash and a space, or "~" with no space
 
 TEXT_LENGTH = re.compile(r'^\d+(\.\d{1,2})?in$')
 TEXT_SIZE = re.compile(r'^\d+pt$')
@@ -181,6 +183,11 @@ def read_slide(number: int, title: str, body: list[Line], result: Result) -> dic
     while i < len(kept):
         line = kept[i]
         if not line.text.startswith('>'):
+            if line.text.startswith(HOLE) and not line.text[len(HOLE):].strip():
+                result.warnings.append(f'line {line.number}: "~ " (the mark of a hole\'s narration) with no words after it')
+            elif NEAR_HOLE.match(line.text):
+                result.warnings.append(f'line {line.number}: looks like the mark of a hole\'s narration, but the mark is '
+                                       '"~ " (a half-width tilde and a space). As written, it is read as plain narration')
             notes.append(line.text)
             i += 1
             continue

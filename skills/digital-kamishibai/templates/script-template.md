@@ -13,6 +13,7 @@ The full definition of the format is `docs/work-format.md` in the Digital Kamish
 | Header | everything before the first slide: `# Title`, then `> Language: xx` (for example `en`, `ja`) | the family only |
 | Slide heading | `## [Slide N] Title` — N starts at 1 and goes up by 1, no gaps | — |
 | Narration | plain text | the narrator, who says it aloud |
+| A hole's narration | `~ ` at the start of each line (`~ My favourite was ...`) | the narrator, who says it aloud — highlighted, as words they may replace with their own |
 | Free cue | a `>` line without a bracketed keyword (`> Wait until everyone is looking.`) | the narrator's eyes |
 | Machine cue | `> [Keyword] ...` (below) | tools act on it |
 | Words on the screen | a `> [Text]` block (below) | listeners, on the picture |
@@ -82,6 +83,9 @@ The figures are estimates for the plan, not a target for the narrator.
 
 Holes are marked with a production note, so they never reach the narrator's screen.
 A hole may stay empty: write the slide so that it stands without it, and delete the note if it is never filled.
+When a hole has stand-in narration that someone else may tell their own way (a sample, a script another person
+narrates), start each of its lines with `~ `: the narrator's screen highlights it, so the narrator sees what they may
+replace. It is still read aloud. Take the mark off once the maker's own words are in and are not to be changed.
 
 ```markdown
 # ⟨Title⟩

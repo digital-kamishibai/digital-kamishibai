@@ -100,6 +100,24 @@ def test_bold_marks_go_and_free_cues_keep_their_mark():
     assert w['slides'][0]['notes'] == '> Wait here.\n\nSay this.'
 
 
+def test_a_hole_keeps_its_mark_in_the_notes_as_narration():
+    r = ok(script('## [Slide 1] A\n\n> Wait here.\n\n~ Our **own** story\n~ goes here.\n\nThe end.\n'))
+    assert r.work['slides'][0]['notes'] == '> Wait here.\n\n~ Our own story\n~ goes here.\n\nThe end.'
+    assert r.warnings == []
+
+
+@pytest.mark.parametrize('line', ['～ 全角のチルダ', '〜 波ダッシュ', '~no space', '~ '])
+def test_a_line_that_looks_like_a_hole_mark_is_warned(line):
+    r = ok(script(f'## [Slide 1] A\n\n{line}\n\nb\n'))
+    assert any('line 7' in w and 'hole' in w for w in r.warnings), r.warnings
+    assert r.work['slides'][0]['notes'].startswith(line.rstrip())
+
+
+def test_tildes_that_are_not_a_mark_are_left_alone():
+    r = ok(script('## [Slide 1] A\n\n~~struck~~ and ~ in a line\n'))
+    assert r.warnings == []
+
+
 def test_line_breaks_and_trailing_spaces_are_kept():
     w = ok(script('## [Slide 1] A\n\na short line  \nand the next\n')).work
     assert w['slides'][0]['notes'] == 'a short line  \nand the next'

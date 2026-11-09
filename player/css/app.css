@@ -2,11 +2,13 @@
   color-scheme: light dark;
   --bg: #faf7f2; --fg: #222; --muted: #666; --card: #fff; --line: #ddd;
   --ok: #1a7f37; --ng: #b42318; --accent: #9a3412; --cue: #1d4ed8; --warn-bg: #fef3c7;
+  --hole-bg: #fff59d;
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     --bg: #161616; --fg: #eee; --muted: #aaa; --card: #222; --line: #333;
     --ok: #4ac26b; --ng: #ff7b72; --accent: #fdba74; --cue: #93c5fd; --warn-bg: #422006;
+    --hole-bg: #5c5000;
   }
 }
 * { box-sizing: border-box; }
@@ -92,6 +94,8 @@ body.narrator main { max-width: none; padding-top: 16px; }
   font-size: 1.4rem; line-height: 1.7; height: calc(100vh - 250px); min-height: 360px; overflow-y: auto; white-space: pre-wrap;
 }
 .notes .cue { color: var(--cue); font-size: 1rem; font-style: italic; }
+/* 穴の語り（行頭 "~ "）: 読む文なので字は普通のまま。背景だけ蛍光ペンの形（行の字の幅だけ塗る） */
+.notes .hole span { background: var(--hole-bg); padding: 0 .15em; border-radius: 2px; -webkit-box-decoration-break: clone; box-decoration-break: clone; }
 .side .label { margin: 8px 0 4px; color: var(--muted); font-size: .9rem; }
 .side .label:first-child { margin-top: 0; }
 /* 聞き手の画面の枠（U2）: 聞き手の全画面と同じ 16:9・黒地 */

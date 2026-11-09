@@ -93,6 +93,8 @@ the work becomes the maker's own through the holes.
    edge (the recipe on the last slide) can land on them or on a busy part of the photo — look at the built slide, and
    offer the maker a `fill` behind the words or a photo cut to 16:9.
 7. **Rewrite only what the holes change** in `script.md`, in the maker's words, and keep the markers and the frame.
+   A hole's narration starts with `~ ` on each line (highlighted on the narrator's screen). When the maker's own words
+   go in, take the mark off; a hole left as in the sample keeps it, so the narrator still sees they may tell it their way.
    A hole can reach past the slides `holes.md` names for it (the narrator is named again near the end; a new recipe
    changes the title, the slides that explain how the ingredients help each other, and sounds such as a mixer):
    before building, read the whole script once for what still belongs to the sample, and show the maker the list.

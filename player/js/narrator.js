@@ -912,6 +912,7 @@ function renderSlide() {
     paragraphs(text).forEach((p, i) => { if (!was.has(p)) changed.add(i); });
   }
   // 台本: 行頭 "> " は語り手への合図として見た目を分ける。改行はそのまま（息継ぎの設計）
+  // 行頭 "~ " は穴の語り（読む文。作る人・語る人が自分の話に替えてよい所）。印は出さず、字はそのまま蛍光ペンの形で出す
   const notes = $('notes');
   notes.replaceChildren();
   let para = 0, blank = true;
@@ -921,6 +922,7 @@ function renderSlide() {
     blank = empty;
     const div = document.createElement('div');
     if (line.startsWith('> ')) { div.className = 'cue'; div.textContent = line.slice(2); }
+    else if (line.startsWith('~ ')) { div.className = 'hole'; div.append(Object.assign(document.createElement('span'), { textContent: line.slice(2) })); }
     else div.textContent = line || ' ';
     if (!empty && changed.has(para)) div.classList.add('edited');
     notes.append(div);

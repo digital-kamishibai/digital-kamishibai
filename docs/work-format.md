@@ -93,6 +93,7 @@ Plain Markdown. Everything before the first slide heading is the **header**.
 | Kind | How to write | On the narrator's screen | Sent to listeners |
 |---|---|---|---|
 | Narration | plain text | yes | **never** |
+| A hole's narration | `~ ` at the start of each line (below) | yes, as narration, **highlighted** | **never** |
 | Free cue (for the narrator's eyes) | a `>` line not listed below | yes, marked as a cue | never |
 | **Machine cue** | `> [Keyword] ...` (§2.4) | yes, marked as a cue | the player acts on it |
 | Production note | `<!-- ... -->` | **no** | never |
@@ -106,6 +107,18 @@ Plain Markdown. Everything before the first slide heading is the **header**.
     its block holds its words, §2.6). Any other line in it is an error.
   - A block that starts with a free cue may not hold a machine cue on a later line — it would silently do nothing.
     That is an error too. Put a blank line between them.
+- **A hole's narration** is narration a maker or a narrator may replace with their own (a sample's hole: their own
+  ingredient, their own stumble). It is **read aloud** like any narration, so it is not a cue: it starts with `~ `
+  (a half-width tilde and a space), on **every line** of the paragraph. The mark is not said and not shown as text;
+  the narrator's screen shows the words as usual, on a light highlighter-yellow background.
+
+  ```markdown
+  ~ My favourite was the banana,
+  ~ because it tastes like the morning.
+  ```
+
+  - When the hole is filled with the maker's own words and nobody should change it any more, the mark comes off.
+  - A line that starts with `～ `, `〜 ` (full-width) or with `~` and no space is plain narration; the builder warns.
 
 ### 2.4 Machine cues
 
@@ -298,7 +311,9 @@ UTF-8 JSON. The builder writes it from `script.md`; a person never needs to edit
 2. Remove machine cue lines (§2.4), each with its line break. For `[Text]`, the whole block (its words too).
 3. Remove `**` around bold text. **Keep the leading `> ` of free cues**, so the player can show them as cues
    rather than as words to read aloud. (A tool that writes speaker notes for slides, such as the `--pptx` export,
-   may remove it there.)
+   may remove it there.) **Keep the leading `~ ` of a hole's narration too** (§2.3), so the player can highlight it
+   and a correction sheet's paragraphs match `script.md`. It is a mark, not words: a player shows the line without it,
+   and a tool that writes the notes out as text to read (speaker notes, a printed script) **must remove it**.
 4. **Only if something was removed in steps 1–2**: where blank lines now run two or more in a row,
    make them one blank line. (A note between two paragraphs would otherwise leave a wider gap than
    the writer made. If nothing was removed, the writer's blank lines stay exactly as they are.)
@@ -467,6 +482,7 @@ Sounds and videos of earlier slides are not replayed.
 | A machine cue block with a line that is not a machine cue, or a free cue block with a machine cue on a later line (§2.3) | error, stop | — |
 | Two `[Picture]` or `[BGM]`/`[BGM once]`/`[BGM after video]` on one slide | error, stop | — |
 | `[BGM after video]` (`start: "after-video"`) on a slide with no `[Video]` | error, stop | error |
+| A line that looks like the mark of a hole's narration but is not (`～ `, `〜 `, `~` with no space), or `~ ` with no words (§2.3) | warning (it is read as plain narration) | — |
 | `<!--` without `-->` | error, stop (the rest of the script would vanish from the notes) | — |
 | `[Text]` with no words, an unknown word on its line, neither or both of `place` and the four lengths, or only some of the four (§2.6) | error, stop | — |
 | A word line of `[Text]` that looks like a machine cue | error, stop (a blank line was forgotten) | — |

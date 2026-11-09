@@ -156,6 +156,8 @@ Write `script.md` from [templates/script-template.md](templates/script-template.
 - `>` lines are cues for the narrator's eyes. `> [Picture]`, `> [Text]`, `> [BGM]` and the other bracketed keywords
   are machine cues that tools act on.
 - `<!-- ... -->` is a production note: never shown to the narrator.
+- `~ ` at the start of each line marks **a hole's narration**: read aloud, and highlighted on the narrator's screen so
+  the person telling it sees where they may put in their own story. Mark a hole's stand-in words this way.
 - Words that listeners see on the picture (a title, a label, a year) go in a `> [Text]` block on that slide.
 - Each slide ends with a line that is exactly `---`.
 
