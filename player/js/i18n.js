@@ -38,6 +38,8 @@ const S = {
   unnamed: ['(no name)', '（名前なし）'],
   iceChecks: (s, a, h) => [`checks sent ${s} · answered ${a} · heard ${h}`, `確認 送信${s}・返事${a}・受信${h}`],
   blockedFrom: (d) => [`No answer from this ${d}. If it is Android 17 or later, Chrome needs the “Local network” permission on that device.`, `この${d}から返事がありません。Android 17 以降なら、その端末で Chrome に「ローカル ネットワーク」の権限が要ります。`],
+  levelMeasuring: ['Measuring how loud the music is…', '曲の大きさを測っています…'],
+  levelLowered: ['These songs are louder than music under the narration should be, so the player plays them quieter (the files are not changed):', 'これらの曲は語りの下に敷くには大きいので、小さくして鳴らします（ファイルはそのまま）:'],
   videoNotSent: ['These videos will not be sent to listeners (each listener gets them streamed from this screen instead):', 'これらの動画は聞き手へ送りません（代わりに、この画面の映像をその場で流します）:'],
   'why_too-big': ['over 300 MB — make a lighter copy', '300MB を超えています——軽い版を作ってください'],
   'why_not-mp4': ['not an MP4 file', 'MP4 ではありません'],

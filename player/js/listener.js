@@ -13,6 +13,7 @@ import { createEngine } from './engine.js';
 import { makeView, viewChanged } from './view.js';
 import { beep, measure } from './tone.js';
 import { LinkPlayer, loadApi, atEnd, isCaptions } from './ytlink.js';
+import { safeGain } from './loudness.js';
 
 applyI18n();
 const $ = (id) => document.getElementById(id);
@@ -332,7 +333,7 @@ function handle(conn, msg, narratorId) {
       expectedPics = Array.isArray(msg.pictures) ? msg.pictures.length : 0;
       picSlides = new Set((Array.isArray(msg.pictures) ? msg.pictures : []).map((p) => p.n));
       for (const a of Array.isArray(msg.audio) ? msg.audio : []) {
-        vids.set(String(a.id), { id: String(a.id), kind: 'audio', size: Number(a.size) || 0, mime: String(a.mime || 'audio/mpeg'), mode: null, bytes: 0, url: null });
+        vids.set(String(a.id), { id: String(a.id), kind: 'audio', size: Number(a.size) || 0, mime: String(a.mime || 'audio/mpeg'), gain: safeGain(a.gain), mode: null, bytes: 0, url: null });
       }
       for (const v of Array.isArray(msg.videos) ? msg.videos : []) {
         vids.set(String(v.id), { id: String(v.id), kind: 'video', n: v.n, size: Number(v.size) || 0, mime: String(v.mime || 'video/mp4'), mode: null, bytes: 0, url: null });
@@ -566,7 +567,7 @@ function refreshAudio() {
   const m = lastA;
   if (!m) return;
   const now = m.playing ? { ...m, pos: m.pos + (performance.now() - m.at) / 1000 } : m;
-  engine.setBgm(now, (id) => { const v = vids.get(id); return v && v.url ? v.url : null; });
+  engine.setBgm(now, (id) => { const v = vids.get(id); return v && v.url ? v.url : null; }, (id) => { const v = vids.get(id); return v ? v.gain : 0; });
 }
 
 /** 画面に触れたら音を出せるようにし、語り手に知らせる（語り手の画面の「音: 出せる」） */

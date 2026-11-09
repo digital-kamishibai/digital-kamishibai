@@ -202,9 +202,15 @@ const idOf = (f) => ({ 'sounds/a.mp3': 'A', 'sounds/s.mp3': 'S' })[f] || null;
 
 test('作品の情報の音は、id・大きさ・MIME だけ（パスは渡らない）', () => {
   const w = welcomeMessage(work, pictures, [...vids, { id: 'A', kind: 'audio', key: 'sounds/secret.mp3', size: 9, mime: 'audio/mpeg' }]);
-  assert.deepEqual(w.audio, [{ id: 'A', size: 9, mime: 'audio/mpeg' }]);
+  assert.deepEqual(w.audio, [{ id: 'A', size: 9, mime: 'audio/mpeg', gain: 0 }]);
   assert.equal(w.videos.length, 1);
   assert.ok(!everything(w).includes('secret'));
+});
+
+test('大きすぎる BGM を下げる量（dB）も渡す。上げる値・数でない値は 0 に、下げすぎは 40dB に収める', () => {
+  const a = (id, gain) => ({ id, kind: 'audio', key: `sounds/${id}.mp3`, size: 9, mime: 'audio/mpeg', gain });
+  const w = welcomeMessage(work, pictures, [a('A', -18.3), a('B', 6), a('C', 'x'), a('D', -90)]);
+  assert.deepEqual(w.audio.map((x) => x.gain), [-18.3, 0, 0, -40]);
 });
 
 test('開演するまで、音の合図はどこにも出ない', () => {

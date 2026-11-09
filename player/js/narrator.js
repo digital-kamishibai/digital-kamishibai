@@ -32,6 +32,7 @@ import { openRoom, keepSignaling, keepAwake, iceState, iceLine, relayOffered, re
 import { whyBlocked, isAndroid, relayNote } from './ice.js';
 import qrcode from '../vendor/qrcode.mjs';
 import { LinkPlayer, loadApi } from './ytlink.js';
+import { integratedLoudness, levelGain } from './loudness.js';
 
 applyI18n();
 const $ = (id) => document.getElementById(id);
@@ -42,7 +43,7 @@ let mediaMap = new Map();
 let workDir = null;                // 作品フォルダそのもの（showDirectoryPicker で選べたときだけ）。修正票の保存先の最初の場所
 let pictures = new Map();          // 番号 → { key, file, mime, size }
 let videos = [];                   // [{ id, kind: 'video', n, key, file, size, mime, problem }]
-let audios = [];                   // [{ id, kind: 'audio', key, file, size, mime, problem }]（BGM・効果音。段階4）
+let audios = [];                   // [{ id, kind: 'audio', key, file, size, mime, problem, gain? }]（BGM・効果音。段階4。gain＝大きすぎる BGM を下げる dB）
 let links = [];                    // [{ id, kind: 'link', n, k, key, yt, start, end }]（リンクの動画。ファイルは無く、配らない）
 const audioUrls = new Map();       // 音の id → 語り手の端末で鳴らす object URL
 // 配る素材。**音を先に**（開演直後から要る。動画は枚に来るまで要らない＝P7）
@@ -238,6 +239,43 @@ $('pickMedia').addEventListener('change', (e) => {
   resolve();
 });
 
+// ---------- BGM の曲の大きさをそろえる（docs/work-format.md §4。2026-11-09） ----------
+// 見本の曲を自分の曲（CD・配信）に差し替えると、約20dB 大きく鳴って語りを消す。開演より前に測り、大きすぎる曲だけ下げる。
+// 曲を丸ごと読み解くのは語り手の端末だけ（PC）。聞き手へは下げる量だけを welcome で渡す
+
+const LEVEL_KEY = 'dk-level:';      // ＋曲の id → 測った大きさ（LUFS）。同じ曲は2回目から測らない
+
+const gainOf = (id) => { const a = audios.find((x) => x.id === id); return a && a.gain ? a.gain : 0; };
+
+async function loudnessOf(a) {
+  try { const v = localStorage.getItem(LEVEL_KEY + a.id); if (v !== null) return Number(v); } catch { /* 覚えられないブラウザ */ }
+  const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
+  const buf = await new AC(1, 1, 44100).decodeAudioData(await a.file.arrayBuffer());
+  const l = integratedLoudness(Array.from({ length: buf.numberOfChannels }, (_, i) => buf.getChannelData(i)), buf.sampleRate);
+  try { localStorage.setItem(LEVEL_KEY + a.id, String(l)); } catch { /* 同上 */ }
+  return l;
+}
+
+async function measureLevels() {
+  const bgm = new Set(work.slides.flatMap((s) => s.cues.filter((c) => c.type === 'bgm').map((c) => c.file)));
+  const songs = audios.filter((a) => bgm.has(a.key));
+  const note = $('levelNote');
+  note.hidden = !songs.length;
+  note.textContent = t('levelMeasuring');
+  for (const a of songs) {
+    try { a.lufs = await loudnessOf(a); } catch { a.lufs = null; }   // 読み解けない曲はそのまま鳴らす
+    a.gain = levelGain(a.lufs);
+  }
+  const low = songs.filter((a) => a.gain < 0);
+  note.hidden = !low.length;
+  note.replaceChildren();
+  if (low.length) {
+    const p = document.createElement('p');
+    p.textContent = t('levelLowered');
+    note.append(p, ul(low.map((a) => `${a.key} (${a.gain.toFixed(1).replace('-', '−')} dB)`)));
+  }
+}
+
 async function resolve(opts = {}) {
   for (const u of urls.values()) URL.revokeObjectURL(u);
   urls.clear();
@@ -264,6 +302,7 @@ async function resolve(opts = {}) {
     audioUrls.set(id, URL.createObjectURL(a.file));
     return { ...a, kind: 'audio', id, problem: sendable({ ...a, kind: 'audio' }) };
   }));
+  await measureLevels();
   $('loadError').hidden = true;
   $('workTitle').textContent = work.title;
   const missing = [...r.missing, ...rv.missing, ...ra.missing];
@@ -1962,7 +2001,7 @@ function streamTo(id) {
 /** 語り手の端末の音を、いまの状態に合わせる。sounds＝その枚の効果音も鳴らすか */
 function playHere(sounds) {
   if (!session.audio.started) return;
-  engine.setBgm(astate(session.audio, Date.now()), (id) => audioUrls.get(id));
+  engine.setBgm(astate(session.audio, Date.now()), (id) => audioUrls.get(id), gainOf);
   if (sounds) for (const f of soundsAt(work, session.slide)) engine.playSound(audioUrls.get(idOf(f)));
 }
 
@@ -2416,6 +2455,7 @@ if (TEST) window.__dk = { link: () => ({ id: vCurrent && vCurrent.kind === 'link
   linkPlayer: () => linkP,
   linkPress: (what, at) => { const p = linkP.p; if (what === 'play') p.playVideo(); else if (what === 'pause') p.pauseVideo(); else p.seekTo(at, true); return true; }, loadForTest: (w, files) => { work = validateWork(w).work; workMap = files; mediaMap = new Map(); sheet = loadSheet(work); return resolve(); }, session: () => session,
   reloadForTest: (w, files) => reloadWith({ work: validateWork(w).work, map: files }), sheet: () => sheet, editing: () => editing, screen: () => screen, voice: () => ({ heard: routes(session.peers, voice, voiceCtx()).narrator, levels: mixer ? mixer.levels() : {}, calls: [...voiceCalls.keys()], state: { ...voice, held: [...voice.held], sameRoom: [...voice.sameRoom], quiet: [...voice.quiet] }, narratorTo: mixer ? mixer.narratorGains() : {} }), audio: () => engine.state(), audioId: (f) => idOf(f),
+  levels: () => audios.map((a) => ({ key: a.key, id: a.id, lufs: a.lufs ?? null, gain: a.gain ?? null })),
   rec: () => ({ on: !!recorder, mime: recMime, status: recorder ? recorder.status() : null, last: window.__dkRecLast || null, name: window.__dkRecName || null, recording: session.recording }),
   // 録ったファイル（OPFS）を base64 で少しずつ取り出す（確認スクリプトが ffprobe にかける）
   recChunk: async (off, len) => { const f = await (await (await navigator.storage.getDirectory()).getFileHandle(window.__dkRecName)).getFile();

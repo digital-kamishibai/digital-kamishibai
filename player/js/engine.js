@@ -4,12 +4,13 @@
 
 import { CROSSFADE_MS, FADE_OUT_MS, DUCK, TALK_DUCK_DB, TALK_DOWN_TC, TALK_UP_TC, bgmPosition } from './audio.js';
 import { TOLERANCE } from './playback.js';
+import { dbToAmp } from './loudness.js';
 
 export function createEngine() {
   let ctx = null;
   let master = null;          // 全体（動画のあいだの下げ・当日の音量つまみ）
   let out = null;             // この端末のスピーカーへ（「この端末でも鳴らす」の消音）。録画は master から取る
-  let deck = null;            // いま鳴っている BGM { id, url, el, gain }
+  let deck = null;            // いま鳴っている BGM { id, url, el, gain, level }（level＝曲の大きさをそろえる倍率。loudness.js）
   let ducked = false;
   let talking = false;        // 語り手が話している（そのあいだ BGM を下げる。T2）
   let muted = false;
@@ -79,19 +80,26 @@ export function createEngine() {
     },
     get unlocked() { return !!ctx && ctx.state === 'running'; },
 
-    /** BGM の合図を反映する。urlOf(id) → 保存した素材の URL（まだ無ければ null） */
-    setBgm(msg, urlOf) {
+    /** BGM の合図を反映する。urlOf(id) → 保存した素材の URL（まだ無ければ null）。
+     *  gainOf(id) → その曲を下げる量（dB。大きすぎる曲をそろえる。docs/work-format.md §4） */
+    setBgm(msg, urlOf, gainOf = () => 0) {
       ensure();
       const url = msg && msg.id ? urlOf(msg.id) : null;
       if (!url) {
         if (deck) { retire(deck, FADE_OUT_MS); deck = null; }
         return;
       }
-      if (deck && deck.id === msg.id) { seekAndPlay(deck, msg); return; }
+      const level = dbToAmp(gainOf(msg.id));
+      if (deck && deck.id === msg.id) {
+        if (deck.level !== level) { deck.level = level; ramp(deck.gain, level, 300); }
+        seekAndPlay(deck, msg);
+        return;
+      }
       const old = deck;
       deck = newDeck(msg.id, url, msg.loop);
+      deck.level = level;
       seekAndPlay(deck, msg);
-      ramp(deck.gain, 1, old ? CROSSFADE_MS : 300);
+      ramp(deck.gain, level, old ? CROSSFADE_MS : 300);
       if (old) retire(old, CROSSFADE_MS);
     },
 
@@ -122,7 +130,7 @@ export function createEngine() {
 
     /** 自動テスト用: いま鳴らしている BGM */
     state() {
-      return { bgm: deck ? deck.id : null, playing: !!deck && !deck.el.paused, pos: deck ? deck.el.currentTime : 0, ducked, talking, muted, music, played, ctx: ctx ? ctx.state : 'none' };
+      return { bgm: deck ? deck.id : null, level: deck ? deck.level : null, playing: !!deck && !deck.el.paused, pos: deck ? deck.el.currentTime : 0, ducked, talking, muted, music, played, ctx: ctx ? ctx.state : 'none' };
     },
   };
 }
