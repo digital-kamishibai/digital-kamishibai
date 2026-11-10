@@ -1,7 +1,7 @@
 // 作品（work.json＋素材）の読み込みと検査。定義は docs/work-format.md だけ——ここはそれに従う。
 // DOM にも通信にも触らない純粋な関数だけを置く（node --test で守る）。
 
-import { youtubeId, isLink, isCaptions } from './ytlink.js';
+import { youtubeId, isLink, isCaptions, isVolumeDb, volumeDbOf, MIN_VOLUME_DB } from './ytlink.js';
 
 export const FORMAT = 'digital-kamishibai/work';
 export const VERSION = 1;
@@ -100,6 +100,7 @@ function linkCueErrors(c) {
   if (c.start !== undefined && !(isTime(c.start) && c.start >= 0)) errors.push('video start must be seconds (>= 0)');
   if (c.end !== undefined && !(isTime(c.end) && c.end > (isTime(c.start) ? c.start : 0))) errors.push('video end must be seconds after start');
   if (c.captions !== undefined && !isCaptions(c.captions)) errors.push('video captions must be a language code, like "ja"');
+  if (c.volume !== undefined && !isVolumeDb(c.volume)) errors.push(`video volume must be dB from ${MIN_VOLUME_DB} to 0 (got ${JSON.stringify(c.volume)})`);
   if (c.role !== undefined || c.seats !== undefined || c.source_segments !== undefined) errors.push('a linked video has no role, seats or source_segments');
   return errors;
 }
@@ -274,7 +275,7 @@ export function resolveVideos(work, maps) {
 
 /** リンクの動画の一覧（work-format §2.4）。ファイルは無く、各端末が YouTube から流す。
  *  id は枚と何本目か（link-N-K）——パスも題も入らないので、そのまま聞き手へ渡せる。
- *  戻り値: [{ id, kind: 'link', n, k, key, yt, start, end, captions }]（key＝リンク。語り手の画面だけで使う） */
+ *  戻り値: [{ id, kind: 'link', n, k, key, yt, start, end, captions, volume }]（volume＝dB、書いていなければ 0）。key＝リンク（語り手の画面だけで使う） */
 export function resolveLinks(work) {
   const out = [];
   for (const s of work.slides) {
@@ -284,7 +285,8 @@ export function resolveLinks(work) {
       k += 1;
       if (!isLink(c)) continue;
       out.push({ id: `link-${s.number}-${k}`, kind: 'link', n: s.number, k, key: c.url, yt: youtubeId(c.url),
-        start: isTime(c.start) ? c.start : 0, end: isTime(c.end) ? c.end : null, captions: isCaptions(c.captions) ? c.captions : null });
+        start: isTime(c.start) ? c.start : 0, end: isTime(c.end) ? c.end : null, captions: isCaptions(c.captions) ? c.captions : null,
+        volume: volumeDbOf(c.volume) });
     }
   }
   return out;

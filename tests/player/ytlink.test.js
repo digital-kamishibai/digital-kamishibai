@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { youtubeId, isLink, cutOf, clampCut, atEnd, jumped, embedSrc, errorReason, isCaptions, EMBED_ORIGIN, END_EARLY } from '../../player/js/ytlink.js';
+import { youtubeId, isLink, cutOf, clampCut, atEnd, jumped, embedSrc, errorReason, isCaptions, ytVolume, volumeDbOf, EMBED_ORIGIN, END_EARLY } from '../../player/js/ytlink.js';
 
 test('YouTube のリンクの形をどれも読む', () => {
   for (const url of [
@@ -95,4 +95,21 @@ test('流せない理由の番号を言葉にする', () => {
   assert.equal(errorReason(2), 'bad-link');
   assert.equal(errorReason(153), 'referrer');
   assert.equal(errorReason(5), 'player');
+});
+
+test('リンクの動画の音量: 当日のつまみ × その動画の dB を、setVolume の 0〜100 にする（setVolume(n) は <video>.volume＝n/100）', () => {
+  assert.equal(ytVolume(1), 100, '書いていなければそのまま');
+  assert.equal(ytVolume(1, 0), 100);
+  assert.equal(ytVolume(1, -6), 50);
+  assert.equal(ytVolume(1, -10), 32);
+  assert.equal(ytVolume(1, -20), 10);
+  assert.equal(ytVolume(1, -40), 1);
+  assert.equal(ytVolume(0.5, -6), 25, 'つまみと掛け合わせる');
+  assert.equal(ytVolume(0, -6), 0);
+  assert.equal(ytVolume(2, 0), 100, 'つまみは 1 まで');
+  assert.equal(ytVolume(1, 6), 100, '大きくはしない（おかしい値はそのまま）');
+  assert.equal(ytVolume(1, -60), 100, '−40 より小さい値もおかしい値');
+  assert.equal(ytVolume(1, '-6'), 100, '数でなければそのまま');
+  assert.equal(volumeDbOf(undefined), 0);
+  assert.equal(volumeDbOf(-6.5), -6.5);
 });

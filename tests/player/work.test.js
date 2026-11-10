@@ -277,6 +277,11 @@ test('リンクの動画: YouTube のリンクと、開始・止める秒（work
   assert.deepEqual(validateWork(withCue({ ...ok, captions: 'pt-BR' })).errors, []);
   bad({ ...ok, captions: 'Japanese!' }, /captions must be a language code/);
   bad({ ...ok, captions: true }, /captions must be a language code/);
+  assert.deepEqual(validateWork(withCue({ ...ok, volume: -6 })).errors, []);
+  assert.deepEqual(validateWork(withCue({ ...ok, volume: -40 })).errors, []);
+  bad({ ...ok, volume: 3 }, /volume must be dB from -40 to 0/);
+  bad({ ...ok, volume: -41 }, /volume must be dB from -40 to 0/);
+  bad({ ...ok, volume: '-6dB' }, /volume must be dB from -40 to 0/);
   bad({ ...ok, role: 'ending' }, /no role, seats or source_segments/);
   bad({ ...ok, source_segments: [{ start: 0, dur: 1 }] }, /no role, seats or source_segments/);
 });
@@ -285,15 +290,15 @@ test('リンクの動画は手元のファイルに結びつけない・足り�
   const w = clone(sample);
   w.slides[1].cues = [{ type: 'video', file: 'videos/a.mp4' }, { type: 'video', url: 'https://youtu.be/8KkKuTCFvzI', start: 351, end: 369 }];
   w.slides[2].picture = null;
-  w.slides[2].cues = [{ type: 'video', url: 'https://www.youtube.com/watch?v=dCVlRFWOjgE' }];
+  w.slides[2].cues = [{ type: 'video', url: 'https://www.youtube.com/watch?v=dCVlRFWOjgE', volume: -6 }];
   w.slides[3].cues = []; w.slides[3].picture = 'pictures/04.jpg'; // 見本のエンディング動画は外す
   assert.deepEqual(validateWork(w).errors, [], '絵の無い枚でも、リンクの動画があればよい');
   const rv = resolveVideos(w, [new Map([['videos/a.mp4', { size: 5 }]])]);
   assert.deepEqual(rv.missing, []);
   assert.deepEqual(rv.videos.map((v) => [v.n, v.k, v.key]), [[2, 1, 'videos/a.mp4']]);
   assert.deepEqual(resolveLinks(w), [
-    { id: 'link-2-2', kind: 'link', n: 2, k: 2, key: 'https://youtu.be/8KkKuTCFvzI', yt: '8KkKuTCFvzI', start: 351, end: 369, captions: null },
-    { id: 'link-3-1', kind: 'link', n: 3, k: 1, key: 'https://www.youtube.com/watch?v=dCVlRFWOjgE', yt: 'dCVlRFWOjgE', start: 0, end: null, captions: null },
+    { id: 'link-2-2', kind: 'link', n: 2, k: 2, key: 'https://youtu.be/8KkKuTCFvzI', yt: '8KkKuTCFvzI', start: 351, end: 369, captions: null, volume: 0 },
+    { id: 'link-3-1', kind: 'link', n: 3, k: 1, key: 'https://www.youtube.com/watch?v=dCVlRFWOjgE', yt: 'dCVlRFWOjgE', start: 0, end: null, captions: null, volume: -6 },
   ]);
   assert.deepEqual(resolveLinks(sample), []);
 });

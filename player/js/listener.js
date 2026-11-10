@@ -12,7 +12,7 @@ import { openStore, freeSpace } from './store.js';
 import { createEngine } from './engine.js';
 import { makeView, viewChanged } from './view.js';
 import { beep, measure } from './tone.js';
-import { LinkPlayer, loadApi, atEnd, isCaptions } from './ytlink.js';
+import { LinkPlayer, loadApi, atEnd, isCaptions, volumeDbOf } from './ytlink.js';
 import { safeGain } from './loudness.js';
 
 applyI18n();
@@ -40,7 +40,7 @@ let narrator = '';        // 語り手の peer ID
 let prepared = false;     // 動画の申告を済ませたか
 const vEl = $('lvideo');
 // リンクの動画（YouTube の埋め込み）。ファイルは受け取らず、この端末が YouTube から流す
-const links = new Map();  // id → { id, n, yt, start, end }
+const links = new Map();  // id → { id, n, yt, start, end, captions, volume }
 const lp = new LinkPlayer($('llinkFrame'), { follow: true });
 let linkOn = false;       // 埋め込みを見せている（語り手がリンクの動画を始めている）
 let playTimer = 0;        // 流せと言われたのに流れない（自動再生を止められた）のを見る
@@ -342,7 +342,7 @@ function handle(conn, msg, narratorId) {
       for (const l of Array.isArray(msg.links) ? msg.links : []) {
         if (l && typeof l.id === 'string' && typeof l.yt === 'string') {
           links.set(l.id, { id: l.id, n: Number(l.n), yt: l.yt, start: Number(l.start) || 0, end: Number.isFinite(l.end) ? l.end : null,
-            captions: isCaptions(l.captions) ? l.captions : null });
+            captions: isCaptions(l.captions) ? l.captions : null, volume: volumeDbOf(l.volume) });
         }
       }
       // 埋め込みを使う作品なら、API を先に読む。読めない端末（ネットに出られない・遮られている）は語り手に知らせる
@@ -748,4 +748,4 @@ $('stage').addEventListener('click', () => {
 document.addEventListener('fullscreenchange', () => { $('hint').hidden = !!document.fullscreenElement || $('picture').hidden; });
 
 // 自動テスト用（?test のときだけ）
-if (TEST) window.__dkl = { link: () => ({ on: linkOn, id: lp.item && lp.item.id, ready: lp.ready, error: lp.error, playing: !lp.paused, pos: lp.currentTime, state: lp.state(), captions: lp.captionsNow(), tap: !$('tapPlay').hidden }), audio: () => engine.state(), view: () => lastView, fakeHeard: null, voiceStream: () => voiceEl.srcObject };
+if (TEST) window.__dkl = { link: () => ({ on: linkOn, id: lp.item && lp.item.id, ready: lp.ready, error: lp.error, playing: !lp.paused, pos: lp.currentTime, state: lp.state(), captions: lp.captionsNow(), vol: lp.volumeNow(), tap: !$('tapPlay').hidden }), audio: () => engine.state(), view: () => lastView, fakeHeard: null, voiceStream: () => voiceEl.srcObject };

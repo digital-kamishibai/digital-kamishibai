@@ -14,7 +14,7 @@ export const PROTOCOL = 1;
 // 語り手 → 聞き手
 //   { t: 'wait' }                                   承認待ち
 //   { t: 'reject' }                                 断られた
-//   { t: 'welcome', title, count, pictures:[{n, mime, size}], videos:[{id, n, size, mime}], audio:[{id, size, mime, gain}], links:[{id, n, yt, start, end, captions}] }
+//   { t: 'welcome', title, count, pictures:[{n, mime, size}], videos:[{id, n, size, mime}], audio:[{id, size, mime, gain}], links:[{id, n, yt, start, end, captions, volume}] }
 //                                                   links＝リンクの動画（YouTube の ID と流す範囲だけ。各端末が埋め込みで流す）
 //   { t: 'pic', n, mime, data }                     絵1枚（data は通信の層が詰める）
 //   { t: 'slide', n }                               いまの枚
@@ -64,7 +64,7 @@ export function welcomeMessage(work, pictures, media = []) {
     // gain＝大きすぎる BGM を下げる量（dB、0 以下。語り手が測った。docs/work-format.md §4）
     audio: audio.map((a) => ({ id: String(a.id), size: Number(a.size) || 0, mime: String(a.mime || 'audio/mpeg'), gain: safeGain(a.gain) })),
     // ⚠️ リンクそのもの（語り手が書いた URL）は渡さず、ID と範囲だけ（合図の項目を名指しで拾う）
-    links: resolveLinks(work).map((l) => ({ id: l.id, n: l.n, yt: l.yt, start: l.start, end: l.end, captions: l.captions })),
+    links: resolveLinks(work).map((l) => ({ id: l.id, n: l.n, yt: l.yt, start: l.start, end: l.end, captions: l.captions, volume: l.volume })),
   };
 }
 

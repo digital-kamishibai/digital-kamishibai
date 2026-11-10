@@ -361,6 +361,26 @@ def test_a_linked_video_may_show_captions_from_the_start():
     assert w['slides'][1]['cues'] == [{'type': 'video', 'url': 'https://www.youtube.com/watch?v=dCVlRFWOjgE', 'start': 45, 'captions': 'pt-BR'}]
 
 
+def test_a_linked_video_may_be_played_quieter():
+    w = ok(script(f'## [Slide 1] A\n\n> [Video] {TED} start 5:51 end 6:09 captions ja volume -6dB\n\na\n',
+                  '## [Slide 2] B\n\n> [Video] https://youtu.be/dCVlRFWOjgE volume -7.5db start 45\n\nb\n',
+                  '## [Slide 3] C\n\n> [Video] https://youtu.be/dCVlRFWOjgE volume 0dB\n\nc\n')).work
+    assert w['slides'][0]['cues'] == [{'type': 'video', 'url': TED, 'start': 351, 'end': 369, 'captions': 'ja', 'volume': -6}]
+    assert w['slides'][1]['cues'] == [{'type': 'video', 'url': 'https://www.youtube.com/watch?v=dCVlRFWOjgE', 'start': 45, 'volume': -7.5}]
+    assert w['slides'][2]['cues'] == [{'type': 'video', 'url': 'https://www.youtube.com/watch?v=dCVlRFWOjgE'}]
+
+
+def test_a_linked_video_volume_is_db_and_never_louder():
+    def err(line):
+        return errors(script(f'## [Slide 1] A\n\n> [Video] {line}\n\na\n'))
+    assert 'is not a volume' in err(f'{TED} volume 50')
+    assert 'is not a volume' in err(f'{TED} volume +3dB')
+    assert 'is not a volume' in err(f'{TED} volume -41dB')
+    assert 'is not a volume' in err(f'{TED} volume quiet')
+    assert 'once each' in err(f'{TED} volume -6dB volume -3dB')
+    assert '"volume <dB>"' in err(f'{TED} volume')
+
+
 def test_youtube_ids_and_times_read_like_the_player():
     for url in ('https://www.youtube.com/watch?v=8KkKuTCFvzI', 'https://youtu.be/8KkKuTCFvzI?t=3',
                 'https://m.youtube.com/watch?v=8KkKuTCFvzI', 'https://www.youtube-nocookie.com/embed/8KkKuTCFvzI',

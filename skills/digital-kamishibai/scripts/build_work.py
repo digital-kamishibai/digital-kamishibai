@@ -55,6 +55,8 @@ SECONDS = re.compile(r'^(?:(?:(\d+):)?(\d+):)?(\d+(?:\.\d+)?)$')         # 351, 
 LINK_TIME = re.compile(r'^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s?)?$')  # t=351, t=351s, t=5m51s
 LINK = re.compile(r'^https?://', re.IGNORECASE)
 CAPTIONS = re.compile(r'^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$')       # ja, en, pt-BR
+VOLUME = re.compile(r'^([+-]?\d+(?:\.\d+)?)dB$', re.IGNORECASE)      # -6dB (a linked video, §2.4)
+MIN_VOLUME_DB = -40                                                  # the player's lower end (ytlink.js)
 
 HEADING = re.compile(r'^## \[Slide (\d+)\][ \t]*(.*?)[ \t]*$')
 NEAR_HEADING = re.compile(r'^##\s*\[')              # looks like a slide heading but is not one
@@ -313,7 +315,8 @@ def plain(value: float) -> int | float:
 
 
 def link_cue(arg: str, line: int, result: Result) -> dict | None:
-    """`[Video] <YouTube link> start 5:51 end 6:09 captions ja` -> {'type': 'video', 'url', 'start', 'end', 'captions'} (§2.4).
+    """`[Video] <YouTube link> start 5:51 end 6:09 captions ja volume -6dB`
+    -> {'type': 'video', 'url', 'start', 'end', 'captions', 'volume'} (§2.4).
     start and end may also come from the link itself (t=, start=, end=), but not from both."""
     words = arg.split()
     url, rest = words[0], words[1:]
@@ -324,15 +327,26 @@ def link_cue(arg: str, line: int, result: Result) -> dict | None:
         return None
     said: dict[str, float] = {}
     if len(rest) % 2:
-        result.errors.append(f'line {line}: after the link, [Video] takes "start <time>", "end <time>" and '
-                             f'"captions <language>" (got: {" ".join(rest)})')
+        result.errors.append(f'line {line}: after the link, [Video] takes "start <time>", "end <time>", '
+                             f'"captions <language>" and "volume <dB>" (got: {" ".join(rest)})')
         return None
     captions = None
+    volume = None
     for key, value in zip(rest[::2], rest[1::2]):
-        if key not in ('start', 'end', 'captions') or key in said or (key == 'captions' and captions):
-            result.errors.append(f'line {line}: after the link, [Video] takes "start <time>", "end <time>" and '
-                                 f'"captions <language>", once each (got "{key}")')
+        if (key not in ('start', 'end', 'captions', 'volume') or key in said
+                or (key == 'captions' and captions) or (key == 'volume' and volume is not None)):
+            result.errors.append(f'line {line}: after the link, [Video] takes "start <time>", "end <time>", '
+                                 f'"captions <language>" and "volume <dB>", once each (got "{key}")')
             return None
+        if key == 'volume':
+            m = VOLUME.match(value)
+            db = float(m.group(1)) if m else None
+            if db is None or db > 0 or db < MIN_VOLUME_DB:
+                result.errors.append(f'line {line}: volume {value} is not a volume. Write how much quieter, in dB, '
+                                     f'from 0dB to {MIN_VOLUME_DB}dB, like -6dB (a linked video cannot be made louder)')
+                return None
+            volume = db
+            continue
         if key == 'captions':
             if not CAPTIONS.match(value):
                 result.errors.append(f'line {line}: captions {value} is not a language (write a code, like ja or en)')
@@ -370,6 +384,8 @@ def link_cue(arg: str, line: int, result: Result) -> dict | None:
         cue['end'] = plain(cut['end'])
     if captions:
         cue['captions'] = captions
+    if volume:
+        cue['volume'] = plain(volume)
     return cue
 
 

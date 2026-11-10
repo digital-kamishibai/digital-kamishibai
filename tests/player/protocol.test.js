@@ -337,7 +337,7 @@ const linkWork = {
       { type: 'video', file: 'videos/SECRET_FILE.mp4' },
       { type: 'video', url: 'https://www.youtube.com/watch?v=8KkKuTCFvzI&list=SECRETLIST', start: 351, end: 369, captions: 'ja' },
     ] },
-    { number: 3, title: 'C', picture: null, notes: '', cues: [{ type: 'video', url: 'https://youtu.be/dCVlRFWOjgE' }] },
+    { number: 3, title: 'C', picture: null, notes: '', cues: [{ type: 'video', url: 'https://youtu.be/dCVlRFWOjgE', volume: -6 }] },
   ],
 };
 
@@ -346,8 +346,8 @@ test('リンクの動画は、YouTube の ID と流す範囲だけが聞き手�
   const out = [...onHello(s, 'a', {}), ...approve(s, 'a', linkWork, new Map())];
   const welcome = out.find((o) => o.msg.t === 'welcome').msg;
   assert.deepEqual(welcome.links, [
-    { id: 'link-2-2', n: 2, yt: '8KkKuTCFvzI', start: 351, end: 369, captions: 'ja' },
-    { id: 'link-3-1', n: 3, yt: 'dCVlRFWOjgE', start: 0, end: null, captions: null },
+    { id: 'link-2-2', n: 2, yt: '8KkKuTCFvzI', start: 351, end: 369, captions: 'ja', volume: 0 },
+    { id: 'link-3-1', n: 3, yt: 'dCVlRFWOjgE', start: 0, end: null, captions: null, volume: -6 },
   ]);
   const text = everything(out);
   for (const secret of ['SECRETLIST', 'youtube.com', 'youtu.be', 'SECRET_FILE', 'SECRET NOTES']) assert.ok(!text.includes(secret), secret);

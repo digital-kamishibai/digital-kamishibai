@@ -36,7 +36,7 @@ The full definition of the format is `docs/work-format.md` in the Digital Kamish
 | `> [BGM stop]` | fade the music out |
 | `> [Sound] sounds/bell.mp3` | a sound, once, when the slide opens |
 | `> [Video] videos/ending.mp4` | a video the narrator starts by pressing play |
-| `> [Video] https://youtu.be/⟨id⟩ start 5:51 end 6:09 captions ja` | a video published on YouTube, played from YouTube on every device from `start` to `end`, with captions in that language shown from the start (all three optional; listeners cannot turn captions on themselves). Nothing is packed. Each device needs the internet, and it does not play when its owner does not allow other sites — write what to say when it cannot be played |
+| `> [Video] https://youtu.be/⟨id⟩ start 5:51 end 6:09 captions ja volume -6dB` | a video published on YouTube, played from YouTube on every device from `start` to `end`, with captions in that language shown from the start, and `volume` dB quieter (all four optional; listeners cannot turn captions on themselves). Linked videos play with YouTube's own loudness, which differs from video to video: when one sounds louder than the rest, turn it down with `volume` (`0dB` to `-40dB`), by ear. Nothing is packed. Each device needs the internet, and it does not play when its owner does not allow other sites — write what to say when it cannot be played |
 
 At most one `[Picture]` and one `[BGM]` / `[BGM once]` / `[BGM after video]` / `[BGM stop]` per slide. Paths use `/`.
 

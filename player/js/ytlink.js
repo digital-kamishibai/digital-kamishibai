@@ -53,6 +53,19 @@ export function jumped(prev, cur) {
 /** 字幕の言語の書き方（ja・en・pt-BR など。BCP 47 の短い形） */
 export const isCaptions = (v) => typeof v === 'string' && /^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$/.test(v);
 
+/** リンクの動画1本の音量（work-format §2.4 の volume。dB、−40〜0）。書いていない・おかしい値は 0（そのまま） */
+export const MIN_VOLUME_DB = -40;
+export const isVolumeDb = (v) => typeof v === 'number' && Number.isFinite(v) && v >= MIN_VOLUME_DB && v <= 0;
+export const volumeDbOf = (v) => (isVolumeDb(v) ? v : 0);
+
+/** setVolume に渡す数（0〜100）。当日の動画のつまみ（0〜1）× その動画の音量（dB）。
+ *  setVolume(n) は埋め込みの <video> の volume を n/100 にする（振幅に比例。2026-11-10 本物の YouTube で 0〜100 を測った）ので、
+ *  −6dB は 50、−20dB は 10。⚠️ 整数しか渡せないので、つまみを下げて小さくすると段が粗くなる */
+export function ytVolume(knob, db = 0) {
+  const k = Math.min(1, Math.max(0, Number(knob) || 0));
+  return Math.round(k * 10 ** (volumeDbOf(db) / 20) * 100);
+}
+
 /** 埋め込みの URL。関連動画は同じチャンネルのものだけ（rel=0）・キーボード操作なし（聞き手）・全画面のボタンなし（fs=0。
  *  全画面はプレイヤーの側で行う）。止める秒（end）は渡さない——渡すと止めたあとに YouTube が関連動画を並べるので、
  *  こちらで少し手前に止める（LinkPlayer）。origin は API の合図を受けるのに要る */
@@ -111,7 +124,7 @@ export class LinkPlayer extends EventTarget {
     this.host = host;
     this.follow = follow;
     this.p = null;          // YT.Player
-    this.item = null;       // { id, yt, start, end }
+    this.item = null;       // { id, yt, start, end, captions, volume }
     this.cut = { start: 0, end: Infinity };
     this.ready = false;
     this.error = null;      // 流せない理由（errorReason か 'api'）
@@ -157,7 +170,13 @@ export class LinkPlayer extends EventTarget {
 
   set volume(v) {
     this.vol = Math.min(1, Math.max(0, Number(v)));
-    if (this.p && this.ready && this.p.setVolume) this.p.setVolume(Math.round(this.vol * 100));
+    // 当日のつまみ × この動画の音量（volume。読み込むたびに onReady で当て直す）
+    if (this.p && this.ready && this.p.setVolume) this.p.setVolume(ytVolume(this.vol, this.item && this.item.volume));
+  }
+
+  /** 埋め込みに渡っている音量（0〜100。確かめ用） */
+  volumeNow() {
+    try { return this.p && this.p.getVolume ? this.p.getVolume() : null; } catch { return null; }
   }
 
   state() {

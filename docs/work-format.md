@@ -12,7 +12,7 @@ Three tools follow it and nothing else:
 To change the format, change this file first, then the tools.
 All three are tested against the same example, [`examples/sample-story/`](../examples/sample-story/).
 
-Status: **v1, first edition (2026-10-22)**; `[BGM once]` added 2026-10-24 (player stage 4). Several `[Video]` on one slide allowed 2026-10-24 (the narrator picks which one to play). `overlays`, `draft` and the correction sheet (§6) added 2026-10-25 (practising and correcting in the player). `slide_size`, `overlay_base`, `overlay_layout` and the `layout` correction added 2026-10-25 (moving the words on the picture). `[Text]` (words on the screen, written in `script.md`, §2.6) added 2026-10-25, and drawn into the picture by the builder the same day. `role`, `seats` and `source_segments` of a video (§3.3) and the `picture`, `video K` and `ending seat N` corrections (§6) added 2026-10-26 (pointing at pictures and videos while practising). `[BGM after video]` added 2026-10-29 (music that the old works start by a click once the video is over). `Use` of a `picture` correction (choosing a candidate in the player) added 2026-10-29. `color` and `fill` of a `layout` correction, the colour of a box and the light-against-dark guide (§3.2) added 2026-10-30 (correcting the colours of the words on the picture). `picture_source` of a slide (§3.2) added 2026-11-01 (a picture correction was taken as changed after a rebuild). `[Video]` with a YouTube link — a **linked video** (§2.4, §3.3) — added 2026-11-09, and its `captions` the same day (listeners cannot choose captions themselves), (a work handed out to other families shows published videos without packing them, and listeners on their own devices see them too). Music that is too loud is played quieter (§4) from 2026-11-09 (a song from a CD put in place of a sample's music drowned out the narration). Covers what stage 1 of the player needs (pictures, slide order, narrator notes)
+Status: **v1, first edition (2026-10-22)**; `[BGM once]` added 2026-10-24 (player stage 4). Several `[Video]` on one slide allowed 2026-10-24 (the narrator picks which one to play). `overlays`, `draft` and the correction sheet (§6) added 2026-10-25 (practising and correcting in the player). `slide_size`, `overlay_base`, `overlay_layout` and the `layout` correction added 2026-10-25 (moving the words on the picture). `[Text]` (words on the screen, written in `script.md`, §2.6) added 2026-10-25, and drawn into the picture by the builder the same day. `role`, `seats` and `source_segments` of a video (§3.3) and the `picture`, `video K` and `ending seat N` corrections (§6) added 2026-10-26 (pointing at pictures and videos while practising). `[BGM after video]` added 2026-10-29 (music that the old works start by a click once the video is over). `Use` of a `picture` correction (choosing a candidate in the player) added 2026-10-29. `color` and `fill` of a `layout` correction, the colour of a box and the light-against-dark guide (§3.2) added 2026-10-30 (correcting the colours of the words on the picture). `picture_source` of a slide (§3.2) added 2026-11-01 (a picture correction was taken as changed after a rebuild). `[Video]` with a YouTube link — a **linked video** (§2.4, §3.3) — added 2026-11-09, and its `captions` the same day (listeners cannot choose captions themselves), (a work handed out to other families shows published videos without packing them, and listeners on their own devices see them too). Music that is too loud is played quieter (§4) from 2026-11-09 (a song from a CD put in place of a sample's music drowned out the narration). `volume` of a linked video added 2026-11-10 (a talk on YouTube played about 6 dB louder than the video files beside it, and the player cannot measure it). Covers what stage 1 of the player needs (pictures, slide order, narrator notes)
 and fixes the shape of sound and video cues. Size limits for video are provisional until stage 2 measures them.
 
 **Not in v1** (decided, not forgotten): sound effects the narrator triggers by tapping, and music volume per slide.
@@ -134,7 +134,7 @@ Paths are relative to the media folder and use `/`.
 | `> [BGM stop]` | fade the music out when the slide opens |
 | `> [Sound] sounds/bell.mp3` | play once when the slide opens |
 | `> [Video] videos/ending.mp4` | this slide has a video. It starts when the **narrator presses play** — never by itself. Music fades out when it starts and does not come back after it (the next `[BGM]` starts music again). A slide may have **several** (see below) |
-| `> [Video] https://www.youtube.com/watch?v=ID start 5:51 end 6:09 captions ja` | a **linked video**: a video published on YouTube, played from YouTube on every device (below). `start`, `end` and `captions` are optional |
+| `> [Video] https://www.youtube.com/watch?v=ID start 5:51 end 6:09 captions ja volume -6dB` | a **linked video**: a video published on YouTube, played from YouTube on every device (below). `start`, `end`, `captions` and `volume` are optional |
 | `> [Text] place top size 54pt bold` | words drawn on the picture. The `>` lines that follow are the words. See §2.6 |
 
 - At most one `[Picture]` and one `[BGM]`/`[BGM once]`/`[BGM after video]`/`[BGM stop]` per slide. Any number of `[Sound]`, `[Video]` and `[Text]`.
@@ -159,6 +159,15 @@ device follows, music fades out when it starts, and `[BGM after video]` starts w
   captions from the start. Listeners' devices have no buttons on the video, so this is the only way they get captions;
   the narrator can still change them on the narrator's screen. Nothing shows when the video has no captions in that
   language, and YouTube does not always obey (check it once before the show).
+- Optionally `volume <dB>` (`volume -6dB`): play this video that much **quieter** on every device, from `0dB` down to
+  `-40dB` (a linked video cannot be made louder). Video files are made the same loudness when they are exported (about
+  −22 LUFS), but a linked video plays with YouTube's own sound, and YouTube only turns down videos louder than about
+  −14 LUFS — so linked videos differ by up to about 10 dB, and the player cannot measure them. When one sounds too loud
+  next to the others, write how much quieter by ear; if you know its loudness (LUFS) over the stretch played, write the
+  difference (−16 LUFS against −22 LUFS: `volume -6dB`). The day's video volume knob still works on top of it.
+  The player hands YouTube's player `setVolume(n)` with `n = knob × 10^(dB/20) × 100`, rounded; `setVolume(n)` sets the
+  embedded `<video>`'s `volume` to `n/100`, which scales the sound wave (measured with the real YouTube player for every
+  `n` from 0 to 100, 2026-11-10). So `-6dB` is `50`, `-10dB` is `32`, `-20dB` is `10`, `-40dB` is `1`.
 - A link may carry its own start and end (`?t=351`, `&start=351&end=369`, as YouTube's share and embed links do).
   They are read too, but a time may not be both in the link and after it.
 - It stops at `end` and stays on that frame; it never runs on into YouTube's suggestions. Only one stretch per line:
@@ -430,10 +439,11 @@ own picture is the one mostly seen.
 | `start` | seconds into the YouTube video where it starts, `>= 0`. Missing means `0` |
 | `end` | seconds into the YouTube video where it stops, after `start`. Missing means the end of the video |
 | `captions` | a language code (`ja`, `en`, `pt-BR`): show captions in that language from the start on every device. Missing means YouTube's own default |
+| `volume` | how much quieter to play it, in dB, from `-40` to `0` (§2.4). Missing means `0` (as YouTube plays it). The builder writes it only when it is not `0` |
 
 A linked video has no `role`, `seats` or `source_segments`. It counts in the order of the slide's videos like any
 other (`video K`, §6), but the narrator cannot point at a stretch of it while practising (change `start` and `end`
-in `script.md` instead). A player sends listeners **only the video's YouTube id, `start`, `end` and `captions`** — not the link
+in `script.md` instead). A player sends listeners **only the video's YouTube id, `start`, `end`, `captions` and `volume`** — not the link
 as written (it can carry more, such as a playlist). Times in the playback messages are seconds into the YouTube video.
 
 A seat holds the times `from <= t < to` (so a time on the line between two seats belongs to the later one). A time
@@ -464,7 +474,7 @@ Sounds and videos of earlier slides are not replayed.
   `[BGM once]` or `[BGM after video]` (integrated loudness, ITU-R BS.1770). A song louder than **−29 LUFS** is played at **−30 LUFS**
   on every device, so a song from a CD or a streaming service (about −10 to −14 LUFS) sits under the narration like the samples' music
   (−30 to −34 LUFS). A quieter song is not made louder. The file is not changed, and no tool is needed (no ffmpeg).
-  Sound effects and the sound of videos are played as they are.
+  Sound effects and the sound of video files are played as they are. A linked video can be made quieter by hand (`volume`, §2.4).
 - **A video over the limit is not sent to listeners.** The player tells the narrator to make a lighter copy.
   The player never re-encodes. Who makes the lighter copy:
   - a family making its own video: export again from the editing app at 720p or 1080p;
@@ -489,8 +499,8 @@ Sounds and videos of earlier slides are not replayed.
 | Unknown `format` or `version` | — | error, with a message |
 | Media file missing | warning, if it can see the media folder | lists missing files **by name** before the show |
 | Video over the limit, or not MP4 | warning | not sent; shown to the narrator |
-| `[Video]` with a link that is not a YouTube link, a time that is not seconds or `m:ss`, an unknown word after the link, `captions` not a language code, `end` not after `start`, or a time both in the link and after it (§2.4) | error, stop | — |
-| `url` not a YouTube link, both `url` and `file`, `start < 0`, `end` not after `start`, `captions` not a language code, or `role`/`seats`/`source_segments` on a linked video (§3.3) | — | error |
+| `[Video]` with a link that is not a YouTube link, a time that is not seconds or `m:ss`, an unknown word after the link, `captions` not a language code, `volume` not dB from `0dB` to `-40dB`, `end` not after `start`, or a time both in the link and after it (§2.4) | error, stop | — |
+| `url` not a YouTube link, both `url` and `file`, `start < 0`, `end` not after `start`, `captions` not a language code, `volume` not a number from `-40` to `0`, or `role`/`seats`/`source_segments` on a linked video (§3.3) | — | error |
 | Linked video that cannot be played (the owner does not allow other sites, gone, no internet) | — (it cannot see YouTube) | shown to the narrator, for this device and for each listener; never an error window |
 | Picture is HEIC | error | error |
 | `overlays` not boxes → paragraphs → lines of text (§3.2) | — | error |

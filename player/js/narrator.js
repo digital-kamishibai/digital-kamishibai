@@ -44,7 +44,7 @@ let workDir = null;                // 作品フォルダそのもの（showDirec
 let pictures = new Map();          // 番号 → { key, file, mime, size }
 let videos = [];                   // [{ id, kind: 'video', n, key, file, size, mime, problem }]
 let audios = [];                   // [{ id, kind: 'audio', key, file, size, mime, problem, gain? }]（BGM・効果音。段階4。gain＝大きすぎる BGM を下げる dB）
-let links = [];                    // [{ id, kind: 'link', n, k, key, yt, start, end }]（リンクの動画。ファイルは無く、配らない）
+let links = [];                    // [{ id, kind: 'link', n, k, key, yt, start, end, captions, volume }]（リンクの動画。ファイルは無く、配らない）
 const audioUrls = new Map();       // 音の id → 語り手の端末で鳴らす object URL
 // 配る素材。**音を先に**（開演直後から要る。動画は枚に来るまで要らない＝P7）
 const media = () => uniqueById([...audios, ...videos]); // 同じ動画を2つの枚で使っても、配るのは1回
@@ -2452,7 +2452,7 @@ window.addEventListener('pagehide', () => {
 renderVoiceButtons();
 
 // 自動テスト用の入口（?test のときだけ。同じページの中からだけ呼べる。外から作品を渡す道ではない）
-if (TEST) window.__dk = { link: () => ({ id: vCurrent && vCurrent.kind === 'link' ? vCurrent.id : null, ready: linkP.ready, error: linkP.error, stalled: linkP.stalled, playing: !linkP.paused, pos: linkP.currentTime, state: linkP.state(), captions: linkP.captionsNow(), note: $('videoNote').textContent }),
+if (TEST) window.__dk = { link: () => ({ id: vCurrent && vCurrent.kind === 'link' ? vCurrent.id : null, ready: linkP.ready, error: linkP.error, stalled: linkP.stalled, playing: !linkP.paused, pos: linkP.currentTime, state: linkP.state(), captions: linkP.captionsNow(), vol: linkP.volumeNow(), note: $('videoNote').textContent }),
   // 語り手が YouTube の再生つまみを押したのと同じこと（埋め込みの中は外から押せないので、API の口から押す）
   linkPlayer: () => linkP,
   linkPress: (what, at) => { const p = linkP.p; if (what === 'play') p.playVideo(); else if (what === 'pause') p.pauseVideo(); else p.seekTo(at, true); return true; }, loadForTest: (w, files) => { work = validateWork(w).work; workMap = files; mediaMap = new Map(); sheet = loadSheet(work); return resolve(); }, session: () => session,

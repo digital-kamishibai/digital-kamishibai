@@ -74,7 +74,7 @@ script = (WORK / 'script.md').read_text(encoding='utf-8')
 script = script.replace('## [Slide 1] Cover\n', '## [Slide 1] Cover\n\n> [BGM] sounds/first.mp3\n', 1)
 script = script.replace('> [Picture] pictures/02.png\n',
                         '> [Picture] pictures/02.png\n\n> [BGM after video] sounds/after.mp3\n'
-                        f'> [Video] https://www.youtube.com/watch?v={FIRST[0]} start {FIRST[1] // 60}:{FIRST[1] % 60:02d} end {FIRST[2]} captions ja\n', 1)
+                        f'> [Video] https://www.youtube.com/watch?v={FIRST[0]} start {FIRST[1] // 60}:{FIRST[1] % 60:02d} end {FIRST[2]} captions ja volume -6dB\n', 1)
 script = script.replace('> [Picture] pictures/03.png\n',
                         f'> [Picture] pictures/03.png\n\n> [Video] https://youtu.be/{SECOND[0]}?t={SECOND[1]} end {SECOND[2]}\n'
                         + ('' if args.real else f'> [Video] https://www.youtube.com/watch?v={BLOCKED}\n'
@@ -84,7 +84,7 @@ r = subprocess.run([sys.executable, str(BUILD), str(WORK), '--skip-text'], captu
 ok('ビルドが通り、リンクの動画のファイルが無いことを警告しない', r.returncode == 0 and 'youtu' not in (r.stdout + r.stderr).lower(),
    (r.stdout + r.stderr).strip().splitlines()[-1] if (r.stdout + r.stderr).strip() else '')
 w = json.loads((WORK / 'work.json').read_text(encoding='utf-8'))
-ok('work.json にリンクと範囲が入る', w['slides'][1]['cues'][-1] == {'type': 'video', 'url': f'https://www.youtube.com/watch?v={FIRST[0]}', 'start': FIRST[1], 'end': FIRST[2], 'captions': 'ja'}
+ok('work.json にリンクと範囲が入る', w['slides'][1]['cues'][-1] == {'type': 'video', 'url': f'https://www.youtube.com/watch?v={FIRST[0]}', 'start': FIRST[1], 'end': FIRST[2], 'captions': 'ja', 'volume': -6}
    and w['slides'][2]['cues'][0] == {'type': 'video', 'url': f'https://www.youtube.com/watch?v={SECOND[0]}', 'start': SECOND[1], 'end': SECOND[2]},
    json.dumps([w['slides'][1]['cues'], w['slides'][2]['cues']]))
 
@@ -154,7 +154,8 @@ FAKE_YT = """(() => {
       if (this.id !== STALL_ID) setTimeout(() => this.set(S.PLAYING), 200); }
     pauseVideo() { if (this.st === S.PLAYING || this.st === S.BUFFERING) this.set(S.PAUSED); }
     seekTo(s) { this.t = s; this.at = performance.now(); if (this.st === S.UNSTARTED || this.st === S.CUED) this.playVideo(); }
-    setVolume() {}
+    setVolume(n) { this.vol = n; }
+    getVolume() { return this.vol; }
     destroy() {}
   }
   window.YT = { Player, PlayerState: S, loaded: 1 };
@@ -227,6 +228,8 @@ try:
     time.sleep(3)
     n, l = both()
     ok('再生: 位置がそろう（1.5秒以内）', n['playing'] and l['playing'] and abs(n['pos'] - l['pos']) < 1.5, f"{n['pos']:.2f} / {l['pos']:.2f}")
+    ok('音量: 語り手も聞き手も、volume -6dB の動画を setVolume(50) で鳴らす',
+       n['vol'] == 50 and l['vol'] == 50, f"{n['vol']} / {l['vol']}")
     ok('再生: 聞き手の画面は絵から動画に替わる', lis.evaluate("document.getElementById('picture').hidden"))
     ok('字幕: 聞き手の埋め込みに、日本語の字幕を最初から出す指定が入る',
        lis.evaluate("document.querySelector('#llinkFrame iframe').src.includes('cc_lang_pref=ja')"))
@@ -282,6 +285,7 @@ try:
     ok('枚を移ると、聞き手は埋め込みを下げて絵に戻る', wait(lis, "!__dkl.link().on && !document.getElementById('picture').hidden", 'listener back to picture', 200))
     if args.real:
         ok('2本目も語り手の枠で読み込める', wait(nar, "__dk.link().ready && !__dk.link().error", 'second ready', 600), json.dumps(nar.evaluate("__dk.link()")))
+        ok('2本目（volume なし）は setVolume(100)', nar.evaluate("__dk.link().vol") == 100, str(nar.evaluate("__dk.link().vol")))
         nar.evaluate("__dk.linkPress('play')")
         played = wait(lis, "__dkl.link().on && __dkl.link().playing", 'second plays', 600)
         if not played:
