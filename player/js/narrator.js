@@ -16,7 +16,7 @@ import { pickMime, recordName, stageSource, createClock, clockStart, clockSlide,
 import { beep, measure } from './tone.js';
 import { CHUNK, mustWait, sendable, progress, fmtMB, fmtTime, picReady, nextPicture } from './transfer.js';
 import { TICK_MS, vstate } from './playback.js';
-import { astate, soundsAt, talkStep } from './audio.js';
+import { createAudio, astate, soundsAt, talkStep } from './audio.js';
 import { createEngine } from './engine.js';
 import {
   editable, sheetEnabled, mayReload, keepSlide, editorStep, boxFromFields, fieldsFromBox, boxText, paragraphs,
@@ -171,6 +171,8 @@ pickFolder($('pickWork'), async (entries, dir) => {
   const r = await readWorkFolder(entries, dir);
   if (!r) return;
   closeEditor({ type: 'cancel' });
+  // 1枚目から開き直すので、開演の前にも戻す。戻さないと開演のボタンが「上演中」のまま押せず、新しい作品の BGM も鳴らなかった（実機で）
+  stopShow();
   work = r.work;
   workMap = r.map;
   workDir = r.dir;
@@ -2062,6 +2064,21 @@ async function doStartShow() {
   await startTalk(); // 話しているあいだ BGM を下げる（練習でもマイクを開く）
 }
 
+/** 開演の前に戻す（doStartShow の逆。開演で変えるものを足したら、ここでも戻す）。
+ *  「作品フォルダを選ぶ」で作品を最初から開き直したときに呼ぶ。「作品を読み直す」（E10）では呼ばない（開演を続ける）。
+ *  ⚠️ 受付中は作品を選び直せない（workLocked）ので、聞き手へ配り直すものは無い。マイクは閉じない（声・録画でも使う） */
+function stopShow() {
+  clearInterval(audioTimer);
+  audioTimer = 0;
+  talkDetach();
+  session.audio = createAudio();
+  engine.setBgm(null, () => null);
+  clock = createClock();
+  renderClock();
+  for (const b of [$('startShow'), $('startShowBar')]) { b.disabled = false; b.textContent = t('startShow'); }
+  updateVoice();
+}
+
 // ---------- 語っているあいだ BGM を下げる（plans/kamishibai-player-talk-duck.md。2026-10-26） ----------
 // 語り手の端末が自分のマイクの大きさを 0.05秒ごとに見て「話している」を決め（talkStep）、この端末の BGM を下げ、聞き手へ合図を送る。
 // 録画は engine の master から取るので同じ下げ方が入る。⚠️ スピーカーで鳴らした BGM をマイクが拾うと、声と取り違える（語り手はイヤホン）
@@ -2121,6 +2138,16 @@ function talkAttach() {
     talk.st = next;
     if (next.talking !== was) applyTalk(next.talking);
   }, 50);
+}
+/** 話し声の判定を外す（開演の前に戻すとき）。BGM の下げも戻す */
+function talkDetach() {
+  clearInterval(talk.timer);
+  talk.timer = 0;
+  if (talk.src) talk.src.disconnect();
+  talk.src = null;
+  talk.an = null;
+  talk.stream = null;
+  setTalking(false);
 }
 $('startShow').addEventListener('click', doStartShow);
 $('startShowBar').addEventListener('click', doStartShow);
