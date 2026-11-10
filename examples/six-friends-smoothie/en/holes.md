@@ -4,6 +4,8 @@ Someone who makes a smoothie every morning made this picture-story show for thei
 It doesn't have to be for children: you can make one just as well for a partner, friends, a class, or a group of adults.
 For this public version we marked **the places you can replace with your own (the holes)**.
 The holes are not blank. What the maker put there is still in place — that is the "filled-in example".
+On the narrator's screen, the narration that is a hole shows with a **pale yellow background** (in the script, the lines
+that start with `~ `).
 
 Changing just the holes is enough to make it your own. The frame of the story (each ingredient has a special skill, and together they help each
 other) works for any favourite dish.
