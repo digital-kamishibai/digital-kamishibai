@@ -5,6 +5,7 @@ import {
   diffNotes, diffOverlays, emptySheet, setSlideEdits, removeItem, judge, reconcile, applySheet,
   fence, sheetMarkdown, sheetName, readSheet, storageKey, isEmpty, pointSeat, clock, seatLines,
   markCut, cutLines, mediaLines, place, videoOf, askPicture, choosePicture, pictureLines, sheetCounts, workSig, commentStatus, removeComment, isOldComment, sheetGroups,
+  setLinkVolume, linkVolumeNow, volumeLines, dbText,
 } from '../../player/js/corrections.js';
 
 const slide = (n, notes, overlays) => ({ number: n, title: '', picture: `pictures/0${n}.jpg`, notes, overlays, cues: [] });
@@ -572,4 +573,61 @@ test('候補から選んだ件を読み戻す（Use だけでもよい）・Use 
   assert.deepEqual(readSheet(JSON.stringify(sh), 'T').items, sh.items);
   const bad = { ...sh, items: [{ slide: 3, kind: 'picture', path: 'pictures/03.png' }, { slide: 3, kind: 'picture', path: 'pictures/03.png', use: '' }] };
   assert.deepEqual(readSheet(JSON.stringify(bad), 'T').items, []);
+});
+
+// ---------- リンクの動画の音量（video K の Volume。§6） ----------
+
+const TED = 'https://www.youtube.com/watch?v=8KkKuTCFvzI';
+const linkSlide = (volume) => ({ number: 5, title: 'Talk', picture: null, notes: 'Listen.', overlays: [], cues: [
+  { type: 'video', file: 'videos/a.mp4' },
+  { type: 'video', url: TED, start: 351, end: 369, ...(volume === undefined ? {} : { volume }) },
+] });
+
+test('音量: 練習で決めた値を video K の件に入れる・台本の値に戻したら件を消す・リンクの動画だけ', () => {
+  let sh = setLinkVolume(emptySheet('T'), linkSlide(), 2, -6);
+  assert.deepEqual(sh.items, [{ slide: 5, kind: 'volume', at: 2, db: -6, was: 0 }]);
+  assert.equal(linkVolumeNow(sh, linkSlide(), 2), -6);
+  sh = setLinkVolume(sh, linkSlide(), 2, -8, '  louder than  the others ');
+  assert.deepEqual(sh.items, [{ slide: 5, kind: 'volume', at: 2, db: -8, was: 0, comment: 'louder than the others' }]);
+  sh = setLinkVolume(sh, linkSlide(), 2, -10);
+  assert.equal(sh.items[0].comment, 'louder than the others', 'ひとことは保つ');
+  assert.deepEqual(setLinkVolume(sh, linkSlide(), 2, 0).items, [], '台本の値に戻した');
+  assert.equal(linkVolumeNow(emptySheet('T'), linkSlide(-4), 2), -4, '件が無ければ台本の値');
+  assert.equal(setLinkVolume(sh, linkSlide(), 1, -6), sh, 'ファイルの動画には付けない');
+  assert.equal(setLinkVolume(sh, linkSlide(), 3, -6), sh, '動画の無い番号');
+  assert.equal(setLinkVolume(sh, linkSlide(), 2, 2), sh, '元より大きくはできない');
+  assert.equal(setLinkVolume(sh, linkSlide(), 2, -42), sh);
+});
+
+test('音量: Markdown は ## [Slide N] video K と Volume <値> (was <台本の値>)', () => {
+  let sh = setLinkVolume(emptySheet('T'), linkSlide(-4), 2, -10, 'drowns the narration');
+  sh = markCut(sh, { ...linkSlide(), cues: [{ type: 'video', file: 'videos/a.mp4' }] }, 1, 'from', 3, FILE);
+  assert.equal(sheetMarkdown(sh, new Date(2026, 10, 10, 10, 0)), [
+    '# Correction sheet: T (2026-11-10 10:00)', '',
+    '## [Slide 5] video 1', 'From 0:03.0', '',
+    '## [Slide 5] video 2', 'Volume -10dB (was -4dB)', 'Comment: drowns the narration', '',
+  ].join('\n'));
+  assert.deepEqual(volumeLines({ db: -7.5, was: 0 }), ['Volume -7.5dB (was 0dB)']);
+  assert.equal(dbText(-0), '0dB');
+  assert.equal(videoOf(sh.items[1]), 2);
+});
+
+test('音量: 読み直して台本がその値なら反映済み・前の値なら未反映・ほかの値かリンクでなくなったら「変わった」', () => {
+  const sh = setLinkVolume(emptySheet('T'), linkSlide(), 2, -6);
+  const x = sh.items[0];
+  assert.equal(judge(x, linkSlide(-6)), 'done');
+  assert.equal(judge(x, linkSlide()), 'pending');
+  assert.equal(judge(x, linkSlide(-3)), 'changed');
+  assert.equal(judge(x, { ...linkSlide(), cues: [{ type: 'video', file: 'videos/a.mp4' }, { type: 'video', file: 'videos/b.mp4' }] }), 'changed');
+  const rc = reconcile(sh, { title: 'T', slides: [0, 1, 2, 3].map((n) => slide(n + 1, '')).concat([linkSlide(-6)]) });
+  assert.deepEqual([rc.done, rc.sheet.items.length], [1, 0]);
+  assert.equal(applySheet(sh, linkSlide()).notes, 'Listen.', '台本には当てない');
+});
+
+test('音量: 保存した件を読み戻す・形の違う件は捨てる', () => {
+  const sh = setLinkVolume(emptySheet('T'), linkSlide(), 2, -6, 'x');
+  assert.deepEqual(readSheet(JSON.stringify(sh), 'T'), sh);
+  const x = sh.items[0];
+  const bad = [{ ...x, db: '-6' }, { ...x, db: 3 }, { ...x, was: -50 }, { ...x, db: 0 }, { ...x, at: '2' }];
+  assert.deepEqual(readSheet(JSON.stringify({ ...sh, items: bad }), 'T').items, []);
 });

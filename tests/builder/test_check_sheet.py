@@ -296,3 +296,26 @@ def test_a_chosen_candidate_is_pending_until_it_is_used(work, capsys):
     candidate.unlink()
     judged, errors = cs.check(work, sheet)
     assert errors == [] and [state for _, state in judged] == ['done']
+
+
+def test_a_linked_video_volume_is_judged_from_the_video_line(work, capsys):
+    # the narrator made a linked video quieter while practising (Volume, §6). Writing back = the [Video] line's volume
+    script = work / 'script.md'
+    text = script.read_text(encoding='utf-8')
+    line = '> [Video] https://youtu.be/8KkKuTCFvzI start 5:51 end 6:09'
+    script.write_text(text.replace('> [Picture] pictures/03.png\n', f'> [Picture] pictures/03.png\n\n{line} volume -4dB\n', 1), encoding='utf-8')
+    sheet = ('# Correction sheet: The Lighthouse Keeper\'s Lamp (2026-11-10 20:00)\n\n'
+             '## [Slide 3] video 1\nVolume -10dB (was -4dB)\nComment: louder than the others\n')
+    title, items, errors = cs.read_sheet(sheet)
+    assert errors == [] and items[0]['volume'] == (-10.0, -4.0) and 'media' not in items[0]
+    (work / 'sheet.md').write_text(sheet, encoding='utf-8')
+    assert cs.main([str(work), str(work / 'sheet.md')]) == 1
+    assert 'PENDING   [Slide 3] video 1  - volume -10dB (was -4dB)  - louder than the others' in capsys.readouterr().out
+    script.write_text(script.read_text(encoding='utf-8').replace('volume -4dB', 'volume -10dB'), encoding='utf-8')
+    assert [state for _, state in cs.check(work, sheet)[0]] == ['done']
+    script.write_text(script.read_text(encoding='utf-8').replace('volume -10dB', 'volume -8dB'), encoding='utf-8')
+    assert [state for _, state in cs.check(work, sheet)[0]] == ['changed']
+    script.write_text(script.read_text(encoding='utf-8').replace(f'{line} volume -8dB', '> [Video] videos/x.mp4'), encoding='utf-8')
+    (work / 'videos').mkdir(exist_ok=True)
+    (work / 'videos' / 'x.mp4').write_bytes(b'mp4')
+    assert [state for _, state in cs.check(work, sheet)[0]] == ['changed']

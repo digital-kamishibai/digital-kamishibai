@@ -21,7 +21,7 @@ import { createEngine } from './engine.js';
 import {
   editable, sheetEnabled, mayReload, keepSlide, editorStep, boxFromFields, fieldsFromBox, boxText, paragraphs,
   emptySheet, setSlideEdits, removeItem, removeComment, isOldComment, judge, reconcile, applySheet, sheetMarkdown, sheetName,
-  readSheet, storageKey, isEmpty, place, textOf, videoCueOf, pointSeat, clock as seatClock, mediaLines, isMedia, videoOf, markCut,
+  readSheet, storageKey, isEmpty, place, textOf, videoCueOf, pointSeat, clock as seatClock, mediaLines, isMedia, videoOf, markCut, setLinkVolume, linkVolumeNow, dbText,
   askPicture, choosePicture, sheetCounts, sheetGroups, workSig,
 } from './corrections.js';
 import {
@@ -31,7 +31,7 @@ import { boxElement } from './overlay-dom.js';
 import { openRoom, keepSignaling, keepAwake, iceState, iceLine, relayOffered, relayPaused, routeState } from './net.js';
 import { whyBlocked, isAndroid, relayNote } from './ice.js';
 import qrcode from '../vendor/qrcode.mjs';
-import { LinkPlayer, loadApi } from './ytlink.js';
+import { LinkPlayer, loadApi, MIN_VOLUME_DB } from './ytlink.js';
 import { integratedLoudness, levelGain } from './loudness.js';
 
 applyI18n();
@@ -972,6 +972,7 @@ function renderEditTools() {
   if (!sheet) $('sheetPanel').hidden = true;
   $('reloadLabel').hidden = !mayReload({ hasWork: !!work, roomOpen: !!peer });
   renderPicBar();
+  renderVolBar();
 }
 
 // ---------- 絵の作り直しを頼む（M4） ----------
@@ -1850,7 +1851,7 @@ $('seatPoint').addEventListener('click', () => {
 });
 for (const ev of ['timeupdate', 'pause', 'play', 'seeked', 'loadedmetadata']) vEl.addEventListener(ev, () => renderMediaBars());
 
-function renderMediaBars() { renderSeatBar(); renderCutBar(); }
+function renderMediaBars() { renderSeatBar(); renderCutBar(); renderVolBar(); }
 
 // ---------- 上演中の動画の区間を直す（M3） ----------
 // 止めた位置を「開始に／終わりに」入れて、修正票に video K を足す。切り直すのは作り手（編集アプリで。区間を定義ファイルに
@@ -1892,6 +1893,43 @@ function markHere(side) {
 }
 $('cutFrom').addEventListener('click', () => markHere('from'));
 $('cutTo').addEventListener('click', () => markHere('to'));
+
+// ---------- リンクの動画の音量を耳で直す ----------
+// リンクの動画は YouTube の音のまま鳴り、動画ごとに大きさが違う（ブラウザからは測れない）。練習で流しながら「音を小さく・大きく」して、
+// 決めた値を修正票（video K の Volume）へ。台本の volume へ書き戻すのは Claude。当日の動画のつまみ（全部の動画・その上演だけ）とは別。
+// 上げられるのは YouTube の元の大きさ（0dB）まで——埋め込みは元より大きく鳴らせない。
+// ⚠️ 修正票の値で鳴らすのは、練習（受付を開いていない）のあいだのこの端末だけ。受付を開いたら台本の値に戻す（聞き手の端末と同じ）
+
+const VOL_STEP = 2; // dB。耳で「少し」と分かる幅
+
+function renderVolBar() {
+  const v = vCurrent;
+  const isLinkNow = !!v && v.kind === 'link' && !!work && !!work.slides[v.n - 1];
+  const can = isLinkNow && !!sheet && editable(editCtx());
+  const slideData = isLinkNow ? work.slides[v.n - 1] : null;
+  // この端末で鳴らす音量: 練習なら修正票の値、そうでなければ台本の値
+  if (isLinkNow && linkP.item && linkP.item.id === v.id) linkP.setItemVolume(can ? linkVolumeNow(sheet, slideData, v.k) : v.volume);
+  $('volBar').hidden = !can;
+  if (!can) return;
+  const db = linkVolumeNow(sheet, slideData, v.k);
+  const was = v.volume || 0;
+  $('volNow').textContent = db === was ? t('volNow', dbText(db)) : t('volChanged', dbText(db), dbText(was));
+  $('volDown').disabled = db <= MIN_VOLUME_DB;
+  $('volUp').disabled = db >= 0;
+}
+
+function stepVolume(dir) {
+  const v = vCurrent;
+  if (!v || v.kind !== 'link' || !sheet || !editable(editCtx())) return;
+  const slideData = work.slides[v.n - 1];
+  const db = Math.min(0, Math.max(MIN_VOLUME_DB, linkVolumeNow(sheet, slideData, v.k) + dir * VOL_STEP));
+  sheet = setLinkVolume(sheet, slideData, v.k, db);
+  saveSheet();
+  renderSheet();
+  renderVolBar();
+}
+$('volDown').addEventListener('click', () => stepVolume(-1));
+$('volUp').addEventListener('click', () => stepVolume(1));
 
 let board = null; // 開いている絵コンテ { id, cards: Map(n → 要素), probe, alive }
 

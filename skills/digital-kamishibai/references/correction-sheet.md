@@ -68,6 +68,7 @@ Comment: sounds more like me
 | `## [Slide N] overlay B` | The **B-th `[Text]` block** of slide N (counted in the order written). Replace its word lines with After: each line becomes `> line`; a blank line between paragraphs becomes a line that is only `>`. An empty After removes the whole `[Text]` block |
 | `## [Slide N] layout B` | The `[Text]` line of the B-th block. Each line of After (`top 0.67in`, `size 62pt`, `color #FFFFFF`, `fill #1E2C4A`) replaces the same word's value, or is **added** when the line does not have that word yet. `fill none` means no band: **remove** the `fill` word (never write `fill none` on the line — the builder stops). If After has a length and the line uses `place`, write all four lengths instead of `place`, taking the ones not in After from the band (`left 0.50in`, `width 12.33in`, `height 1.20in`; `top 0.30in` / `3.15in` / `6.00in` for top / middle / bottom); a change of `size`, `color` or `fill` alone keeps `place`. After writing back a colour, look at the slide once (or at the player's light-against-dark number when the work is opened again): the maker chose the colour, but a number under 70 is worth one sentence |
 | `## [Slide N] comment` | No change of text; the `Comment:` line asks for something (often a new box). Do it if it is clear; otherwise ask the maker |
+| `## [Slide N] video K` with `Volume -6dB (was 0dB)` | The narrator made the K-th `[Video]` of slide N (a YouTube link) quieter or louder by ear while practising. On that `[Video]` line, set `volume -6dB` (replace the `volume` word's value, or add `volume -6dB` at the end of the line). `Volume 0dB` means: **remove** the `volume` word. If the line does not say `was` now (its `volume` changed since), ask the maker |
 
 - `Comment:` under a correction is the maker's reason or wish. Read it; it may ask for more than the change itself.
 - A `comment` about the **ending video** (a photo in it, not the words of the slide) is not written back either:
@@ -75,7 +76,7 @@ Comment: sounds more like me
 
 ## Pictures and videos: not written back — the maker chooses
 
-`picture`, `video K` and `ending seat N` say what to change and where. They have no After: a new picture, a new cut
+`picture`, `video K` (with `From`/`To`) and `ending seat N` say what to change and where. They have no After: a new picture, a new cut
 or another photo in a seat is **chosen by the maker**. Never pick it yourself, and never write these into `script.md`.
 
 | Heading | What to do |
@@ -109,7 +110,8 @@ nothing: the picture correction stays **not done yet**.
    of a video is in the file, not in `script.md`, so the check cannot see it) or, for an ending seat that now holds another
    picture, `changed`; neither is `PENDING`. The player sees a new picture or video file when the work is opened again.
    A picture with `Use` is `PENDING` while the chosen candidate is still in `pictures/_candidates/` (run `--use`), and
-   `done` once it has been put in place.
+   `done` once it has been put in place. A `Volume` is `PENDING` while the `[Video]` line still has the old volume
+   (`was`), `done` once it has the new one, and `changed` when it has another.
 3. Tell the maker what you changed, slide by slide, and ask them to open the work again in the player.
    The player removes the corrections that are done by itself and shows the rest.
    **If you made candidates, say which slides have them** and that the maker chooses in the player

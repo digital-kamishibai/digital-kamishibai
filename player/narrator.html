@@ -185,6 +185,14 @@
             <button id="cutTo" class="mini" type="button" data-i18n="cutTo">End here</button>
           </span>
         </div>
+        <!-- リンクの動画の音量を耳で直す。この1本だけ・修正票へ（当日の動画のつまみとは別）。練習用の版で受付を開いていないときだけ -->
+        <div id="volBar" class="seatbar" hidden>
+          <span id="volNow" class="seat-now"></span>
+          <span class="seat-act">
+            <button id="volDown" class="mini" type="button" data-i18n="volDown">Quieter</button>
+            <button id="volUp" class="mini" type="button" data-i18n="volUp">Louder</button>
+          </span>
+        </div>
         <!-- 絵の作り直しを頼む（M4）。何をどう直したいかの文（必須）を修正票へ。1枚に1件。練習用の版で受付を開いていないときだけ -->
         <div id="picBar" class="seatbar" hidden>
           <span id="picSheet" class="seat-now"></span>

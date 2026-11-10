@@ -11,6 +11,9 @@ opened again (§6, the table at the end):
     reworded  — neither Before nor After is there (the writer changed it again; the narrator decides)
     pending   — Before is still there: not written back yet
 
+A `Volume` of a linked video (`video K`) is judged from the `[Video]` line's `volume`: done when it is the new value,
+pending while it is still the old one (`was`), changed otherwise.
+
 Exit code 0 when nothing is pending, 1 otherwise (or on errors). Standard library only.
 """
 from __future__ import annotations
@@ -27,6 +30,7 @@ HEADING = re.compile(r'^## \[Slide (\d+)\] (?:(notes) (\d+)(?:-(\d+))?|(overlay|
 # Pictures and videos (work-format §6): the sheet says what to change and where; the maker chooses the new one.
 MEDIA_KINDS = ('picture', 'video', 'ending seat')
 MEDIA_LINE = re.compile(r'^(From|To|At|Label|Pin|Use) (.+?)[ \t]*$')
+VOLUME_LINE = re.compile(r'^Volume (-?\d+(?:\.\d+)?)dB \(was (-?\d+(?:\.\d+)?)dB\)[ \t]*$')
 FENCE = re.compile(r'^(`{3,})[ \t]*$')
 LAYOUT_LINE = re.compile(r'^(left|top|width|height) (-?\d+(?:\.\d+)?)in$|^size (\d+)pt$'
                          r'|^(color) (#[0-9A-Fa-f]{6})$|^(fill) (#[0-9A-Fa-f]{6}|none)$')
@@ -127,6 +131,8 @@ def read_sheet(text: str) -> tuple[str | None, list[dict], list[str]]:
             continue
         elif line.startswith('Comment:') and item is not None:
             item['comment'] = line[len('Comment:'):].strip()
+        elif item is not None and item['kind'] == 'video' and (vm := VOLUME_LINE.match(line)):
+            item['volume'] = (float(vm.group(1)), float(vm.group(2)))
         elif item is not None and item['kind'] in MEDIA_KINDS and (mm := MEDIA_LINE.match(line)):
             item.setdefault('media', {})[mm.group(1).lower()] = mm.group(2)   # not 'at': that is the heading's number
         i += 1
@@ -230,6 +236,18 @@ def seat_state(item: dict, slide: dict | None) -> str:
     return 'changed' if seat is None or seat.get('label') != label else 'look'
 
 
+def volume_state(item: dict, slide: dict | None) -> str:
+    """A Volume of a linked video (§6): 'done' when its [Video] line has the new volume, 'pending' while it has
+    the old one, 'changed' when it has another, or the K-th video is not a linked video any more."""
+    videos = [c for c in (slide or {}).get('cues', []) if c.get('type') == 'video']
+    cue = videos[item['at'] - 1] if 0 < item['at'] <= len(videos) else None
+    if not cue or 'url' not in cue:
+        return 'changed'
+    now = float(cue.get('volume', 0))
+    db, was = item['volume']
+    return 'done' if now == db else 'pending' if now == was else 'changed'
+
+
 def check(folder: Path, sheet_text: str, media: Path | None = None) -> tuple[list[tuple[dict, str]], list[str]]:
     """→ ([(item, 'done' | 'reworded' | 'pending' | 'comment' | 'look' | 'changed')], errors).
     'look': a picture or video correction — never judged from the sheet; the maker makes and chooses the new one.
@@ -253,6 +271,8 @@ def check(folder: Path, sheet_text: str, media: Path | None = None) -> tuple[lis
             return 'comment'
         if item['kind'] == 'ending seat':
             return seat_state(item, slides.get(item['slide']))
+        if item['kind'] == 'video' and 'volume' in item:
+            return volume_state(item, slides.get(item['slide']))
         if item['kind'] == 'picture' and 'use' in item.get('media', {}):
             use = item['media']['use']
             left = any((base / use).is_file() for base in (folder, media) if base is not None)
@@ -284,7 +304,8 @@ def main(argv: list[str] | None = None) -> int:
             f'{item["at"][0]}' if item['at'][0] == item['at'][1] else f'{item["at"][0]}-{item["at"][1]}')
         where = f'[Slide {item["slide"]}] {item["kind"]}' + (f' {at}' if at is not None else '')
         use = item.get('media', {}).get('use') if item['kind'] == 'picture' else None
-        note = (f'  - use {use}' if use else '') + (f'  - {item["comment"]}' if item.get('comment') else '')
+        vol = item.get('volume')
+        note = (f'  - use {use}' if use else '') + (f'  - volume {vol[0]:g}dB (was {vol[1]:g}dB)' if vol else '') + (f'  - {item["comment"]}' if item.get('comment') else '')
         print(f'{labels[state]} {where}{note}')
     pending = sum(1 for _, s in judged if s == 'pending')
     print(f'{len(judged)} item(s): {pending} pending')

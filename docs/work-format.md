@@ -12,7 +12,7 @@ Three tools follow it and nothing else:
 To change the format, change this file first, then the tools.
 All three are tested against the same example, [`examples/sample-story/`](../examples/sample-story/).
 
-Status: **v1, first edition (2026-10-22)**; `[BGM once]` added 2026-10-24 (player stage 4). Several `[Video]` on one slide allowed 2026-10-24 (the narrator picks which one to play). `overlays`, `draft` and the correction sheet (§6) added 2026-10-25 (practising and correcting in the player). `slide_size`, `overlay_base`, `overlay_layout` and the `layout` correction added 2026-10-25 (moving the words on the picture). `[Text]` (words on the screen, written in `script.md`, §2.6) added 2026-10-25, and drawn into the picture by the builder the same day. `role`, `seats` and `source_segments` of a video (§3.3) and the `picture`, `video K` and `ending seat N` corrections (§6) added 2026-10-26 (pointing at pictures and videos while practising). `[BGM after video]` added 2026-10-29 (music that the old works start by a click once the video is over). `Use` of a `picture` correction (choosing a candidate in the player) added 2026-10-29. `color` and `fill` of a `layout` correction, the colour of a box and the light-against-dark guide (§3.2) added 2026-10-30 (correcting the colours of the words on the picture). `picture_source` of a slide (§3.2) added 2026-11-01 (a picture correction was taken as changed after a rebuild). `[Video]` with a YouTube link — a **linked video** (§2.4, §3.3) — added 2026-11-09, and its `captions` the same day (listeners cannot choose captions themselves), (a work handed out to other families shows published videos without packing them, and listeners on their own devices see them too). Music that is too loud is played quieter (§4) from 2026-11-09 (a song from a CD put in place of a sample's music drowned out the narration). `volume` of a linked video added 2026-11-10 (a talk on YouTube played about 6 dB louder than the video files beside it, and the player cannot measure it). Covers what stage 1 of the player needs (pictures, slide order, narrator notes)
+Status: **v1, first edition (2026-10-22)**; `[BGM once]` added 2026-10-24 (player stage 4). Several `[Video]` on one slide allowed 2026-10-24 (the narrator picks which one to play). `overlays`, `draft` and the correction sheet (§6) added 2026-10-25 (practising and correcting in the player). `slide_size`, `overlay_base`, `overlay_layout` and the `layout` correction added 2026-10-25 (moving the words on the picture). `[Text]` (words on the screen, written in `script.md`, §2.6) added 2026-10-25, and drawn into the picture by the builder the same day. `role`, `seats` and `source_segments` of a video (§3.3) and the `picture`, `video K` and `ending seat N` corrections (§6) added 2026-10-26 (pointing at pictures and videos while practising). `[BGM after video]` added 2026-10-29 (music that the old works start by a click once the video is over). `Use` of a `picture` correction (choosing a candidate in the player) added 2026-10-29. `color` and `fill` of a `layout` correction, the colour of a box and the light-against-dark guide (§3.2) added 2026-10-30 (correcting the colours of the words on the picture). `picture_source` of a slide (§3.2) added 2026-11-01 (a picture correction was taken as changed after a rebuild). `[Video]` with a YouTube link — a **linked video** (§2.4, §3.3) — added 2026-11-09, and its `captions` the same day (listeners cannot choose captions themselves), (a work handed out to other families shows published videos without packing them, and listeners on their own devices see them too). Music that is too loud is played quieter (§4) from 2026-11-09 (a song from a CD put in place of a sample's music drowned out the narration). `volume` of a linked video added 2026-11-10 (a talk on YouTube played about 6 dB louder than the video files beside it, and the player cannot measure it), and the `Volume` correction (§6) the same day (a maker who does not know dB sets it by ear while practising). Covers what stage 1 of the player needs (pictures, slide order, narrator notes)
 and fixes the shape of sound and video cues. Size limits for video are provisional until stage 2 measures them.
 
 **Not in v1** (decided, not forgotten): sound effects the narrator triggers by tapping, and music volume per slide.
@@ -168,6 +168,8 @@ device follows, music fades out when it starts, and `[BGM after video]` starts w
   The player hands YouTube's player `setVolume(n)` with `n = knob × 10^(dB/20) × 100`, rounded; `setVolume(n)` sets the
   embedded `<video>`'s `volume` to `n/100`, which scales the sound wave (measured with the real YouTube player for every
   `n` from 0 to 100, 2026-11-10). So `-6dB` is `50`, `-10dB` is `32`, `-20dB` is `10`, `-40dB` is `1`.
+  **No dB needs to be known:** while practising a draft, the narrator's screen has *quieter* and *louder* buttons
+  for this one video, and what was chosen by ear goes on the correction sheet (`Volume`, §6) to be written back here.
 - A link may carry its own start and end (`?t=351`, `&start=351&end=369`, as YouTube's share and embed links do).
   They are read too, but a time may not be both in the link and after it.
 - It stops at `end` and stays on that frame; it never runs on into YouTube's suggestions. Only one stretch per line:
@@ -603,7 +605,7 @@ Comment: the band in the picture is gone, and the words sank into the sky
   is a heading `## [Slide N] comment` followed by the `Comment:` line only.
 - **Before** is what lets the person or the chat AI find the place in the source: notes are not the source word for word
   (production notes, bold and cues are removed — §3.2).
-- The keywords (`Correction sheet`, `[Slide N]`, `notes`, `overlay`, `layout`, `left`, `top`, `width`, `height`, `size`, `color`, `fill`, `none`, `Before`, `After`, `Comment`, `picture`, `video`, `ending seat`, `At`, `Label`, `Pin`, `From`, `To`, `source`, `Use`) are fixed. Do not translate them.
+- The keywords (`Correction sheet`, `[Slide N]`, `notes`, `overlay`, `layout`, `left`, `top`, `width`, `height`, `size`, `color`, `fill`, `none`, `Before`, `After`, `Comment`, `picture`, `video`, `ending seat`, `At`, `Label`, `Pin`, `From`, `To`, `source`, `Use`, `Volume`, `was`) are fixed. Do not translate them.
 
 **Pictures and videos** cannot be corrected in the player — a picture is made again, a video is cut again or put
 together again, and **the maker chooses** the new one. The sheet only says **what to change, and where**:
@@ -641,12 +643,30 @@ Comment: too dark — another photo from that morning
   the same moment in the original. A `To` exactly where two stretches meet is the end of the earlier stretch (a `From`
   there is the start of the later one). If the narrator sets a start at or after the end (or an end at or before the
   start), the other one is dropped. `Comment:` is optional.
+- `video K` with `Volume <dB> (was <dB>)`: for a **linked video** (§2.4), the volume the narrator chose by ear while
+  practising, with the `[Video]` line's `volume` when it was chosen (`was`; `0dB` when it has none). The narrator's
+  screen has *quieter* and *louder* buttons for the video being shown, in steps of 2 dB, from `0dB` (YouTube's own
+  sound — an embedded video cannot be made louder than that) down to `-40dB`; it plays at the chosen volume on the
+  narrator's device at once, and back at `was` the correction is removed. They are not the day's video volume knob
+  (every video, only for that show). Only while practising: once the audience is invited, every device, the narrator's
+  included, plays the `volume` of `work.json`. Written back as the `[Video]` line's `volume` (`0dB`: no `volume`).
+  `Comment:` is optional. Video files have no `Volume` (they are made the same loudness when exported).
+
+  ````markdown
+  ## [Slide 5] video 1
+  Volume -6dB (was 0dB)
+  Comment: louder than the other videos
+  ````
 - `ending seat N`: seat N of the slide's ending video (`role: "ending"` with `seats`), pointed at while paused:
   `At` is where it was paused; `Label` and `Pin` copy the seat's `label` and `pin` when it has them. It asks for
   **another picture in that seat**; `Comment:` (optional) says why. The seat keeps its place on the song.
 - One slide may have several of these, and any of them next to text corrections. A slide's `comment` stays as above.
 
-These three are **never judged as done by Before and After** (there is no text to compare). The player remembers,
+A `Volume` is judged by the `[Video]` line's `volume` when the work is opened again: **done** (removed by itself) when
+it is the chosen value, **not done** while it is still `was`, and **changed — look, and remove it** when it is another
+value or the video is no longer a linked video.
+
+The other three are **never judged as done by Before and After** (there is no text to compare). The player remembers,
 next to the sheet but not in the Markdown, which picture or video file was pointed at (its size and date, and the
 picture's path — for a slide with `picture_source`, that file, not the built picture, which every build writes again), the seat's `label`, and the video's `source_segments`. When the work is opened again and that file, label or cut has
 changed (or the video is gone), the player shows the correction as

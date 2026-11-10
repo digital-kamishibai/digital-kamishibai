@@ -174,6 +174,13 @@ export class LinkPlayer extends EventTarget {
     if (this.p && this.ready && this.p.setVolume) this.p.setVolume(ytVolume(this.vol, this.item && this.item.volume));
   }
 
+  /** いま読み込んでいる1本の音量（dB）を替える（練習で耳で直すとき。読み込み直さない） */
+  setItemVolume(db) {
+    if (!this.item || volumeDbOf(this.item.volume) === volumeDbOf(db)) return;
+    this.item = { ...this.item, volume: volumeDbOf(db) };
+    this.volume = this.vol;
+  }
+
   /** 埋め込みに渡っている音量（0〜100。確かめ用） */
   volumeNow() {
     try { return this.p && this.p.getVolume ? this.p.getVolume() : null; } catch { return null; }

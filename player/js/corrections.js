@@ -11,10 +11,12 @@
 //   - 上演中の動画の区間（video。止めた位置を「開始に／終わりに」。§6 video K）——コマと同じく判定せず、動画のファイルか元の区間が変わったら「変わった」
 //   - 絵の作り直し（picture。何をどう直したいかの文が必須。§6 picture）——1枚に1件。絵のパスかファイルが変わったら「変わった」。
 //     候補（pictures/_candidates）から選んだときは Use（文は任意）。絵が変わって候補が無くなったら反映済み
+//   - リンクの動画の音量（volume。耳で決めた dB。§6 video K の Volume）——台本の値がその値になったら反映済み、前の値のままなら未反映
 // ⚠️ 修正票は聞き手へ送らない（R1。notes・overlays と同じ）。語り手の端末の外へ出るのは、コピーとファイルへの保存だけ
 
 import { diffLayout, layoutLines, judgeLayout, applyLayoutItem, isLayoutValues } from './layout.js';
 import { toSource } from './work.js';
+import { isLink, isVolumeDb, volumeDbOf } from './ytlink.js';
 
 export const SHEET_VERSION = 1;
 export const storageKey = (title) => `dk-corrections:${title}`;
@@ -179,11 +181,11 @@ export function setSlideEdits(sheet, slideData, edits, sig) {
   return { ...sheet, items, comments, commentAt };
 }
 
-const KIND_ORDER = { notes: 0, overlay: 1, layout: 2, picture: 3, video: 4, seat: 5 };
-/** 絵・動画の件（文ではない。Before/After を持たず、判定は「変わった」かどうかだけ） */
-export const isMedia = (x) => x.kind === 'seat' || x.kind === 'video' || x.kind === 'picture';
-/** その件が指す動画は、枚の何本目か（コマは video・区間は at。絵の件は動画を指さない＝null） */
-export const videoOf = (x) => (x.kind === 'seat' ? x.video : x.kind === 'video' ? x.at : null);
+const KIND_ORDER = { notes: 0, overlay: 1, layout: 2, picture: 3, video: 4, volume: 5, seat: 6 };
+/** 絵・動画の件（文ではない。Before/After の囲みを持たない） */
+export const isMedia = (x) => x.kind === 'seat' || x.kind === 'video' || x.kind === 'picture' || x.kind === 'volume';
+/** その件が指す動画は、枚の何本目か（コマは video・区間と音量は at。絵の件は動画を指さない＝null） */
+export const videoOf = (x) => (x.kind === 'seat' ? x.video : x.kind === 'video' || x.kind === 'volume' ? x.at : null);
 function order(a, b) {
   if (a.slide !== b.slide) return a.slide - b.slide;
   if (a.kind !== b.kind) return KIND_ORDER[a.kind] - KIND_ORDER[b.kind];
@@ -315,6 +317,46 @@ export function cutLines(x) {
   return out;
 }
 
+// ---------- リンクの動画の音量（video K の Volume） ----------
+// リンクの動画は YouTube の音のまま鳴り、動画ごとに大きさが違う（ブラウザからは測れない）。練習で耳で決めた音量を修正票へ。
+// 書き戻すのは Claude（台本の [Video] 行の volume）。ファイルの動画は書き出しで大きさがそろうので、ここでは扱わない
+
+/** その枚の k 本目の動画の音量を db（dB、−40〜0）にしたい。台本の値（was）に戻したら件を消す。
+ *  リンクの動画でない・範囲の外なら sheet をそのまま返す。comment: 文字なら書き替える（空なら消す）・undefined なら前のひとことを保つ */
+export function setLinkVolume(sheet, slideData, k, db, comment) {
+  const cue = videoCueOf(slideData, k);
+  if (!isLink(cue) || !isVolumeDb(db)) return sheet;
+  const same = (x) => x.kind === 'volume' && x.slide === slideData.number && x.at === k;
+  const old = sheet.items.find(same);
+  const was = volumeDbOf(cue.volume);
+  const rest = sheet.items.filter((x) => !same(x));
+  if (db === was) return { ...sheet, items: rest };
+  const item = { slide: slideData.number, kind: 'volume', at: k, db, was };
+  const c = comment === undefined ? (old && old.comment) || '' : String(comment).replace(/\s+/g, ' ').trim();
+  if (c) item.comment = c;
+  return { ...sheet, items: [...rest, item].sort(order) };
+}
+
+/** 練習のあいだ、その動画を鳴らす音量: 修正票にあればその値、無ければ台本の値（dB） */
+export function linkVolumeNow(sheet, slideData, k) {
+  const x = sheet ? sheet.items.find((y) => y.kind === 'volume' && y.slide === slideData.number && y.at === k) : null;
+  return x ? x.db : volumeDbOf((videoCueOf(slideData, k) || {}).volume);
+}
+
+/** 音量の件が、いまの作品でどうなったか → 'done'（台本がその値になった）| 'pending'（台本が前の値のまま）|
+ *  'changed'（どちらでもない値になった・リンクの動画でなくなった） */
+function judgeVolume(item, slideData) {
+  const cue = videoCueOf(slideData, item.at);
+  if (!isLink(cue)) return 'changed';
+  const now = volumeDbOf(cue.volume);
+  return now === item.db ? 'done' : now === item.was ? 'pending' : 'changed';
+}
+
+/** dB の書き方（§6・§2.4: -6dB・0dB。小数は1桁まで） */
+export const dbText = (db) => `${Math.round(db * 10) / 10 || 0}dB`;
+/** 音量の件の行（§6: Volume <新しい値> (was <台本の値>)・Comment） */
+export const volumeLines = (x) => [`Volume ${dbText(x.db)} (was ${dbText(x.was)})`, ...(x.comment ? [`Comment: ${x.comment}`] : [])];
+
 /** 指したコマが、いまの作品でどうなったか → 'changed'（写真の名前か動画のファイルが変わった）| 'pending'。
  *  file＝いまの動画のファイルの見分け（分からなければ null＝写真の名前だけで見る） */
 function judgeSeat(item, slideData, file) {
@@ -357,6 +399,7 @@ export function judge(item, slideData, fileOf) {
   if (item.kind === 'picture') return judgePicture(item, slideData, fileOf ? fileOf(item) : null);
   if (item.kind === 'seat') return judgeSeat(item, slideData, fileOf ? fileOf(item) : null);
   if (item.kind === 'video') return judgeCut(item, slideData, fileOf ? fileOf(item) : null);
+  if (item.kind === 'volume') return judgeVolume(item, slideData);
   if (item.kind === 'layout') return judgeLayout(item, slideData);
   const found = (x) => (item.kind === 'notes'
     ? findRun(paragraphs(slideData.notes).map(trimEnds), x.map(trimEnds)) >= 0
@@ -439,7 +482,7 @@ const pad = (n) => String(n).padStart(2, '0');
 const stamp = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 export const place = (x) => (x.kind === 'notes' ? `notes ${x.at[0] === x.at[1] ? x.at[0] : `${x.at[0]}-${x.at[1]}`}`
-  : x.kind === 'seat' ? `ending seat ${x.at}` : x.kind === 'picture' ? 'picture' : `${x.kind} ${x.at}`);
+  : x.kind === 'seat' ? `ending seat ${x.at}` : x.kind === 'picture' ? 'picture' : x.kind === 'volume' ? `video ${x.at}` : `${x.kind} ${x.at}`);
 /** 動画の中の秒 → m:ss.s（§6） */
 export function clock(sec) {
   const tenths = Math.round(Math.max(0, Number(sec) || 0) * 10);
@@ -458,7 +501,8 @@ export function seatLines(x) {
 export const textOf = (x, side) => (x.kind === 'notes' ? joinParagraphs(x[side]) : x.kind === 'layout' ? layoutLines(x[side]) : boxText(x[side]));
 
 /** 絵・動画の件の行（見出しの下） */
-export const mediaLines = (x) => (x.kind === 'seat' ? seatLines(x) : x.kind === 'picture' ? pictureLines(x) : cutLines(x));
+export const mediaLines = (x) => (x.kind === 'seat' ? seatLines(x) : x.kind === 'picture' ? pictureLines(x)
+  : x.kind === 'volume' ? volumeLines(x) : cutLines(x));
 
 /** 修正票 → Markdown。skip＝書かない件の番号（手を入れて反映した件。Claude にもう一度当てさせない）。
  *  sig＝いまの作品のしるし。渡したら、前回のひとこと（isOldComment＝見て消す）は書かない——
@@ -513,7 +557,9 @@ export function readSheet(raw, title) {
     || (x.kind === 'video' && Number.isInteger(x.at) && (x.from !== undefined || x.to !== undefined)
       && ['from', 'to', 'fromSource', 'toSource'].every((k) => x[k] === undefined || typeof x[k] === 'number')
       && (x.comment === undefined || typeof x.comment === 'string') && isFile(x.file)
-      && (x.segments === undefined || (Array.isArray(x.segments) && x.segments.every((g) => g && typeof g.start === 'number' && typeof g.dur === 'number'))))));
+      && (x.segments === undefined || (Array.isArray(x.segments) && x.segments.every((g) => g && typeof g.start === 'number' && typeof g.dur === 'number'))))
+    || (x.kind === 'volume' && Number.isInteger(x.at) && isVolumeDb(x.db) && isVolumeDb(x.was) && x.db !== x.was
+      && (x.comment === undefined || typeof x.comment === 'string'))));
   const comments = {};
   for (const [k, v] of Object.entries(j.comments || {})) if (typeof v === 'string' && v) comments[k] = v;
   const commentAt = {};
