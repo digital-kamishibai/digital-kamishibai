@@ -1,0 +1,35 @@
+{
+  "work": {
+    "format": "digital-kamishibai/work",
+    "version": 1,
+    "title": "Holes",
+    "language": "en",
+    "slides": [
+      {
+        "number": 1,
+        "title": "Unnumbered and numbered",
+        "picture": "pictures/01.jpg",
+        "notes": "~ My favourite was the banana,\n~ because it tastes like the morning.\n\n~1 First came the banana,\n~1 and then the milk.\n\nA plain line, then\n~2 a marked line in the same paragraph.",
+        "cues": []
+      },
+      {
+        "number": 2,
+        "title": "Not marks",
+        "picture": "pictures/02.jpg",
+        "notes": "～ full-width tilde\n〜 wave dash\n~no space\n~1no space\n~１ full-width digit\n~\n\n~ \n\n~3 ",
+        "cues": []
+      }
+    ]
+  },
+  "texts": {},
+  "errors": [],
+  "warnings": [
+    "hole-near line 18",
+    "hole-near line 19",
+    "hole-near line 20",
+    "hole-near line 21",
+    "hole-near line 22",
+    "hole-empty line 25",
+    "hole-empty line 27"
+  ]
+}

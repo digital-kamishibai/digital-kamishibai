@@ -21,15 +21,15 @@
 
 > When the music starts, listen for a moment before you begin. ♩ means take a breath. / means a short pause
 
-~ Every morning, / Mom makes a smoothie. / It's a drink you make by blending nuts and fruit in a blender. ♩
+~1 Every morning, / Mom makes a smoothie. / It's a drink you make by blending nuts and fruit in a blender. ♩
 
-~ Why did Mom start making it? ♩
+~1 Why did Mom start making it? ♩
 
-~ One reason: to keep the body from rusting. / If you leave an iron nail outside, it turns red with rust, right? / Something a little like that happens inside our bodies too, bit by bit.
+~1 One reason: to keep the body from rusting. / If you leave an iron nail outside, it turns red with rust, right? / Something a little like that happens inside our bodies too, bit by bit.
 
-~ The other reason: to keep blood vessels soft and bendy. / Blood vessels are the hoses inside your body that carry your blood. ♩
+~1 The other reason: to keep blood vessels soft and bendy. / Blood vessels are the hoses inside your body that carry your blood. ♩
 
-~ Today's story is about what happens inside this smoothie.
+~1 Today's story is about what happens inside this smoothie.
 
 ---
 
@@ -101,7 +101,7 @@ There are studies showing that tomatoes and nuts / help blood vessels stretch an
 And the things that keep the body from rusting / seem to be stronger as a team, inside foods of many colors, / than when you take just one of them out on its own. ♩
 
 Running, going places, playing with everyone. / The years when you can move around like that, full of energy, are called your healthy years. /
-~ Mom wants those years to be long. ♩
+~1 Mom wants those years to be long. ♩
 
 This smoothie has lots of things in it that help protect your body.
 
@@ -146,6 +146,6 @@ That pulp is fiber. / It becomes food for the tiny bacteria in your tummy, / and
 
 The six friends have become one. ♩
 
-~ This is Mom's smoothie.
+~1 This is Mom's smoothie.
 
 > The story ends here. Don't add anything. After a short pause, play the ending video (the music fades out by itself when the video starts)

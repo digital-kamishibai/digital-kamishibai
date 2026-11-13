@@ -1,0 +1,12 @@
+{
+  "work": null,
+  "texts": {},
+  "errors": [
+    "picture-heic slide 2"
+  ],
+  "warnings": [
+    "no-language",
+    "audio-format slide 2",
+    "video-format slide 2"
+  ]
+}

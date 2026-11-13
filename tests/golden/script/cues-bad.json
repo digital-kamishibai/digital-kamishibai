@@ -1,0 +1,16 @@
+{
+  "work": null,
+  "texts": {},
+  "errors": [
+    "bgm-stop-file line 10",
+    "cue-unknown line 11",
+    "cue-no-file line 12",
+    "path-backslash line 13",
+    "cue-block-mixed line 14",
+    "cue-in-free-cue line 17",
+    "text-not-first line 20",
+    "picture-twice slide 1",
+    "bgm-twice slide 1"
+  ],
+  "warnings": []
+}

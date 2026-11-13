@@ -1,0 +1,55 @@
+{
+  "work": {
+    "format": "digital-kamishibai/work",
+    "version": 1,
+    "title": "Linked videos",
+    "language": "en",
+    "slides": [
+      {
+        "number": 1,
+        "title": "Forms",
+        "picture": "pictures/01.jpg",
+        "notes": "Say this when the video cannot be played.",
+        "cues": [
+          {
+            "type": "video",
+            "url": "https://www.youtube.com/watch?v=8KkKuTCFvzI",
+            "start": 351,
+            "end": 369
+          },
+          {
+            "type": "video",
+            "url": "https://www.youtube.com/watch?v=8KkKuTCFvzI",
+            "start": 351,
+            "end": 369.5
+          },
+          {
+            "type": "video",
+            "url": "https://www.youtube.com/watch?v=dCVlRFWOjgE",
+            "start": 45,
+            "end": 158,
+            "captions": "pt-BR",
+            "volume": -12
+          },
+          {
+            "type": "video",
+            "url": "https://www.youtube.com/watch?v=dCVlRFWOjgE",
+            "start": 3951
+          },
+          {
+            "type": "video",
+            "url": "https://www.youtube.com/watch?v=dCVlRFWOjgE"
+          },
+          {
+            "type": "video",
+            "url": "https://www.youtube.com/watch?v=dCVlRFWOjgE",
+            "captions": "ja"
+          }
+        ]
+      }
+    ]
+  },
+  "texts": {},
+  "errors": [],
+  "warnings": []
+}

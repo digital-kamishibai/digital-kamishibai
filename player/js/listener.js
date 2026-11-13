@@ -14,6 +14,7 @@ import { makeView, viewChanged } from './view.js';
 import { beep, measure } from './tone.js';
 import { LinkPlayer, loadApi, atEnd, isCaptions, volumeDbOf } from './ytlink.js';
 import { safeGain } from './loudness.js';
+import { isSiteSrc } from './sample.js';
 
 applyI18n();
 const $ = (id) => document.getElementById(id);
@@ -333,10 +334,10 @@ function handle(conn, msg, narratorId) {
       expectedPics = Array.isArray(msg.pictures) ? msg.pictures.length : 0;
       picSlides = new Set((Array.isArray(msg.pictures) ? msg.pictures : []).map((p) => p.n));
       for (const a of Array.isArray(msg.audio) ? msg.audio : []) {
-        vids.set(String(a.id), { id: String(a.id), kind: 'audio', size: Number(a.size) || 0, mime: String(a.mime || 'audio/mpeg'), gain: safeGain(a.gain), mode: null, bytes: 0, url: null });
+        vids.set(String(a.id), { id: String(a.id), kind: 'audio', size: Number(a.size) || 0, mime: String(a.mime || 'audio/mpeg'), gain: safeGain(a.gain), mode: null, bytes: 0, url: null, src: isSiteSrc(a.src) ? a.src : null });
       }
       for (const v of Array.isArray(msg.videos) ? msg.videos : []) {
-        vids.set(String(v.id), { id: String(v.id), kind: 'video', n: v.n, size: Number(v.size) || 0, mime: String(v.mime || 'video/mp4'), mode: null, bytes: 0, url: null });
+        vids.set(String(v.id), { id: String(v.id), kind: 'video', n: v.n, size: Number(v.size) || 0, mime: String(v.mime || 'video/mp4'), mode: null, bytes: 0, url: null, src: isSiteSrc(v.src) ? v.src : null });
       }
       links.clear();
       for (const l of Array.isArray(msg.links) ? msg.links : []) {
@@ -496,6 +497,7 @@ async function prepareVideos(conn, narratorId) {
   const items = [];
   for (const v of vids.values()) {
     v.bytes = store ? await store.bytes(v.id) : 0;
+    if (store && v.src && v.bytes < v.size) await fromSite(v); // サイトの見本: 語り手から送らせずにサイトから取る（中継を通らない）
     if (v.bytes >= v.size) await finish(v);
     items.push({ id: v.id, bytes: v.bytes });
   }
@@ -505,6 +507,41 @@ async function prepareVideos(conn, narratorId) {
   if (!store || [...vids.values()].every((v) => v.bytes >= v.size)) return;
   const bulk = peer.connect(narratorId, { label: 'bulk', serialization: 'raw', reliable: true });
   bulk.on('data', (data) => onBulk(conn, data));
+}
+
+/** サイトの見本の素材を、サイトから取って保存に書く（4MB の区切りごと。語り手から受けるのと同じ形）。
+ *  取れない・大きさが合わないときは書いた分を消す → have で 0 と言い、いままでどおり語り手から受ける */
+async function fromSite(v) {
+  let total = 0;
+  try {
+    const res = await fetch(v.src);
+    if (!res.ok || !res.body) throw new Error(`HTTP ${res.status}`);
+    const reader = res.body.getReader();
+    let parts = [];
+    let n = 0;
+    let index = 0;
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (value) { parts.push(value); n += value.byteLength; }
+      while (n >= SEGMENT || (done && n > 0)) {
+        const all = new Blob(parts);
+        const seg = all.slice(0, SEGMENT);
+        await store.writeSegment(v.id, index++, seg);
+        total += seg.size;
+        v.bytes = total;
+        showStatus();
+        const rest = all.slice(SEGMENT);
+        parts = rest.size ? [rest] : [];
+        n = rest.size;
+      }
+      if (done) break;
+    }
+    if (total !== v.size) throw new Error(`size ${total} != ${v.size}`);
+  } catch (err) {
+    console.warn('site', v.src, err);
+    try { await store.remove(v.id); } catch { /* 無い */ }
+    v.bytes = 0;
+  }
 }
 
 function onBulk(conn, data) {
@@ -748,4 +785,5 @@ $('stage').addEventListener('click', () => {
 document.addEventListener('fullscreenchange', () => { $('hint').hidden = !!document.fullscreenElement || $('picture').hidden; });
 
 // 自動テスト用（?test のときだけ）
-if (TEST) window.__dkl = { link: () => ({ on: linkOn, id: lp.item && lp.item.id, ready: lp.ready, error: lp.error, playing: !lp.paused, pos: lp.currentTime, state: lp.state(), captions: lp.captionsNow(), vol: lp.volumeNow(), tap: !$('tapPlay').hidden }), audio: () => engine.state(), view: () => lastView, fakeHeard: null, voiceStream: () => voiceEl.srcObject };
+if (TEST) window.__dkl = { link: () => ({ on: linkOn, id: lp.item && lp.item.id, ready: lp.ready, error: lp.error, playing: !lp.paused, pos: lp.currentTime, state: lp.state(), captions: lp.captionsNow(), vol: lp.volumeNow(), tap: !$('tapPlay').hidden }), audio: () => engine.state(), view: () => lastView,
+  vids: () => [...vids.values()].map((v) => ({ id: v.id, kind: v.kind, size: v.size, bytes: v.bytes, src: v.src, ready: !!v.url })), fakeHeard: null, voiceStream: () => voiceEl.srcObject };

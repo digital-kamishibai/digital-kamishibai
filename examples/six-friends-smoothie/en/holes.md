@@ -5,7 +5,7 @@ It doesn't have to be for children: you can make one just as well for a partner,
 For this public version we marked **the places you can replace with your own (the holes)**.
 The holes are not blank. What the maker put there is still in place — that is the "filled-in example".
 On the narrator's screen, the narration that is a hole shows with a **pale yellow background** (in the script, the lines
-that start with `~ `).
+that start with a mark like `~1 `; the number is the hole's number in the table below).
 
 Changing just the holes is enough to make it your own. The frame of the story (each ingredient has a special skill, and together they help each
 other) works for any favourite dish.
@@ -33,6 +33,11 @@ The narrator comes up again at the end of slide 4 and in the last line of slide 
 
 **How the maker filled it**: **the person who always makes it** told it themselves, and gave two reasons in their own
 words: "to keep the body from rusting" and "to keep blood vessels soft and bendy".
+
+**Questions to help you find your story**:
+- When, and why, did you start making this dish?
+- Why do you keep making it?
+- What do you most want the people who eat it to know?
 
 **Other ways to fill it**:
 - "I wanted my children to have Grandma's taste too."

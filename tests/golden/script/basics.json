@@ -1,0 +1,74 @@
+{
+  "work": {
+    "format": "digital-kamishibai/work",
+    "version": 1,
+    "title": "The Lamp",
+    "language": "en",
+    "slides": [
+      {
+        "number": 1,
+        "title": "Cover",
+        "picture": "pictures/cover.png",
+        "notes": "Tonight's story is about a lamp.\n\nWho do you think lit it?  Think.\n\n> Pause here, look at them",
+        "cues": [
+          {
+            "type": "bgm",
+            "file": "sounds/sea.mp3"
+          }
+        ]
+      },
+      {
+        "number": 2,
+        "title": "",
+        "picture": "pictures/02.jpg",
+        "notes": "Line one\nline two (kept as written)\n\n\nTwo blank lines above stay (nothing was removed on this slide).",
+        "cues": []
+      },
+      {
+        "number": 3,
+        "title": "Sounds and videos",
+        "picture": "pictures/03.jpg",
+        "notes": "The end.",
+        "cues": [
+          {
+            "type": "sound",
+            "file": "sounds/bell.mp3"
+          },
+          {
+            "type": "sound",
+            "file": "sounds/door.m4a"
+          },
+          {
+            "type": "video",
+            "file": "videos/one.mp4"
+          },
+          {
+            "type": "video",
+            "file": "videos/two.mp4"
+          },
+          {
+            "type": "bgm",
+            "file": "sounds/theme.mp3",
+            "loop": false
+          }
+        ]
+      },
+      {
+        "number": 4,
+        "title": "Silence",
+        "picture": "pictures/04.jpg",
+        "notes": "Quiet.",
+        "cues": [
+          {
+            "type": "bgm-stop"
+          }
+        ]
+      }
+    ]
+  },
+  "texts": {},
+  "errors": [],
+  "warnings": [
+    "after-end line 23"
+  ]
+}

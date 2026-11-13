@@ -192,6 +192,13 @@ export function findWorkJson(paths) {
   return { path: p, base: p.includes('/') ? p.slice(0, p.lastIndexOf('/')) : '' };
 }
 
+/** 穴の語りの行（docs/work-format.md §2.3: 行頭の "~ " か、番号付きの "~N "）→ { hole: 穴の番号（無ければ ''）, text: 印を外した文 }。
+ *  穴の語りでなければ null。印は読まない（語り手の画面にも、書き出す台本にも出さない） */
+export function holeLine(line) {
+  const m = /^~([0-9]*) /.exec(line);
+  return m ? { hole: m[1], text: line.slice(m[0].length) } : null;
+}
+
 function stemAndExt(path) {
   const dot = path.lastIndexOf('.');
   const slash = path.lastIndexOf('/');

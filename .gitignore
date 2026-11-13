@@ -36,3 +36,9 @@ __pycache__/
 # エンディング動画の梯子の絵コンテと中間ファイル（家族の写真が入る）
 **/ending/
 **/ending_*/
+
+# サイトの見本（scripts/fetch-samples.mjs が配る直前に取り込む写し）と、取り込み・作り直しの控え
+player/samples/
+player/samples.new/
+player/sample-list.json
+.cache/

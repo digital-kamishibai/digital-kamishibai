@@ -158,6 +158,8 @@ Write `script.md` from [templates/script-template.md](templates/script-template.
 - `<!-- ... -->` is a production note: never shown to the narrator.
 - `~ ` at the start of each line marks **a hole's narration**: read aloud, and highlighted on the narrator's screen so
   the person telling it sees where they may put in their own story. Mark a hole's stand-in words this way.
+  When the holes are numbered (a sample's `holes.md`, a script handed to others), write the number in the mark:
+  `~1 ` for hole 1 (1 to 99). The marked lines of one paragraph carry the same mark.
 - Words that listeners see on the picture (a title, a label, a year) go in a `> [Text]` block on that slide.
 - Each slide ends with a line that is exactly `---`.
 

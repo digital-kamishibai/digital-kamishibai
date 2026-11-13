@@ -2,13 +2,13 @@
 // 画面は「準備・受付・上演」の3つを同じページの中で切り替える（語り手の画面の作り直し U1。ページを移ると接続が切れる）。
 import './https.js';
 import { t, applyI18n } from './i18n.js';
-import { validateWork, fileMap, findWorkJson, dirEntries, workDirOf, resolvePictures, resolveVideos, resolveAudio, resolveBases, resolveCandidates, resolveLinks, videoId, uniqueById, seatAt, toSource } from './work.js';
+import { holeLine, validateWork, fileMap, findWorkJson, dirEntries, workDirOf, resolvePictures, resolveVideos, resolveAudio, resolveBases, resolveCandidates, resolveLinks, videoId, uniqueById, seatAt, toSource } from './work.js';
 import {
   createSession, onHello, approve, reject, onGot, onGone, goTo, approvedCount, wouldExceed,
   mayOpenBulk, onHave, onVideoFail, playVideo, onSync,
   knownToken, staleTwins, startShow, slideAudio, videoAudio, videoEndAudio, talkMessage, audioTick, setVolume, onView, onHeard, onLink, setRecording,
 } from './protocol.js';
-import { chipState, nextScreen, bannerFor, videosOn, pickVideo, mustStopFor, videoName, clampSplit, splitAt, SPLIT_DEFAULT, SPLIT_MIN, SPLIT_MAX, SPLIT_STEP } from './view.js';
+import { chipState, nextScreen, bannerFor, videosOn, pickVideo, mustStopFor, videoName, clampSplit, splitAt, SPLIT_DEFAULT, SPLIT_MIN, SPLIT_MAX, SPLIT_STEP, clampNotesSize, NOTES_DEFAULT, NOTES_STEP } from './view.js';
 import { createVoice, heardFrom, routes, voiceMessages, rollOrder, judgeRollCall } from './voice.js';
 import { createMixer } from './mixer.js';
 import { createRecorder } from './recorder.js';
@@ -33,6 +33,14 @@ import { whyBlocked, isAndroid, relayNote } from './ice.js';
 import qrcode from '../vendor/qrcode.mjs';
 import { LinkPlayer, loadApi, MIN_VOLUME_DB } from './ytlink.js';
 import { integratedLoudness, levelGain } from './loudness.js';
+import { SAMPLE_LIST, sampleQuery, pickSample, sampleBase, sampleFiles } from './sample.js';
+import { readScript } from './script.js';
+import {
+  holeRuns, makeVariant, makeMade, variantWork, changedRuns, sameOutsideHoles, basedOn, skeletonDiffs, pickBySkeleton, wideMarks, fixWideMarks, unfence,
+} from './variant.js';
+import { readZip } from './zip.js';
+import { holeSection, buildPrompt, parseAnswer } from './advise.js';
+import { pictureScenes, buildComposePrompt } from './compose.js';
 
 applyI18n();
 const $ = (id) => document.getElementById(id);
@@ -40,6 +48,9 @@ const $ = (id) => document.getElementById(id);
 let work = null;
 let workMap = new Map();
 let mediaMap = new Map();
+let site = null;                   // サイトの見本として開いたとき（docs/work-format.md §1。フォルダから開いたら null）:
+                                   // { base, levels, slug, lang, version, title, script（見本の script.md）, sampleWork, sampleRead, texts（変えた欄: 番号 → 文） }
+let varying = null;                // 語りを変える欄を開いている枚（段2）
 let workDir = null;                // 作品フォルダそのもの（showDirectoryPicker で選べたときだけ）。修正票の保存先の最初の場所
 let pictures = new Map();          // 番号 → { key, file, mime, size }
 let videos = [];                   // [{ id, kind: 'video', n, key, file, size, mime, problem }]
@@ -93,6 +104,7 @@ const recMime = typeof MediaRecorder !== 'undefined' ? pickMime((m) => MediaReco
 
 function setScreen(next) {
   screen = next;
+  document.body.dataset.screen = screen;   // 上演の画面だけ、ページを画面の高さに収める（app.css）
   $('screenPrep').hidden = screen !== 'prep';
   $('screenRoom').hidden = screen !== 'room';
   $('screenShow').hidden = screen !== 'show';
@@ -102,6 +114,7 @@ function setScreen(next) {
   }
   renderBanner();
   renderPractice();
+  renderVaryNote();
   window.scrollTo(0, 0);
 }
 
@@ -165,7 +178,10 @@ async function readWorkFolder(entries, dir) {
   return { work: w, map: fileMap(entries, found.base), dir: d };
 }
 
-pickFolder($('pickWork'), async (entries, dir) => {
+pickFolder($('pickWork'), (entries, dir) => openEntries(entries, dir));
+
+/** 選んだファイル群（作品フォルダ、または zip の中身）から作品を開く */
+async function openEntries(entries, dir) {
   // 受付中に作品を選び直すと、聞き手へ配った絵・動画の一覧と食い違う（E10）
   if (peer) return showLoadError([t('workLocked')]);
   const r = await readWorkFolder(entries, dir);
@@ -176,6 +192,8 @@ pickFolder($('pickWork'), async (entries, dir) => {
   work = r.work;
   workMap = r.map;
   workDir = r.dir;
+  site = null;
+  varying = null;
   mediaMap = new Map();
   sheet = loadSheet(work);
   // 開いたときも、修正票を作品と照らし合わせる（反映済みは消す）。読み直すときだけだと、ページを開き直して選んだ作品に
@@ -190,7 +208,7 @@ pickFolder($('pickWork'), async (entries, dir) => {
   }
   note2(msg);
   resolve();
-});
+}
 
 // 作品を読み直す（E10）: 練習中だけ。今の画面にとどまり、今の枚を保つ。修正票を読み直した作品と比べる
 pickFolder($('reloadWork'), async (entries, dir) => {
@@ -210,6 +228,8 @@ async function reloadWith(r) {
   work = r.work;
   workMap = r.map; // 素材フォルダを別に選んでいたら、それはそのまま使う
   workDir = r.dir;
+  site = null;
+  varying = null;
   let msg = '';
   if (sheetEnabled(work)) {
     const rv = resolveVideos(work, [workMap, mediaMap]);
@@ -241,6 +261,466 @@ $('pickMedia').addEventListener('change', (e) => {
   resolve();
 });
 
+// ---------- サイトの見本を開く（narrator.html?sample=<slug>&lang=<lang>。docs/work-format.md §1） ----------
+// 素材をサイトから取り、File にして workMap に入れる——あとは作品フォルダと同じ道（resolve 以下は変えない）。
+// 更新日時は 0 にそろえる: 素材の id（videoId）が毎回同じになり、聞き手の端末に残した分が次の上演でも使える
+
+async function getOk(url) {
+  const res = await fetch(url, { cache: 'no-cache' });
+  if (!res.ok) throw new Error(`${url}: HTTP ${res.status}`);
+  return res;
+}
+
+async function openSample(q) {
+  const box = $('sampleNote');
+  box.hidden = false;
+  box.textContent = t('sampleLoading', 0, 0);
+  try {
+    let entry = pickSample(await (await getOk(SAMPLE_LIST)).json(), q.slug, q.lang, navigator.language);
+    if (!entry) throw new Error(t('sampleNone', q.slug));
+    // 変えた版は、元にした版の素材で開く（サイトの版は増えるだけ）。その版が無ければ一番新しい版で（docs/work-format.md §6）
+    const kept = q.variant && !q.script ? readKept(entry) : null;
+    const scriptIn = q.script || (kept && kept.kind === 'made' ? kept.origin : null); // 段4a の台本は、置いた元の台本から開き直す
+    const want = q.version || (kept && kept.version) || entry.version;
+    let older = false;
+    if (want !== entry.version) {
+      const res = await fetch(sampleBase({ ...entry, version: want }) + 'version.json', { cache: 'no-cache' });
+      if (res.ok) entry = { ...entry, version: want }; else older = true;
+    }
+    const base = sampleBase(entry);
+    const { work: w, errors } = validateWork(await (await getOk(base + 'work.json')).json());
+    if (errors.length) throw new Error(errors.join(' / '));
+    const { files, total, levels } = sampleFiles(await (await getOk(base + 'version.json')).json());
+    const script = await (await getOk(base + 'script.md')).text();   // 語りを変える元（段2）
+    const holesRes = await fetch(base + 'holes.md', { cache: 'no-cache' }); // 穴の手引き（段3「AI に相談」。無い版もある）
+    const holes = holesRes.ok ? await holesRes.text() : '';
+    const planRes = await fetch(base + 'plan.md', { cache: 'no-cache' });   // 絵のプロンプト（段4a「AI と台本を書く」の絵の説明。無い版もある）
+    const plan = planRes.ok ? await planRes.text() : '';
+    // 貼った・開いた台本は、素材を取る前に確かめる（見本の素材で開けなければ、何も読み込まずに止まる）
+    const sampleRead = readScript(script);
+    const from = scriptIn ? fromScript(script, sampleRead, scriptIn) : null;
+    const map = new Map();
+    let got = 0;
+    for (const f of files) {
+      const blob = await (await getOk(base + f.path)).blob();
+      map.set(f.path, new File([blob], f.path.split('/').pop(), { type: blob.type, lastModified: 0 }));
+      got += f.size;
+      box.textContent = t('sampleLoading', got, total);
+    }
+    if (peer) throw new Error(t('workLocked'));
+    closeEditor({ type: 'cancel' });
+    stopShow();
+    work = w;
+    workMap = map;
+    workDir = null;
+    mediaMap = new Map();
+    site = { base, levels, slug: entry.slug, lang: entry.lang, version: entry.version, title: w.title,
+      script, holes, plan, sampleScript: script, sampleWork: w, sampleRead, texts: {}, made: false };
+    varying = null;
+    sheet = null;           // 配った版（draft ではない）。修正票は無い
+    if (from && from.made) {
+      // 段4a: 欄の元は貼った台本。見本の手引きは見本の話のためのものなので、AI に相談は出さない
+      site.made = true;
+      site.script = from.made;
+      site.holes = '';
+      if (kept && kept.kind === 'made' && kept.version === site.version && kept.texts) {
+        site.texts = Object.fromEntries(Object.entries(kept.texts).filter(([k, v]) => /^[0-9]+$/.test(k) && typeof v === 'string'));
+      }
+      if (!applyVariant()) { site.texts = {}; if (!applyVariant()) throw new Error(t('madeBroken')); }
+      if (q.script) saveVariant();
+      markVariantUrl();
+    } else if (from) {
+      site.texts = from.texts;
+      if (!applyVariant()) throw new Error(t('variantOther'));
+      saveVariant();
+      markVariantUrl();
+    } else if (kept) restoreVariant(kept);
+    else markVariantUrl();
+    note2([older ? t('sampleOlder', want) : '', q.matched ? t('madeMatched', w.title) : '', site.made ? t('madeNote') : ''].filter(Boolean).join(' '));
+    box.hidden = true;
+    await resolve();
+    go({ type: 'tab', to: 'show' }); // そのまま上演の画面で練習（受付は開いていない）
+  } catch (err) {
+    box.hidden = true;
+    showLoadError(err && err.lines ? err.lines : [t('sampleFail'), String((err && err.message) || err)]);
+  }
+}
+
+// ---------- 語りを変えてみる（段2。docs/work-format.md §6 の最後） ----------
+// サイトの見本を練習しているあいだだけ、黄色い所（穴の語り）を替えられる。work.json は書き換えない:
+// 変えた版は見本の script.md の黄色い所を差し替えたもの（variant.js）。画面に出す作品は、見本の work.json の語りだけを替えたもの。
+// このブラウザに見本と言語ごとに1つ置き、ファイルに保存できる。語りは聞き手へ送らない（いまの保証のまま）
+
+const variantKey = (s) => `dk-variant:${s.slug}:${s.lang}`;
+const canVary = () => !!site && !peer && !!work;
+
+/** 変えた欄（site.texts）から、画面に出す作品を作り直す。何も変えていなければ見本のまま */
+function applyVariant() {
+  if (!site) return true;
+  const meta = { title: site.title, slug: site.slug, lang: site.lang, version: site.version };
+  if (!site.made && !Object.keys(site.texts).length) { work = site.sampleWork; site.variant = null; return true; }
+  const script = site.made ? makeMade(site.script, site.texts, meta, site.sampleRead, readScript) : makeVariant(site.script, site.texts, meta);
+  const r = variantWork(site.sampleWork, site.sampleRead, readScript(script));
+  if (!r.work) return false;
+  work = r.work;
+  site.variant = script;
+  return true;
+}
+
+function saveVariant() {
+  try {
+    if (site.made) {
+      localStorage.setItem(variantKey(site), JSON.stringify({ kind: 'made', version: site.version, origin: site.script, texts: site.texts, script: site.variant, at: Date.now() }));
+    } else if (Object.keys(site.texts).length) {
+      localStorage.setItem(variantKey(site), JSON.stringify({ version: site.version, texts: site.texts, script: site.variant, at: Date.now() }));
+    } else localStorage.removeItem(variantKey(site));
+  } catch { /* 置けないブラウザ: 知らせのとおり、ファイルに保存してもらう */ }
+}
+
+/** このブラウザに置いた変えた版（無ければ null） */
+function readKept(s) {
+  try {
+    const kept = JSON.parse(localStorage.getItem(variantKey(s)) || 'null');
+    if (!kept || !Number.isInteger(kept.version) || !kept.texts || typeof kept.texts !== 'object') return null;
+    return kept.kind !== 'made' || typeof kept.origin === 'string' ? kept : null;
+  } catch { return null; }
+}
+
+/** 開けない理由を、行ごとに出す */
+const loadErr = (lines) => Object.assign(new Error(lines.join(' / ')), { lines });
+
+/** 台本（ファイル・貼った文・このブラウザに置いた段4a の台本）を見本の版に当てる。素材を取る前に呼ぶ。
+ *  黄色い所のほかが見本と同じ → { texts }（段2の変えた版）。ほかも違う → 骨組みが見本と同じときだけ { made }（段4a）。
+ *  開けなければ、違う枚を全部まとめて投げる（docs/work-format.md §6「A script written from a sample」） */
+function fromScript(sampleScript, sampleRead, text) {
+  const idx = changedRuns(sampleScript, text);
+  if (idx !== null && sameOutsideHoles(sampleScript, text)) {
+    const runs = holeRuns(text);
+    return { texts: Object.fromEntries(idx.map((i) => [i, runs[i].text])) };
+  }
+  const read = readScript(text);
+  if (!read.work) throw loadErr([t('scriptErrors'), ...read.errors]);
+  const diffs = skeletonDiffs(sampleRead, read);
+  if (diffs.length) throw loadErr([t('madeSkeleton'), ...diffs.map((d) => t('madeDiff_' + d.what, d.slide ?? d.sample, d.script))]);
+  return { made: text };
+}
+
+/** 読み込み直しても同じ版で開けるように、URL に variant=1 を付ける（変えていなければ外す） */
+function markVariantUrl() {
+  if (!site) return;
+  const u = new URL(location.href);
+  u.searchParams.set('sample', site.slug);
+  u.searchParams.set('lang', site.lang);
+  if (site.variant) u.searchParams.set('variant', '1'); else u.searchParams.delete('variant');
+  history.replaceState(null, '', u.pathname + u.search);
+}
+
+/** このブラウザに置いた変えた版を、開いた見本に当てる（開くときに、元にした版を選んである） */
+function restoreVariant(kept) {
+  if (!kept || kept.version !== site.version) { note2(t('varyBroken')); return; }
+  site.texts = Object.fromEntries(Object.entries(kept.texts).filter(([k, v]) => /^[0-9]+$/.test(k) && typeof v === 'string'));
+  if (!applyVariant()) { site.texts = {}; work = site.sampleWork; note2(t('varyBroken')); return; }
+  markVariantUrl();
+  renderVaryNote();
+}
+
+function renderVaryNote() {
+  const on = !!site && !!site.variant && screen === 'show';
+  $('varyNote').hidden = !on;
+  if (on && !$('varyNoteText').dataset.saved) $('varyNoteText').textContent = t('varyKept');
+}
+
+function openVary() {
+  if (!canVary() || editing != null) return;
+  varying = session.slide;
+  site.textsAtOpen = JSON.stringify(site.texts);
+  $('advisePane').hidden = true;
+  const fields = $('varyFields');
+  fields.replaceChildren();
+  for (const r of holeRuns(site.script).filter((x) => x.slide === varying)) {
+    const box = document.createElement('div');
+    box.className = 'vary-field';
+    const head = document.createElement('div');
+    head.className = 'row';
+    const label = document.createElement('span');
+    label.className = 'label';
+    label.textContent = t('varyHole', r.hole);
+    const reset = document.createElement('button');
+    reset.className = 'mini';
+    reset.textContent = t('varyReset');
+    const area = document.createElement('textarea');
+    area.spellcheck = false;
+    area.dataset.index = String(r.index);
+    area.value = site.texts[r.index] ?? r.text;
+    area.rows = Math.max(2, area.value.split('\n').length + 1);
+    // 高さは中身に合わせる（折り返す狭い画面でも、文が欄の外に隠れない）
+    const fit = () => { area.style.height = 'auto'; area.style.height = `${area.scrollHeight + 2}px`; };
+    area.addEventListener('input', fit);
+    reset.addEventListener('click', () => { area.value = r.text; fit(); });
+    head.append(label);
+    // AI に相談（段3）: 番号の付いた穴の、その枚の最初の欄にだけ。手引きにその穴の節があるときだけ
+    if (r.hole && holeSection(site.holes, r.hole) && !fields.querySelector(`[data-advise="${r.hole}"]`)) {
+      const ask = document.createElement('button');
+      ask.className = 'mini';
+      ask.dataset.advise = r.hole;
+      ask.textContent = t('adviseBtn');
+      ask.addEventListener('click', () => openAdvise(r.hole));
+      head.append(ask);
+    }
+    head.append(reset);
+    box.append(head, area);
+    fields.append(box);
+  }
+  renderEditTools();
+  for (const a of fields.querySelectorAll('textarea')) a.dispatchEvent(new Event('input'));
+}
+
+/** 欄を閉じて、変えた語りを画面に出し、このブラウザに置く */
+function closeVary() {
+  if (varying == null) return;
+  const runs = holeRuns(site.script);
+  const before = site.textsAtOpen ?? JSON.stringify(site.texts);
+  for (const area of $('varyFields').querySelectorAll('textarea')) {
+    const i = Number(area.dataset.index);
+    if (area.value === runs[i].text) delete site.texts[i]; else site.texts[i] = area.value;
+  }
+  varying = null;
+  // 何も変えずに閉じたら、このブラウザには書かない（見本のまま開いて欄を閉じただけで、置いてあった変えた版を消さない）
+  if (JSON.stringify(site.texts) === before) { renderSlide(); return; }
+  if (!applyVariant()) { site.texts = {}; work = site.sampleWork; note2(t('varyBroken')); }
+  saveVariant();
+  markVariantUrl();
+  delete $('varyNoteText').dataset.saved;
+  renderSlide();
+  renderVaryNote();
+}
+
+$('varyBtn').addEventListener('click', openVary);
+
+// ---------- AI に相談（段3）: 穴1つ分のプロンプトを渡し、答えを欄へ戻す ----------
+let advising = null;   // 相談している穴の番号
+
+/** いま欄に書いてある文を入れた変えた欄（開いている枚の欄も含む） */
+function currentTexts() {
+  const runs = holeRuns(site.script);
+  const texts = { ...site.texts };
+  for (const area of $('varyFields').querySelectorAll('textarea')) {
+    const i = Number(area.dataset.index);
+    if (area.value === runs[i].text) delete texts[i]; else texts[i] = area.value;
+  }
+  return texts;
+}
+
+function openAdvise(hole) {
+  advising = hole;
+  const texts = currentTexts();
+  let slides = site.sampleWork.slides;
+  if (Object.keys(texts).length) {
+    const r = readScript(makeVariant(site.script, texts, { title: site.title, slug: site.slug, lang: site.lang, version: site.version }));
+    if (r.work) slides = r.work.slides;
+  }
+  $('advisePrompt').value = buildPrompt({ lang: site.lang, title: site.title, hole, section: holeSection(site.holes, hole), slides });
+  $('adviseAnswer').value = '';
+  $('adviseNote').textContent = '';
+  $('advisePane').hidden = false;
+  $('advisePane').scrollIntoView({ block: 'nearest' });
+}
+
+$('adviseCopy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('advisePrompt').value);
+    $('adviseNote').textContent = t('adviseCopied');
+  } catch {
+    $('advisePrompt').select();
+    $('adviseNote').textContent = t('adviseCopyFail');
+  }
+});
+$('adviseClose').addEventListener('click', () => { $('advisePane').hidden = true; advising = null; });
+$('adviseApply').addEventListener('click', () => {
+  if (!advising) return;
+  const runs = holeRuns(site.script);
+  const r = parseAnswer($('adviseAnswer').value, runs.filter((x) => x.hole === advising));
+  if (r.error) { $('adviseNote').textContent = t('adviseErr_' + r.error, r.slide, r.want, r.got); return; }
+  const slides = new Set();
+  for (const [k, text] of Object.entries(r.texts)) {
+    const i = Number(k);
+    slides.add(runs[i].slide);
+    const area = $('varyFields').querySelector(`textarea[data-index="${i}"]`);
+    if (area) { area.value = text; area.dispatchEvent(new Event('input')); }
+    else if (text === runs[i].text) delete site.texts[i];
+    else site.texts[i] = text;          // ほかの枚の欄: 閉じたときに、ほかの欄と一緒に残す
+  }
+  $('adviseNote').textContent = t('adviseDone', [...slides].sort((a, b) => a - b));
+});
+$('varyDone').addEventListener('click', closeVary);
+$('varyResetAll').addEventListener('click', () => {
+  if (!site) return;
+  site.texts = {};
+  varying = null;
+  applyVariant();
+  saveVariant();
+  markVariantUrl();
+  renderSlide();
+  renderVaryNote();
+});
+
+// ---------- 台本のファイルを開く・貼る（段2: 変えた版を開き直す） ----------
+
+async function openFromScript(text) {
+  text = unfence(text);   // チャット AI の答えを、コードブロックの記号ごと貼ったとき
+  $('wideBox').hidden = true;
+  const wide = wideMarks(text);
+  if (wide) {
+    // 黄色い所の印が全角: 直すかを聞く（黙って直さない）。直さずに開くこともできる
+    $('wideText').textContent = t('wideMarks', wide);
+    $('wideBox').hidden = false;
+    pendingScript = text;
+    return;
+  }
+  await openScriptText(text);
+}
+
+let pendingScript = null;   // 全角の印を直すかを聞いているあいだの台本
+$('wideFix').addEventListener('click', () => { const s = pendingScript; pendingScript = null; $('wideBox').hidden = true; if (s != null) openScriptText(fixWideMarks(s)); });
+$('wideKeep').addEventListener('click', () => { const s = pendingScript; pendingScript = null; $('wideBox').hidden = true; if (s != null) openScriptText(s); });
+
+async function openScriptText(text) {
+  const b = basedOn(text);
+  if (b) return openSample({ slug: b.slug, lang: b.lang, version: b.version, script: text });
+  // Based on が無い: サイトの見本（台本の言語のもの。言語が無ければ全部）の一番新しい版と、骨組みを突き合わせる
+  const read = readScript(text);
+  if (!read.work) return showLoadError([t('scriptErrors'), ...read.errors]);
+  let list;
+  try {
+    list = await (await getOk(SAMPLE_LIST)).json();
+  } catch (err) {
+    return showLoadError([t('sampleFail'), String((err && err.message) || err)]);
+  }
+  const lang = String(read.work.language || '').toLowerCase();
+  const same = list.filter((e) => lang && String(e.lang).toLowerCase() === lang);
+  const candidates = [];
+  for (const entry of same.length ? same : list) {
+    const res = await fetch(sampleBase(entry) + 'script.md', { cache: 'no-cache' });
+    if (res.ok) candidates.push({ entry, read: readScript(await res.text()) });
+  }
+  const p = pickBySkeleton(candidates, read);
+  if (p.none && p.nearest) {
+    return showLoadError([t('madeNearest', p.nearest.entry.title), ...p.nearest.diffs.map((d) => t('madeDiff_' + d.what, d.slide ?? d.sample, d.script))]);
+  }
+  if (p.none) return showLoadError([t('scriptNotVariant')]);
+  if (p.many) return showLoadError([t('madeMany', p.many.map((e) => e.title))]);
+  await openSample({ slug: p.entry.slug, lang: p.entry.lang, version: p.entry.version, script: text, matched: true });
+}
+
+$('openScript').addEventListener('change', async (e) => {
+  const f = e.target.files && e.target.files[0];
+  e.target.value = '';
+  if (!f) return;
+  if (/\.zip$/i.test(f.name) || f.type === 'application/zip') return openZip(f);
+  await openFromScript(await f.text());
+});
+
+/** zip を開く（docs/work-format.md §1 Zip）: work.json があれば作品フォルダと同じに。script.md だけなら変えた版として。
+ *  iPad はフォルダを選べないので、作品を zip にすれば開ける。中身はここで全部ほどく（素材の照合が File を要る） */
+async function openZip(f) {
+  let entries;
+  try {
+    entries = await readZip(f);
+  } catch (err) {
+    return showLoadError([t('zipBad'), String((err && err.message) || err)]);
+  }
+  const paths = entries.map((x) => x.path);
+  if (findWorkJson(paths)) {
+    const box = $('sampleNote');
+    box.hidden = false;
+    const total = entries.reduce((a, x) => a + x.size, 0);
+    let got = 0;
+    const files = [];
+    try {
+      for (const x of entries) {
+        box.textContent = t('zipOpening', got, total);
+        files.push({ path: x.path, file: await x.file() });
+        got += x.size;
+      }
+    } catch (err) {
+      box.hidden = true;
+      return showLoadError([t('zipBad'), String((err && err.message) || err)]);
+    }
+    box.hidden = true;
+    return openEntries(files, null);
+  }
+  const script = entries.find((x) => x.path === 'script.md' || /^[^/]+\/script\.md$/.test(x.path));
+  if (script) return openFromScript(await (await script.file()).text());
+  showLoadError([t('zipEmpty')]);
+}
+$('pasteScriptBtn').addEventListener('click', () => { $('pasteBox').hidden = !$('pasteBox').hidden; });
+$('pasteOpen').addEventListener('click', async () => {
+  const text = $('pasteText').value;
+  if (!text.trim()) return;
+  await openFromScript(text);
+  if (site && site.variant) { $('pasteText').value = ''; $('pasteBox').hidden = true; }
+});
+
+// ---------- この見本を元に、AI と台本を書く（段4a の後半） ----------
+// 見本の台本と絵の説明（plan.md）をプロンプトにして渡し、返ってきた台本は「台本を貼る」と同じ道で開く
+
+$('composeBtn').addEventListener('click', () => {
+  if (!site) return;
+  const pane = $('composePane');
+  if (!pane.hidden) { pane.hidden = true; return; }
+  $('composePrompt').value = buildComposePrompt({ lang: site.lang, title: site.sampleWork.title, slides: site.sampleWork.slides.length,
+    script: site.sampleScript, scenes: pictureScenes(site.plan) });
+  $('composeNote').textContent = '';
+  $('composeErr').hidden = true;
+  pane.hidden = false;
+  pane.scrollIntoView({ block: 'nearest' });
+});
+$('composeCopy').addEventListener('click', async () => {
+  try {
+    await navigator.clipboard.writeText($('composePrompt').value);
+    $('composeNote').textContent = t('adviseCopied');
+  } catch {
+    $('composePrompt').select();
+    $('composeNote').textContent = t('adviseCopyFail');
+  }
+});
+$('composeClose').addEventListener('click', () => { $('composePane').hidden = true; });
+$('composeOpen').addEventListener('click', async () => {
+  const text = $('composeAnswer').value;
+  if (!text.trim()) return;
+  const before = site;
+  $('composeErr').hidden = true;
+  $('loadError').hidden = true;
+  await openFromScript(text);
+  if (!$('wideBox').hidden) return go({ type: 'tab', to: 'prep' });   // 全角の印を直すかは、準備の画面で聞く
+  if (site !== before && site && site.made) { $('composeAnswer').value = ''; $('composePane').hidden = true; }
+});
+
+/** 変えた版（script.md）をファイルに保存する。保存のあとにだけ、消されにくい置き方をブラウザに頼む（Firefox は窓が出る） */
+$('varySave').addEventListener('click', async () => {
+  if (!site || !site.variant) return;
+  const name = `${site.slug}-${site.lang}-script.md`;
+  const blob = new Blob([site.variant], { type: 'text/markdown' });
+  try {
+    if (typeof window.showSaveFilePicker === 'function') {
+      const h = await window.showSaveFilePicker({ suggestedName: name, types: [{ description: 'Markdown', accept: { 'text/markdown': ['.md'] } }] });
+      const w = await h.createWritable();
+      await w.write(blob);
+      await w.close();
+    } else {
+      const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: name });
+      a.click();
+      setTimeout(() => URL.revokeObjectURL(a.href), 10000);
+    }
+  } catch (err) {
+    if (err && err.name === 'AbortError') return;
+    throw err;
+  }
+  try { if (navigator.storage && navigator.storage.persist) await navigator.storage.persist(); } catch { /* 任意 */ }
+  $('varyNoteText').textContent = t('varySaved', name);
+  $('varyNoteText').dataset.saved = '1';
+});
+
 // ---------- BGM の曲の大きさをそろえる（docs/work-format.md §4。2026-11-09） ----------
 // 見本の曲を自分の曲（CD・配信）に差し替えると、約20dB 大きく鳴って語りを消す。開演より前に測り、大きすぎる曲だけ下げる。
 // 曲を丸ごと読み解くのは語り手の端末だけ（PC）。聞き手へは下げる量だけを welcome で渡す
@@ -250,6 +730,8 @@ const LEVEL_KEY = 'dk-level:';      // ＋曲の id → 測った大きさ（LUF
 const gainOf = (id) => { const a = audios.find((x) => x.id === id); return a && a.gain ? a.gain : 0; };
 
 async function loudnessOf(a) {
+  // サイトの見本は、取り込みのときに測った大きさを使う（曲を丸ごと読み解かない）
+  if (site && typeof site.levels[a.key] === 'number') return site.levels[a.key];
   try { const v = localStorage.getItem(LEVEL_KEY + a.id); if (v !== null) return Number(v); } catch { /* 覚えられないブラウザ */ }
   const AC = window.OfflineAudioContext || window.webkitOfflineAudioContext;
   const buf = await new AC(1, 1, 44100).decodeAudioData(await a.file.arrayBuffer());
@@ -278,6 +760,9 @@ async function measureLevels() {
   }
 }
 
+/** 素材の id に使う題。見本を元に書いた台本で題が替わっても、見本の題のまま（docs/work-format.md §6） */
+const mediaTitle = () => (site ? site.sampleWork.title : work.title);
+
 async function resolve(opts = {}) {
   for (const u of urls.values()) URL.revokeObjectURL(u);
   urls.clear();
@@ -287,7 +772,8 @@ async function resolve(opts = {}) {
   for (const [n, p] of pictures) urls.set(n, URL.createObjectURL(p.file));
   const rv = resolveVideos(work, [workMap, mediaMap]);
   videos = await Promise.all(rv.videos.map(async (v) => ({
-    ...v, kind: 'video', id: await videoId(work.title, v.key, v.size, v.file.lastModified), problem: sendable(v),
+    ...v, kind: 'video', id: await videoId(mediaTitle(), v.key, v.size, v.file.lastModified), problem: sendable(v),
+    ...(site ? { src: site.base + v.key } : {}), // サイトの見本: 聞き手もサイトから取る（§1）
   })));
   links = resolveLinks(work);
   // 埋め込みの API を先に読む。読めなければ準備の画面に出す（上演の枚に来てからでは、流せないと分かるのが遅い）
@@ -300,9 +786,9 @@ async function resolve(opts = {}) {
   for (const u of audioUrls.values()) URL.revokeObjectURL(u);
   audioUrls.clear();
   audios = await Promise.all(ra.audio.map(async (a) => {
-    const id = await videoId(work.title, a.key, a.size, a.file.lastModified);
+    const id = await videoId(mediaTitle(), a.key, a.size, a.file.lastModified);
     audioUrls.set(id, URL.createObjectURL(a.file));
-    return { ...a, kind: 'audio', id, problem: sendable({ ...a, kind: 'audio' }) };
+    return { ...a, kind: 'audio', id, problem: sendable({ ...a, kind: 'audio' }), ...(site ? { src: site.base + a.key } : {}) };
   }));
   await measureLevels();
   $('loadError').hidden = true;
@@ -342,9 +828,12 @@ async function resolve(opts = {}) {
 }
 
 function showLoadError(lines) {
+  const para = () => lines.map((l) => { const p = document.createElement('p'); p.textContent = l; return p; });
   const box = $('loadError');
   box.hidden = false;
-  box.replaceChildren(...lines.map((l) => { const p = document.createElement('p'); p.textContent = l; return p; }));
+  box.replaceChildren(...para());
+  // AI と台本を書く箱から開いたときは、上演の画面に居るので、箱の中にも理由を出す
+  if (!$('composePane').hidden) { $('composeErr').hidden = false; $('composeErr').replaceChildren(...para()); }
 }
 
 // ---------- 受付 ----------
@@ -352,6 +841,7 @@ function showLoadError(lines) {
 $('openRoom').addEventListener('click', async () => {
   // 本番（受付中）は直さない（E1）。開いている直す欄は、書きかけを修正票の下書きとして残して閉じる
   closeEditor({ type: 'room' });
+  closeVary();
   $('openRoom').disabled = true;
   $('roomStatus').textContent = t('opening');
   session.expected = Math.max(0, parseInt($('expected').value, 10) || 0);
@@ -799,6 +1289,7 @@ function wayLine(p) {
 function renderChips() {
   const box = $('chips');
   const approved = [...session.peers.values()].filter((p) => p.status === 'approved');
+  renderSideMore(approved.filter((p) => chipState(p.view, { slide: session.slide, video: !!session.playback.id }).level === 'warn').length);
   if (!approved.length) { box.replaceChildren(Object.assign(document.createElement('div'), { className: 'muted', textContent: t('chipNone') })); return; }
   const expect = { slide: session.slide, video: !!session.playback.id };
   box.replaceChildren(...approved.map((p) => {
@@ -914,7 +1405,7 @@ function renderSlide() {
     paragraphs(text).forEach((p, i) => { if (!was.has(p)) changed.add(i); });
   }
   // 台本: 行頭 "> " は語り手への合図として見た目を分ける。改行はそのまま（息継ぎの設計）
-  // 行頭 "~ " は穴の語り（読む文。作る人・語る人が自分の話に替えてよい所）。印は出さず、字はそのまま蛍光ペンの形で出す
+  // 行頭 "~ "・"~N " は穴の語り（読む文。作る人・語る人が自分の話に替えてよい所）。印は出さず、字はそのまま蛍光ペンの形で出す
   const notes = $('notes');
   notes.replaceChildren();
   let para = 0, blank = true;
@@ -924,7 +1415,7 @@ function renderSlide() {
     blank = empty;
     const div = document.createElement('div');
     if (line.startsWith('> ')) { div.className = 'cue'; div.textContent = line.slice(2); }
-    else if (line.startsWith('~ ')) { div.className = 'hole'; div.append(Object.assign(document.createElement('span'), { textContent: line.slice(2) })); }
+    else if (holeLine(line)) { div.className = 'hole'; div.append(Object.assign(document.createElement('span'), { textContent: holeLine(line).text })); }
     else div.textContent = line || ' ';
     if (!empty && changed.has(para)) div.classList.add('edited');
     notes.append(div);
@@ -967,12 +1458,17 @@ function renderEditTools() {
   const n = session.slide;
   const can = !!work && editable(editCtx());
   $('editBtn').hidden = !can || editing === n;
-  $('notes').hidden = editing === n;
+  const holesHere = canVary() && holeRuns(site.script).some((r) => r.slide === n);
+  if (varying != null && (varying !== n || !canVary())) closeVary();
+  $('varyBtn').hidden = !holesHere || varying === n || editing != null;
+  $('varyPane').hidden = varying !== n;
+  $('notes').hidden = editing === n || varying === n;
   $('editPane').hidden = editing !== n;
   $('sheetBtn').hidden = !sheet;
   if (sheet) $('sheetBtn').textContent = t('sheetBtn', sheetCounts(sheet, statusOf, sigNow()));
   if (!sheet) $('sheetPanel').hidden = true;
-  $('reloadLabel').hidden = !mayReload({ hasWork: !!work, roomOpen: !!peer });
+  // サイトの見本はフォルダから読み直すものではない（押すとフォルダ選びが開き、見本から入った人には意味が通らない）
+  $('reloadLabel').hidden = !!site || !mayReload({ hasWork: !!work, roomOpen: !!peer });
   renderPicBar();
   renderVolBar();
 }
@@ -1616,6 +2112,7 @@ function move(delta) {
   const out = goTo(session, session.slide + delta, work.slides.length);
   if (session.slide === before) return;
   if (editing != null) closeEditor({ type: 'move' }); // 枚を動かしたら、開いている直す欄は修正票に入れて閉じる
+  if (varying != null) closeVary();                   // 語りを変える欄も、変えたまま閉じる
   if (session.playback.id) stopVideo(); // 枚を離れたら動画を止め、聞き手の画面を絵へ戻す
   chosenVideo = null;                    // 新しい枚では1本目から
   send(out);
@@ -1673,11 +2170,50 @@ $('splitter').addEventListener('keydown', (e) => {
   else if (e.key === 'Home') { e.preventDefault(); splitNow = setSplit(SPLIT_DEFAULT, true); }
 });
 $('nextBtn').addEventListener('click', () => move(1));
+
+// ---------- 台本の字の大きさ・縦積みの折りたたみ（2026-11-13） ----------
+
+const NOTES_KEY = 'dk-notes-size';
+function setNotesSize(v, save) {
+  const rem = clampNotesSize(v);
+  $('showGrid').style.setProperty('--notes-size', `${rem}rem`);
+  if (save) {
+    try { if (rem === NOTES_DEFAULT) localStorage.removeItem(NOTES_KEY); else localStorage.setItem(NOTES_KEY, String(rem)); } catch { /* 覚えられないブラウザ */ }
+  }
+  return rem;
+}
+let notesSize = (() => { try { return setNotesSize(localStorage.getItem(NOTES_KEY), false); } catch { return setNotesSize(null, false); } })();
+$('notesSmaller').addEventListener('click', () => { notesSize = setNotesSize(notesSize - NOTES_STEP, true); });
+$('notesBigger').addEventListener('click', () => { notesSize = setNotesSize(notesSize + NOTES_STEP, true); });
+
+/** 縦積みのときの「札・練習の欄」の行。warn＝気を付ける札の数（畳んでいても分かるように） */
+// 数はボタンに持たせる（renderChips は上の方から先に呼ばれることがある＝ここの let はまだ使えない）
+function renderSideMore(warn) {
+  const btn = $('sideMoreBtn');
+  if (warn === undefined) warn = Number(btn.dataset.warn || 0); else btn.dataset.warn = String(warn);
+  const open = btn.getAttribute('aria-expanded') === 'true';
+  btn.textContent = `${open ? '▾' : '▸'} ${warn ? t('sideMoreWarn', warn) : t('sideMore')}`;
+  btn.classList.toggle('warn', !!warn);
+  $('sideMore').classList.toggle('closed', !open);
+}
+$('sideMoreBtn').addEventListener('click', () => {
+  const btn = $('sideMoreBtn');
+  btn.setAttribute('aria-expanded', String(btn.getAttribute('aria-expanded') !== 'true'));
+  renderSideMore();
+});
+renderSideMore(0);
+
 document.addEventListener('keydown', (e) => {
   // 枚送りのキーは上演の画面でだけ効く（受付の画面で押して、知らないうちに枚が進まないように）
   if (screen !== 'show' || cand || (e.target.matches && e.target.matches('input, textarea, video, .lay, .splitter'))) return;
   if (['ArrowRight', 'PageDown', ' '].includes(e.key)) { e.preventDefault(); move(1); }
   if (['ArrowLeft', 'PageUp'].includes(e.key)) { e.preventDefault(); move(-1); }
+  // ↓↑ は台本を送る（枠の 8 割ずつ）。マウスに持ち替えずに読み進める
+  if (['ArrowDown', 'ArrowUp'].includes(e.key) && !$('notes').hidden) {
+    e.preventDefault();
+    const n = $('notes');
+    n.scrollBy({ top: (e.key === 'ArrowDown' ? 1 : -1) * n.clientHeight * 0.8, behavior: TEST ? 'auto' : 'smooth' });
+  }
 });
 
 // ---------- 動画の再生（設計 #6・#7・#10） ----------
@@ -2371,6 +2907,9 @@ $('volVideo').addEventListener('input', onVolume);
 /** 上演の画面の上の「練習中（受付を開いていません）」（P1） */
 function renderPractice() {
   $('practiceNote').hidden = screen !== 'show' || !isPractice({ roomOpen: !!peer });
+  $('practiceSample').hidden = !site;
+  $('composeBtn').hidden = !site;
+  if (!site || peer) $('composePane').hidden = true;
 }
 
 /** 経過時間（P3。本番でも出す）。全体と、この枚 */
@@ -2516,12 +3055,15 @@ window.addEventListener('pagehide', () => {
 
 renderVoiceButtons();
 
+const sampleQ = sampleQuery(location.search);
+if (sampleQ) openSample(sampleQ);
+
 // 自動テスト用の入口（?test のときだけ。同じページの中からだけ呼べる。外から作品を渡す道ではない）
 if (TEST) window.__dk = { link: () => ({ id: vCurrent && vCurrent.kind === 'link' ? vCurrent.id : null, ready: linkP.ready, error: linkP.error, stalled: linkP.stalled, playing: !linkP.paused, pos: linkP.currentTime, state: linkP.state(), captions: linkP.captionsNow(), vol: linkP.volumeNow(), note: $('videoNote').textContent }),
   // 語り手が YouTube の再生つまみを押したのと同じこと（埋め込みの中は外から押せないので、API の口から押す）
   linkPlayer: () => linkP,
   linkPress: (what, at) => { const p = linkP.p; if (what === 'play') p.playVideo(); else if (what === 'pause') p.pauseVideo(); else p.seekTo(at, true); return true; }, loadForTest: (w, files) => { work = validateWork(w).work; workMap = files; mediaMap = new Map(); sheet = loadSheet(work); return resolve(); }, session: () => session,
-  reloadForTest: (w, files) => reloadWith({ work: validateWork(w).work, map: files }), sheet: () => sheet, editing: () => editing, screen: () => screen, voice: () => ({ heard: routes(session.peers, voice, voiceCtx()).narrator, levels: mixer ? mixer.levels() : {}, calls: [...voiceCalls.keys()], state: { ...voice, held: [...voice.held], sameRoom: [...voice.sameRoom], quiet: [...voice.quiet] }, narratorTo: mixer ? mixer.narratorGains() : {} }), audio: () => engine.state(), audioId: (f) => idOf(f),
+  reloadForTest: (w, files) => reloadWith({ work: validateWork(w).work, map: files }), sheet: () => sheet, editing: () => editing, screen: () => screen, site: () => site, bulks: () => bulks.size, advise: () => ({ hole: advising, prompt: $('advisePrompt').value }), vary: () => ({ texts: site ? site.texts : null, variant: site ? site.variant : null, notes: work ? work.slides.map((x) => x.notes) : null }), voice: () => ({ heard: routes(session.peers, voice, voiceCtx()).narrator, levels: mixer ? mixer.levels() : {}, calls: [...voiceCalls.keys()], state: { ...voice, held: [...voice.held], sameRoom: [...voice.sameRoom], quiet: [...voice.quiet] }, narratorTo: mixer ? mixer.narratorGains() : {} }), audio: () => engine.state(), audioId: (f) => idOf(f),
   levels: () => audios.map((a) => ({ key: a.key, id: a.id, lufs: a.lufs ?? null, gain: a.gain ?? null })),
   rec: () => ({ on: !!recorder, mime: recMime, status: recorder ? recorder.status() : null, last: window.__dkRecLast || null, name: window.__dkRecName || null, recording: session.recording }),
   // 録ったファイル（OPFS）を base64 で少しずつ取り出す（確認スクリプトが ffprobe にかける）

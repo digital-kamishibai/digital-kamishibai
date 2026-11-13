@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeView, viewChanged, cleanView, chipState, nextScreen, bannerFor, videosOn, pickVideo, mustStopFor, videoName, clampSplit, splitAt, SPLIT_DEFAULT, SPLIT_MIN, SPLIT_MAX } from '../../player/js/view.js';
+import { makeView, viewChanged, cleanView, chipState, nextScreen, bannerFor, videosOn, pickVideo, mustStopFor, videoName, clampSplit, splitAt, SPLIT_DEFAULT, SPLIT_MIN, SPLIT_MAX, clampNotesSize, NOTES_DEFAULT, NOTES_MIN, NOTES_MAX } from '../../player/js/view.js';
 import { resolveVideos, validateWork } from '../../player/js/work.js';
 import { createSession, onHello, approve, reject, onView, knownToken } from '../../player/js/protocol.js';
 
@@ -234,4 +234,14 @@ test('ドラッグした位置から割合を出す', () => {
   assert.equal(splitAt(100, 100, 1000), SPLIT_MIN);
   assert.equal(splitAt(1100, 100, 1000), SPLIT_MAX);
   assert.equal(splitAt(500, 100, 0), SPLIT_DEFAULT);
+});
+
+// ---------- 台本の字の大きさ ----------
+
+test('台本の字の大きさは 1〜2.6rem に収め、数でなければ既定（覚えた値が壊れていても既定で動く）', () => {
+  assert.equal(clampNotesSize(1.6), 1.6);
+  assert.equal(clampNotesSize('1.6000000001'), 1.6);   // 0.2 を足し続けた誤差を丸める
+  assert.equal(clampNotesSize(0.4), NOTES_MIN);
+  assert.equal(clampNotesSize(9), NOTES_MAX);
+  for (const bad of [null, undefined, '', 'abc', NaN, Infinity]) assert.equal(clampNotesSize(bad), NOTES_DEFAULT, String(bad));
 });
