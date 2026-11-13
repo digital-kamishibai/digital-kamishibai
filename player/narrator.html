@@ -14,7 +14,7 @@
 <nav class="tabs" id="tabs">
   <strong class="app" data-i18n="appName">Kamishibai Room Player</strong>
   <button class="tab" data-screen="prep" data-i18n="tabPrep">Prepare</button>
-  <button class="tab" data-screen="room" data-i18n="tabRoom" disabled>Room</button>
+  <button class="tab" data-screen="room" data-i18n="tabRoom" disabled>Connect</button>
   <button class="tab" data-screen="show" data-i18n="tabShow" disabled>Show</button>
   <span class="grow"></span>
   <span id="tabWork" class="muted"></span>
@@ -32,6 +32,27 @@
       </label>
       <strong id="workTitle"></strong>
     </div>
+    <!-- 変えた版（段2）を開き直す: 保存した script.md を開くか、貼る。Based on の見本と版の素材で開く。
+         zip も受ける: work.json があれば作品として（iPad はフォルダを選べない）、script.md だけなら変えた版として -->
+    <div class="row">
+      <label class="file"><span data-i18n="openScript">Open a script file</span>
+        <input id="openScript" type="file" accept=".md,.zip,text/markdown,text/plain,application/zip">
+      </label>
+      <button id="pasteScriptBtn" data-i18n="pasteScript">Paste a script</button>
+    </div>
+    <div id="pasteBox" class="card" hidden>
+      <textarea id="pasteText" class="paste" rows="8" spellcheck="false"></textarea>
+      <div class="row"><button id="pasteOpen" class="primary" data-i18n="pasteOpen">Open</button></div>
+    </div>
+    <!-- 貼った・開いた台本の、行頭の全角の印（「～ 」）: 直すかを聞く（黙って直さない） -->
+    <div id="wideBox" class="card" hidden>
+      <p id="wideText"></p>
+      <div class="row">
+        <button id="wideFix" class="primary" data-i18n="wideFix">Fix and open</button>
+        <button id="wideKeep" data-i18n="wideKeep">Open as it is</button>
+      </div>
+    </div>
+    <div id="sampleNote" class="card" hidden></div>
     <div id="loadError" class="card error" hidden></div>
     <div id="missing" class="card error" hidden></div>
     <div id="videoWarn" class="card error" hidden></div>
@@ -43,7 +64,7 @@
       </label>
     </div>
     <div id="prepNext" class="row" style="margin-top: 16px" hidden>
-      <button class="primary" data-goto="room" data-i18n="toRoom">Go to the room</button>
+      <button class="primary" data-goto="room" data-i18n="toRoom">Connect family devices</button>
       <!-- 練習＝受付を開かずに上演の画面を使う（録画と練習 P1。別の練習モードは作らない） -->
       <button data-goto="show" data-i18n="practice">Practice</button>
     </div>
@@ -56,7 +77,7 @@
         <label><span data-i18n="expected">Listeners expected</span>
           <input id="expected" type="number" min="0" max="6" value="1" style="width: 5em">
         </label>
-        <button id="openRoom" class="primary" data-i18n="open">Open the room</button>
+        <button id="openRoom" class="primary" data-i18n="open">Connect family devices</button>
         <span id="roomStatus" class="muted"></span>
       </div>
       <p id="micWarn" class="error" data-i18n="micWarn" hidden></p>
@@ -101,7 +122,32 @@
     <!-- 上演中に新しい端末が来たら、ここで「入れる／断る」（U5。入り直しの端末は出ない） -->
     <div id="joinBanner" class="banner" hidden></div>
     <!-- 受付を開いていないあいだは練習（P1） -->
-    <div id="practiceNote" class="banner practice" data-i18n="practiceNote" hidden>Practising (the room is not open)</div>
+    <!-- 練習中の帯から、そのまま家族の端末をつなぎに行ける（玄関の「1台で通して見る」から入った人の次の一歩） -->
+    <div id="practiceNote" class="banner practice" hidden>
+      <span data-i18n="practiceNote">Practising (no family devices connected yet)</span>
+      <span id="practiceSample" data-i18n="practiceSample" hidden></span>
+      <button data-goto="room" data-i18n="toRoom">Connect family devices</button>
+      <button id="composeBtn" data-i18n="composeBtn" hidden>Write a script with an AI, from this sample</button>
+    </div>
+    <!-- この見本を元に、AI と台本を書く（段4a の後半）: プロンプトを渡し、AI が書いた台本を「台本を貼る」と同じ道で開く -->
+    <div id="composePane" class="card advise" hidden>
+      <p class="muted" data-i18n="composeHint"></p>
+      <textarea id="composePrompt" class="paste" rows="6" readonly spellcheck="false"></textarea>
+      <div class="row"><button id="composeCopy" class="primary" data-i18n="adviseCopy">Copy the prompt</button></div>
+      <div class="label" data-i18n="composeAnswer">The script the AI wrote</div>
+      <textarea id="composeAnswer" class="paste" rows="6" spellcheck="false"></textarea>
+      <div class="row">
+        <button id="composeOpen" class="primary" data-i18n="composeOpen">Open</button>
+        <button id="composeClose" data-i18n="adviseClose">Close</button>
+        <small id="composeNote" class="muted"></small>
+      </div>
+      <div id="composeErr" class="error" hidden></div>
+    </div>
+    <!-- 変えた語りの置き場の知らせ（段2・残し方）。「残っています」とは言い切らない（プライベートブラウズは見分けられない） -->
+    <div id="varyNote" class="banner practice" hidden>
+      <span id="varyNoteText"></span>
+      <button id="varySave" data-i18n="varySave">Save to a file</button>
+    </div>
     <!-- 上の帯（U9）: 準備・設定・ときどき開くもの。上演中に押し続ける「次へ」から離す -->
     <div class="toolbar">
       <button id="startShowBar" class="start" data-i18n="startShow">Start the show (music and sounds)</button>
@@ -144,7 +190,8 @@
       <label class="muted"><span data-i18n="micLabel">Microphone</span> <select id="micPick"></select></label>
       <span id="micNow" class="muted"></span>
     </div>
-    <!-- 左＝聞き手の画面・戻る／次へ・札・次の絵、右＝台本（U4'）。境目はドラッグで動かせる（U8） -->
+    <!-- 左＝聞き手の画面・戻る／次へと次の絵・札、右＝台本（U4'）。境目はドラッグで動かせる（U8）。
+         ページはスクロールさせず、台本は枠の中だけでスクロールする（2026-11-13）。縦向き・狭い画面は 絵 → 台本 → 戻る／次へ の縦積み -->
     <div class="show" id="showGrid">
       <div class="side">
         <div class="label" data-i18n="stageLabel">What listeners see</div>
@@ -155,15 +202,22 @@
           <!-- リンクの動画（YouTube の埋め込み。work-format §2.4）。ここにある YouTube の再生つまみが、そのまま合図になる -->
           <div id="nlink" class="ylink" hidden></div>
         </div>
-        <!-- 戻る／次へ（U4'）: 聞き手の画面の真下。上演中にいちばんよく押す -->
+        <!-- 戻る／次へ（U4'）: 聞き手の画面の真下。上演中にいちばんよく押す。次の絵は「次へ」の横（押す前に目に入る。2026-11-13） -->
         <div class="nav">
           <button id="prev" data-i18n="prev">Back</button>
           <span id="navNo" class="no"></span>
           <button id="nextBtn" class="primary" data-i18n="next">Next</button>
+          <figure class="nav-next">
+            <figcaption id="nextLabel"></figcaption>
+            <img id="next" class="next" alt="">
+          </figure>
         </div>
         <!-- 1枚に動画が複数ある枚では、ここで流す1本を選ぶ（W2） -->
         <div id="videoPick" class="vpick" hidden></div>
         <div id="videoNote" class="label"></div>
+        <!-- 縦積みのときだけ出る折りたたみ（札と練習用の欄）。札に警告があれば印を出す -->
+        <button id="sideMoreBtn" class="side-more-btn" type="button" aria-expanded="false" aria-controls="sideMore"></button>
+        <div id="sideMore" class="side-more">
         <!-- エンディング動画のコマを指す（M1）と絵コンテ（M2）。練習用の版で受付を開いていないときだけ。
              絵コンテのカードは動画から切り出した下書きで、聞き手へは送らない（R1） -->
         <div id="seatBar" class="seatbar" hidden>
@@ -208,17 +262,42 @@
         </div>
         <!-- 聞き手ごとの札（U3）。各端末の報告（view）から -->
         <div id="chips" class="chips"></div>
-        <div id="nextLabel" class="label"></div>
-        <img id="next" class="next" alt="">
+        </div>
       </div>
       <div id="splitter" class="splitter" role="separator" aria-orientation="vertical" tabindex="0" data-i18n-title="splitterHint"></div>
       <div class="script">
         <div class="row"><strong id="slideNo"></strong><span id="slideTitle"></span><span id="editedMark" class="edited-mark" data-i18n="editedMark" hidden></span><span class="grow"></span><span id="clock" class="clock"></span>
+          <!-- 台本の字の大きさ（この端末のブラウザが覚える） -->
+          <span class="notes-size"><button id="notesSmaller" class="mini" type="button" data-i18n-title="notesSmaller">A−</button><button id="notesBigger" class="mini" type="button" data-i18n-title="notesBigger">A+</button></span>
           <!-- 直す（E1）: 練習用の版を練習しているときだけ。本番（受付中）は出さない -->
-          <button id="editBtn" class="mini" data-i18n="edit" hidden>Correct</button></div>
+          <button id="editBtn" class="mini" data-i18n="edit" hidden>Correct</button>
+          <!-- 語りを変えてみる（段2）: サイトの見本を練習しているときだけ。黄色い所（穴の語り）だけ。work.json は書き換えない -->
+          <button id="varyBtn" class="mini" data-i18n="varyBtn" hidden>Change the narration</button></div>
         <div id="notes" class="notes"></div>
         <!-- 画面の文字（E3）。絵に焼き込まれている文字を、語り手の画面にだけ文字として出す（聞き手へは送らない） -->
         <div id="overlaysView" class="overlays" hidden></div>
+        <!-- 語りを変える欄（段2）: その枚の黄色い所を1つずつ欄に。印は見せない。閉じると、変えた版（script.md）をこのブラウザに置く -->
+        <div id="varyPane" class="edit" hidden>
+          <div class="label" data-i18n="varyLabel"></div>
+          <div id="varyFields"></div>
+          <!-- AI に相談（段3）: 穴1つ分のプロンプト。チャット AI の答えを貼ると、その穴の欄（ほかの枚の欄も）に入る -->
+          <div id="advisePane" class="card advise" hidden>
+            <p class="muted" data-i18n="adviseHint"></p>
+            <textarea id="advisePrompt" class="paste" rows="6" readonly spellcheck="false"></textarea>
+            <div class="row"><button id="adviseCopy" class="primary" data-i18n="adviseCopy">Copy the prompt</button></div>
+            <div class="label" data-i18n="adviseAnswer">The AI's answer</div>
+            <textarea id="adviseAnswer" class="paste" rows="6" spellcheck="false"></textarea>
+            <div class="row">
+              <button id="adviseApply" class="primary" data-i18n="adviseApply">Put it in the fields</button>
+              <button id="adviseClose" data-i18n="adviseClose">Close</button>
+              <small id="adviseNote" class="muted"></small>
+            </div>
+          </div>
+          <div class="row">
+            <button id="varyDone" class="primary" data-i18n="varyDone">Done</button>
+            <button id="varyResetAll" data-i18n="varyResetAll">Back to the sample everywhere</button>
+          </div>
+        </div>
         <!-- 直す欄（E1・E4）。台本と、その枚の画面の文字を並べて開く。work.json は書き換えず、閉じると修正票に入る -->
         <div id="editPane" class="edit" hidden>
           <!-- 絵の上で直す（overlay_layout）。文字の枠だけ抜いた下敷きの上に、ブラウザが枠を描く＝直すための下書き。聞き手には送らない（R1・L8） -->

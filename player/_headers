@@ -5,3 +5,7 @@
   Permissions-Policy: microphone=(self), camera=(), geolocation=(), screen-wake-lock=(self), fullscreen=(self)
   Referrer-Policy: no-referrer
   X-Content-Type-Options: nosniff
+
+# サイトの見本（scripts/fetch-samples.mjs）。版ごとの道に置き、中身は変えない（変えたら版を上げる）ので、長く覚えてよい
+/samples/*
+  Cache-Control: public, max-age=31536000, immutable

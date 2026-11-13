@@ -1,0 +1,85 @@
+{
+  "work": null,
+  "texts": {
+    "1": [
+      {
+        "attrs": {
+          "place": "bottom"
+        },
+        "words": [
+          "twice"
+        ]
+      },
+      {
+        "attrs": {
+          "left": "0.5in",
+          "top": "1in"
+        },
+        "words": [
+          "partial"
+        ]
+      },
+      {
+        "attrs": {
+          "place": "top",
+          "left": "1in"
+        },
+        "words": [
+          "both"
+        ]
+      },
+      {
+        "attrs": {
+          "size": "big"
+        },
+        "words": [
+          "unknown"
+        ]
+      },
+      {
+        "attrs": {},
+        "words": [
+          "no place"
+        ]
+      },
+      {
+        "attrs": {
+          "place": "middle"
+        },
+        "words": [
+          ""
+        ]
+      },
+      {
+        "attrs": {
+          "place": "top"
+        },
+        "words": [
+          "words",
+          "[Picture] pictures/01.jpg"
+        ]
+      },
+      {
+        "attrs": {
+          "place": "top"
+        },
+        "words": []
+      }
+    ]
+  },
+  "errors": [
+    "text-twice line 7",
+    "text-box-partial line 10",
+    "text-place-and-box line 13",
+    "text-bad-value line 16",
+    "text-unknown-word line 16",
+    "text-unknown-word line 16",
+    "text-no-box line 16",
+    "text-no-box line 19",
+    "text-no-words line 22",
+    "cue-in-text-words line 27",
+    "text-no-value line 29",
+    "text-no-words line 29"
+  ],
+  "warnings": []
+}

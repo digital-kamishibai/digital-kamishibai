@@ -373,3 +373,37 @@ test('リンクの動画でも、再生の合図はファイルの動画と同�
   const out = playVideo(s, 'play', { id: 'link-2-2', pos: 351, now: 1000 });
   assert.deepEqual(out, [{ to: 'a', msg: { t: 'vstate', id: 'link-2-2', playing: true, pos: 351 } }]);
 });
+
+// サイトの見本（docs/work-format.md §1）: 聞き手もサイトから取れる道を、サイトの見本の素材にだけ付ける
+test('welcome: サイトの見本の素材にだけ src（samples/ の下の道だけ）', () => {
+  const site = [
+    { id: 'A', kind: 'audio', key: 'sounds/bgm.mp3', size: 9, mime: 'audio/mpeg', src: 'samples/s/ja/1/sounds/bgm.mp3' },
+    { id: 'V', kind: 'video', n: 5, key: 'videos/ending.mp4', size: 9, mime: 'video/mp4', src: 'samples/s/ja/1/videos/ending.mp4' },
+    { id: 'X', kind: 'audio', key: 'sounds/x.mp3', size: 9, mime: 'audio/mpeg', src: 'https://evil.example/x.mp3' },
+  ];
+  const w = welcomeMessage(work, pictures, site);
+  assert.equal(w.audio.find((a) => a.id === 'A').src, 'samples/s/ja/1/sounds/bgm.mp3');
+  assert.equal(w.videos[0].src, 'samples/s/ja/1/videos/ending.mp4');
+  assert.ok(!('src' in w.audio.find((a) => a.id === 'X')), 'サイトの外の道は渡さない');
+});
+
+test('welcome: フォルダから開いた作品には src が1つも無い', () => {
+  const folder = [
+    { id: 'A', kind: 'audio', key: 'sounds/bgm.mp3', size: 9, mime: 'audio/mpeg' },
+    { id: 'V', kind: 'video', n: 5, key: 'videos/ending.mp4', size: 9, mime: 'video/mp4' },
+  ];
+  assert.ok(!everything(welcomeMessage(work, pictures, folder)).includes('"src"'));
+});
+
+// 語りを変えた版（段2）でも、語りは聞き手へ行かない
+test('welcome: 変えた語りの作品でも notes を送らない', async () => {
+  const { makeVariant, variantWork } = await import('../../player/js/variant.js');
+  const { readScript } = await import('../../player/js/script.js');
+  const script = '# T\n\n> Language: en\n\n## [Slide 1] A\n\n~1 placeholder words\n';
+  const v = makeVariant(script, { 0: 'MY OWN SECRET STORY' }, { title: 'T', slug: 's', lang: 'en', version: 1 });
+  const read = readScript(script);
+  const w = variantWork(read.work, read, readScript(v)).work;
+  assert.ok(w.slides[0].notes.includes('MY OWN SECRET STORY'));
+  const out = welcomeMessage(w, new Map([[1, { mime: 'image/jpeg', size: 1 }]]));
+  assert.ok(!everything(out).includes('SECRET'));
+});

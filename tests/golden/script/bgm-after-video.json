@@ -1,0 +1,31 @@
+{
+  "work": {
+    "format": "digital-kamishibai/work",
+    "version": 1,
+    "title": "Music after the video",
+    "language": "en",
+    "slides": [
+      {
+        "number": 1,
+        "title": "Video then music",
+        "picture": "pictures/01.jpg",
+        "notes": "Play the video.",
+        "cues": [
+          {
+            "type": "video",
+            "file": "videos/ending.mp4"
+          },
+          {
+            "type": "bgm",
+            "file": "sounds/theme.mp3",
+            "loop": false,
+            "start": "after-video"
+          }
+        ]
+      }
+    ]
+  },
+  "texts": {},
+  "errors": [],
+  "warnings": []
+}

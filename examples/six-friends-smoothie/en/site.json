@@ -1,0 +1,274 @@
+{
+  "card": {
+    "line": "For children of about 6 to 12 · about 6 minutes · to show it to listeners, one more phone or tablet"
+  },
+  "versions": [
+    {
+      "version": 1,
+      "files": [
+        {
+          "path": "work.json",
+          "size": 5562,
+          "sha256": "3eb0ee8d2338e163957e9c94a0bbf91fae058c1b021120415ef7de28ac8d9d24"
+        },
+        {
+          "path": "script.md",
+          "size": 6159,
+          "sha256": "c0a35f2fc326ad258898a654a2ec9fbf999a094233fe5f6653e0d42bd6ccbb02"
+        },
+        {
+          "path": "pictures/_built/01.jpg",
+          "size": 340192,
+          "sha256": "571830adb7823ea7ba5817a9dc7cc1256f2471a3a4e5da66baff9929132d76e8"
+        },
+        {
+          "path": "sounds/bgm.mp3",
+          "size": 11189647,
+          "sha256": "ca88293319447fd7aa3a7c827d098466430e38df303f9a49c9d931ea64032e42"
+        },
+        {
+          "path": "pictures/_built/02.jpg",
+          "size": 202465,
+          "sha256": "ff22e54df2d4580691bf5ee8a6050d8e94117695cf4c980823d086ee27c91ee4"
+        },
+        {
+          "path": "sounds/pon.mp3",
+          "size": 63991,
+          "sha256": "13193a188bbe70162d2c3f0137d51fdd3b3af3800477b7253344bdd87e6626ca"
+        },
+        {
+          "path": "pictures/_built/03.jpg",
+          "size": 256311,
+          "sha256": "972e44384df56a96cee7da0f8f9a7aa528c16e0ef851bba79363f4ac062a9a42"
+        },
+        {
+          "path": "pictures/_built/04.jpg",
+          "size": 407330,
+          "sha256": "977be0ecf8db41c9517db9c970d202ba473e0fd4c298d995793eab48b8b1d5b2"
+        },
+        {
+          "path": "pictures/_built/05.jpg",
+          "size": 319350,
+          "sha256": "5e208dba10e856d5cdb632f4afd2b707caf044164388c5cff1fd5c5f34d49f26"
+        },
+        {
+          "path": "sounds/mixer.mp3",
+          "size": 78411,
+          "sha256": "60427606940381a252d859c9522c474e39a9b80c640a4c414ad382c09ec2ff20"
+        },
+        {
+          "path": "videos/ending.mp4",
+          "size": 21796420,
+          "sha256": "70d543a5081d4781fb1ae9752a0fd348badb80d2832a75d44a3a50187586e150"
+        }
+      ],
+      "levels": {
+        "sounds/bgm.mp3": -31.7
+      }
+    },
+    {
+      "version": 2,
+      "files": [
+        {
+          "path": "work.json",
+          "size": 5569,
+          "sha256": "79385f33d01b37bef26469692c080cc118c217d8688365851ba6f7bf0246998c"
+        },
+        {
+          "path": "script.md",
+          "size": 6166,
+          "sha256": "88aa2f81d585ee352f80a85cc80376452e600e0cc3d234f5de276376e885263e"
+        },
+        {
+          "path": "pictures/_built/01.jpg",
+          "size": 340192,
+          "sha256": "571830adb7823ea7ba5817a9dc7cc1256f2471a3a4e5da66baff9929132d76e8"
+        },
+        {
+          "path": "sounds/bgm.mp3",
+          "size": 11189647,
+          "sha256": "ca88293319447fd7aa3a7c827d098466430e38df303f9a49c9d931ea64032e42"
+        },
+        {
+          "path": "pictures/_built/02.jpg",
+          "size": 202465,
+          "sha256": "ff22e54df2d4580691bf5ee8a6050d8e94117695cf4c980823d086ee27c91ee4"
+        },
+        {
+          "path": "sounds/pon.mp3",
+          "size": 63991,
+          "sha256": "13193a188bbe70162d2c3f0137d51fdd3b3af3800477b7253344bdd87e6626ca"
+        },
+        {
+          "path": "pictures/_built/03.jpg",
+          "size": 256311,
+          "sha256": "972e44384df56a96cee7da0f8f9a7aa528c16e0ef851bba79363f4ac062a9a42"
+        },
+        {
+          "path": "pictures/_built/04.jpg",
+          "size": 407330,
+          "sha256": "977be0ecf8db41c9517db9c970d202ba473e0fd4c298d995793eab48b8b1d5b2"
+        },
+        {
+          "path": "pictures/_built/05.jpg",
+          "size": 319350,
+          "sha256": "5e208dba10e856d5cdb632f4afd2b707caf044164388c5cff1fd5c5f34d49f26"
+        },
+        {
+          "path": "sounds/mixer.mp3",
+          "size": 78411,
+          "sha256": "60427606940381a252d859c9522c474e39a9b80c640a4c414ad382c09ec2ff20"
+        },
+        {
+          "path": "videos/ending.mp4",
+          "size": 21796420,
+          "sha256": "70d543a5081d4781fb1ae9752a0fd348badb80d2832a75d44a3a50187586e150"
+        }
+      ],
+      "levels": {
+        "sounds/bgm.mp3": -31.7
+      }
+    },
+    {
+      "version": 3,
+      "files": [
+        {
+          "path": "work.json",
+          "size": 5569,
+          "sha256": "79385f33d01b37bef26469692c080cc118c217d8688365851ba6f7bf0246998c"
+        },
+        {
+          "path": "script.md",
+          "size": 6166,
+          "sha256": "88aa2f81d585ee352f80a85cc80376452e600e0cc3d234f5de276376e885263e"
+        },
+        {
+          "path": "holes.md",
+          "size": 14198,
+          "sha256": "7947468f967cad23f28195ee0bd96324816366a6610135e1e0483b96c785238b"
+        },
+        {
+          "path": "pictures/_built/01.jpg",
+          "size": 340192,
+          "sha256": "571830adb7823ea7ba5817a9dc7cc1256f2471a3a4e5da66baff9929132d76e8"
+        },
+        {
+          "path": "sounds/bgm.mp3",
+          "size": 11189647,
+          "sha256": "ca88293319447fd7aa3a7c827d098466430e38df303f9a49c9d931ea64032e42"
+        },
+        {
+          "path": "pictures/_built/02.jpg",
+          "size": 202465,
+          "sha256": "ff22e54df2d4580691bf5ee8a6050d8e94117695cf4c980823d086ee27c91ee4"
+        },
+        {
+          "path": "sounds/pon.mp3",
+          "size": 63991,
+          "sha256": "13193a188bbe70162d2c3f0137d51fdd3b3af3800477b7253344bdd87e6626ca"
+        },
+        {
+          "path": "pictures/_built/03.jpg",
+          "size": 256311,
+          "sha256": "972e44384df56a96cee7da0f8f9a7aa528c16e0ef851bba79363f4ac062a9a42"
+        },
+        {
+          "path": "pictures/_built/04.jpg",
+          "size": 407330,
+          "sha256": "977be0ecf8db41c9517db9c970d202ba473e0fd4c298d995793eab48b8b1d5b2"
+        },
+        {
+          "path": "pictures/_built/05.jpg",
+          "size": 319350,
+          "sha256": "5e208dba10e856d5cdb632f4afd2b707caf044164388c5cff1fd5c5f34d49f26"
+        },
+        {
+          "path": "sounds/mixer.mp3",
+          "size": 78411,
+          "sha256": "60427606940381a252d859c9522c474e39a9b80c640a4c414ad382c09ec2ff20"
+        },
+        {
+          "path": "videos/ending.mp4",
+          "size": 21796420,
+          "sha256": "70d543a5081d4781fb1ae9752a0fd348badb80d2832a75d44a3a50187586e150"
+        }
+      ],
+      "levels": {
+        "sounds/bgm.mp3": -31.7
+      }
+    },
+    {
+      "version": 4,
+      "files": [
+        {
+          "path": "work.json",
+          "size": 5569,
+          "sha256": "79385f33d01b37bef26469692c080cc118c217d8688365851ba6f7bf0246998c"
+        },
+        {
+          "path": "script.md",
+          "size": 6166,
+          "sha256": "88aa2f81d585ee352f80a85cc80376452e600e0cc3d234f5de276376e885263e"
+        },
+        {
+          "path": "holes.md",
+          "size": 14198,
+          "sha256": "7947468f967cad23f28195ee0bd96324816366a6610135e1e0483b96c785238b"
+        },
+        {
+          "path": "plan.md",
+          "size": 6635,
+          "sha256": "571d411ce6e71114a6304424efd5b4fee164ee7f529aa5c2ddb28f2af2d79b30"
+        },
+        {
+          "path": "pictures/_built/01.jpg",
+          "size": 340192,
+          "sha256": "571830adb7823ea7ba5817a9dc7cc1256f2471a3a4e5da66baff9929132d76e8"
+        },
+        {
+          "path": "sounds/bgm.mp3",
+          "size": 11189647,
+          "sha256": "ca88293319447fd7aa3a7c827d098466430e38df303f9a49c9d931ea64032e42"
+        },
+        {
+          "path": "pictures/_built/02.jpg",
+          "size": 202465,
+          "sha256": "ff22e54df2d4580691bf5ee8a6050d8e94117695cf4c980823d086ee27c91ee4"
+        },
+        {
+          "path": "sounds/pon.mp3",
+          "size": 63991,
+          "sha256": "13193a188bbe70162d2c3f0137d51fdd3b3af3800477b7253344bdd87e6626ca"
+        },
+        {
+          "path": "pictures/_built/03.jpg",
+          "size": 256311,
+          "sha256": "972e44384df56a96cee7da0f8f9a7aa528c16e0ef851bba79363f4ac062a9a42"
+        },
+        {
+          "path": "pictures/_built/04.jpg",
+          "size": 407330,
+          "sha256": "977be0ecf8db41c9517db9c970d202ba473e0fd4c298d995793eab48b8b1d5b2"
+        },
+        {
+          "path": "pictures/_built/05.jpg",
+          "size": 319350,
+          "sha256": "5e208dba10e856d5cdb632f4afd2b707caf044164388c5cff1fd5c5f34d49f26"
+        },
+        {
+          "path": "sounds/mixer.mp3",
+          "size": 78411,
+          "sha256": "60427606940381a252d859c9522c474e39a9b80c640a4c414ad382c09ec2ff20"
+        },
+        {
+          "path": "videos/ending.mp4",
+          "size": 21796420,
+          "sha256": "70d543a5081d4781fb1ae9752a0fd348badb80d2832a75d44a3a50187586e150"
+        }
+      ],
+      "levels": {
+        "sounds/bgm.mp3": -31.7
+      }
+    }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "work": null,
+  "texts": {},
+  "errors": [
+    "hole-number line 7",
+    "hole-number line 8",
+    "hole-number line 10",
+    "hole-mixed line 13",
+    "hole-mixed line 16"
+  ],
+  "warnings": []
+}

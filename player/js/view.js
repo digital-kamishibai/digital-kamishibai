@@ -133,3 +133,17 @@ export function clampSplit(v) {
 
 /** ドラッグした位置 → 割合（x は画面の座標、left・width は境目を含む2列ぶんの箱） */
 export const splitAt = (x, left, width) => clampSplit(width > 0 ? ((x - left) / width) * 100 : SPLIT_DEFAULT);
+
+// ---------- 台本の字の大きさ（上演の画面。2026-11-13） ----------
+
+export const NOTES_DEFAULT = 1.4; // rem
+export const NOTES_MIN = 1;
+export const NOTES_MAX = 2.6;
+export const NOTES_STEP = 0.2;    // A− A+ の1回
+
+/** 台本の字の大きさ（rem）をそろえる（範囲の外は端へ・数でなければ既定・小数1桁） */
+export function clampNotesSize(v) {
+  const n = Number(v);
+  if (v === null || v === undefined || v === '' || !Number.isFinite(n)) return NOTES_DEFAULT;
+  return Math.round(Math.min(NOTES_MAX, Math.max(NOTES_MIN, n)) * 10) / 10;
+}

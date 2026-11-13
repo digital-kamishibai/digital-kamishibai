@@ -392,3 +392,11 @@ test('選んだフォルダの中身は webkitdirectory と同じ形のパスに
   assert.equal((await workDirOf(d, found.base)).name, 'a', '親を選んでも、修正票の保存先は work.json のあるフォルダ');
   assert.equal((await workDirOf(d, 'works')).name, 'works');
 });
+
+test('holeLine: 穴の語りの行（"~ " と番号付きの "~N "）', async () => {
+  const { holeLine } = await import('../../player/js/work.js');
+  assert.deepEqual(holeLine('~ My favourite'), { hole: '', text: 'My favourite' });
+  assert.deepEqual(holeLine('~1 灯台の明かりは'), { hole: '1', text: '灯台の明かりは' });
+  assert.deepEqual(holeLine('~12 x'), { hole: '12', text: 'x' });
+  for (const no of ['~no space', '~1no', '> ~ cue', 'plain', '～ 全角', ' ~ indented']) assert.equal(holeLine(no), null, no);
+});

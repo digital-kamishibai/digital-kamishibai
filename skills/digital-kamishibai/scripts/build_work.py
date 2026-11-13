@@ -51,23 +51,27 @@ BGM_KEYWORDS = ('BGM', 'BGM once', 'BGM after video', 'BGM stop')
 YOUTUBE_HOSTS = {'youtube.com', 'www.youtube.com', 'm.youtube.com', 'youtube-nocookie.com', 'www.youtube-nocookie.com',
                  'youtu.be'}
 YOUTUBE_ID = re.compile(r'^[A-Za-z0-9_-]{11}$')
-SECONDS = re.compile(r'^(?:(?:(\d+):)?(\d+):)?(\d+(?:\.\d+)?)$')         # 351, 351.5, 5:51, 1:05:51
-LINK_TIME = re.compile(r'^(?:(\d+)h)?(?:(\d+)m)?(?:(\d+(?:\.\d+)?)s?)?$')  # t=351, t=351s, t=5m51s
+# [0-9], not \d: \d also reads full-width digits, and the player's reader (script.js) does not
+SECONDS = re.compile(r'^(?:(?:([0-9]+):)?([0-9]+):)?([0-9]+(?:\.[0-9]+)?)$')         # 351, 351.5, 5:51, 1:05:51
+LINK_TIME = re.compile(r'^(?:([0-9]+)h)?(?:([0-9]+)m)?(?:([0-9]+(?:\.[0-9]+)?)s?)?$')  # t=351, t=351s, t=5m51s
 LINK = re.compile(r'^https?://', re.IGNORECASE)
 CAPTIONS = re.compile(r'^[A-Za-z]{2,3}(-[A-Za-z0-9]{2,8})*$')       # ja, en, pt-BR
-VOLUME = re.compile(r'^([+-]?\d+(?:\.\d+)?)dB$', re.IGNORECASE)      # -6dB (a linked video, §2.4)
+VOLUME = re.compile(r'^([+-]?[0-9]+(?:\.[0-9]+)?)dB$', re.IGNORECASE)      # -6dB (a linked video, §2.4)
 MIN_VOLUME_DB = -40                                                  # the player's lower end (ytlink.js)
 
-HEADING = re.compile(r'^## \[Slide (\d+)\][ \t]*(.*?)[ \t]*$')
+HEADING = re.compile(r'^## \[Slide ([0-9]+)\][ \t]*(.*?)[ \t]*$')
 NEAR_HEADING = re.compile(r'^##\s*\[')              # looks like a slide heading but is not one
 TITLE = re.compile(r'^# (.+?)[ \t]*$')
 LANGUAGE = re.compile(r'^>[ \t]*Language:[ \t]*(\S+)[ \t]*$')
 CUE = re.compile(r'^>[ \t]*\[([^\]]+)\][ \t]*(.*?)[ \t]*$')
-HOLE = '~ '                                          # a hole's narration (§2.3): read aloud, the maker may replace it
-NEAR_HOLE = re.compile(r'^(?:[～〜][ \t　]|~(?=[^ ~]))')  # a full-width tilde or wave dash and a space, or "~" with no space
+# a hole's narration (§2.3): read aloud, the maker may replace it. "~ ", or a numbered hole "~N " (N from 1 to 99)
+HOLE_MARK = re.compile(r'^~([0-9]*) ')
+HOLE_NUMBER = re.compile(r'^[1-9][0-9]?$')
+# a full-width tilde or wave dash and a space, "~" with no space, or "~" and digits with no space (full-width digits too)
+NEAR_HOLE = re.compile(r'^(?:[～〜][ \t　]|~(?=[^ ~0-9])|~[0-9]+(?![ 0-9]))')
 
-TEXT_LENGTH = re.compile(r'^\d+(\.\d{1,2})?in$')
-TEXT_SIZE = re.compile(r'^\d+pt$')
+TEXT_LENGTH = re.compile(r'^[0-9]+(\.[0-9]{1,2})?in$')
+TEXT_SIZE = re.compile(r'^[0-9]+pt$')
 TEXT_COLOR = re.compile(r'^#[0-9A-Fa-f]{6}$')
 EMU_PER_IN = 914400
 SLIDE_SIZE = {'width': 12192000, 'height': 6858000}          # 16:9, 13.333 x 7.5 in
@@ -97,6 +101,18 @@ class Result:
     work: dict | None = None
     errors: list[str] = field(default_factory=list)
     warnings: list[str] = field(default_factory=list)
+    # the same errors and warnings as short codes with where they are ("slide-numbers", "cue-unknown line 7"):
+    # the room player reads a pasted script.md with the same codes (docs/work-format.md §2.7, tests/golden/)
+    error_codes: list[str] = field(default_factory=list)
+    warning_codes: list[str] = field(default_factory=list)
+
+    def error(self, code: str, at: str, text: str) -> None:
+        self.errors.append(f'{at}: {text}' if at else text)
+        self.error_codes.append(f'{code} {at}' if at else code)
+
+    def warn(self, code: str, at: str, text: str) -> None:
+        self.warnings.append(f'{at}: {text}' if at else text)
+        self.warning_codes.append(f'{code} {at}' if at else code)
 
 
 # ---------- reading ----------
@@ -128,7 +144,7 @@ def strip_notes(source: str, result: Result) -> list[Line]:
         text = ''.join(out)
         lines.append(Line(number, text, had, had and text.strip() == ''))
     if inside:
-        result.errors.append(f'line {opened_at}: "<!--" is never closed with "-->" '
+        result.error('note-open', f'line {opened_at}', f'"<!--" is never closed with "-->" '
                              '(everything after it would vanish from the narrator\'s screen)')
     return lines
 
@@ -143,7 +159,7 @@ def parse_text_attrs(rest: str, where: str, result: Result) -> dict:
             value, i = True, i + 1
         elif key in ('place', 'align', 'anchor', 'left', 'top', 'width', 'height', 'size', 'color', 'fill'):
             if i + 1 >= len(words):
-                result.errors.append(f'{where}: [Text] "{key}" needs a value')
+                result.error('text-no-value', where, f'[Text] "{key}" needs a value')
                 break
             value, i = words[i + 1], i + 2
             ok = (value in TEXT_CHOICES[key] if key in TEXT_CHOICES
@@ -151,23 +167,23 @@ def parse_text_attrs(rest: str, where: str, result: Result) -> dict:
                   else TEXT_SIZE.match(value) if key == 'size'
                   else TEXT_COLOR.match(value))
             if not ok:
-                result.errors.append(f'{where}: [Text] "{key} {value}" is not a value it takes')
+                result.error('text-bad-value', where, f'[Text] "{key} {value}" is not a value it takes')
         else:
-            result.errors.append(f'{where}: [Text] unknown word "{key}" (do not translate the words on a [Text] line)')
+            result.error('text-unknown-word', where, f'[Text] unknown word "{key}" (do not translate the words on a [Text] line)')
             i += 1
             continue
         if key in attrs:
-            result.errors.append(f'{where}: [Text] "{key}" is written twice')
+            result.error('text-twice', where, f'[Text] "{key}" is written twice')
         attrs[key] = value
     lengths = [k for k in ('left', 'top', 'width', 'height') if k in attrs]
     if 'place' in attrs and lengths:
-        result.errors.append(f'{where}: [Text] write either "place" or left/top/width/height, not both')
+        result.error('text-place-and-box', where, f'[Text] write either "place" or left/top/width/height, not both')
     elif 'place' not in attrs and len(lengths) != 4:
         if lengths:
             missing = ', '.join(k for k in ('left', 'top', 'width', 'height') if k not in attrs)
-            result.errors.append(f'{where}: [Text] needs all four of left/top/width/height (missing: {missing})')
+            result.error('text-box-partial', where, f'[Text] needs all four of left/top/width/height (missing: {missing})')
         else:
-            result.errors.append(f'{where}: [Text] needs "place top|middle|bottom" or left/top/width/height')
+            result.error('text-no-box', where, f'[Text] needs "place top|middle|bottom" or left/top/width/height')
     return attrs
 
 
@@ -181,19 +197,35 @@ def read_slide(number: int, title: str, body: list[Line], result: Result) -> dic
     texts: list[dict] = []
 
     kept = [line for line in body if not line.only_note]
+    para_mark: tuple[str, int] | None = None     # the mark of the paragraph so far, and its line (§2.3)
     i = 0
     while i < len(kept):
         line = kept[i]
         if not line.text.startswith('>'):
-            if line.text.startswith(HOLE) and not line.text[len(HOLE):].strip():
-                result.warnings.append(f'line {line.number}: "~ " (the mark of a hole\'s narration) with no words after it')
+            mark = HOLE_MARK.match(line.text)
+            if not line.text.strip():
+                para_mark = None
+            if mark:
+                digits = mark.group(1)
+                if digits and not HOLE_NUMBER.match(digits):
+                    result.error('hole-number', f'line {line.number}', f'"~{digits} " is not a hole number '
+                                 '(write ~1 to ~99 with no leading zero, or "~ " for a hole with no number)')
+                elif para_mark and para_mark[0] != digits:
+                    result.error('hole-mixed', f'line {line.number}', f'the mark "~{digits} " is not the mark '
+                                 f'"~{para_mark[0]} " of line {para_mark[1]} in the same paragraph (a paragraph is one hole)')
+                elif not para_mark:
+                    para_mark = (digits, line.number)
+                if not line.text[mark.end():].strip():
+                    result.warn('hole-empty', f'line {line.number}',
+                                f'"~{digits} " (the mark of a hole\'s narration) with no words after it')
             elif NEAR_HOLE.match(line.text):
-                result.warnings.append(f'line {line.number}: looks like the mark of a hole\'s narration, but the mark is '
+                result.warn('hole-near', f'line {line.number}', f'looks like the mark of a hole\'s narration, but the mark is '
                                        '"~ " (a half-width tilde and a space). As written, it is read as plain narration')
             notes.append(line.text)
             i += 1
             continue
         block = [line]
+        para_mark = None
         i += 1
         while i < len(kept) and kept[i].text.startswith('>'):
             block.append(kept[i])
@@ -203,7 +235,7 @@ def read_slide(number: int, title: str, body: list[Line], result: Result) -> dic
             for later in block[1:]:
                 m = CUE.match(later.text)
                 if m and m.group(1) in CUE_KEYWORDS:
-                    result.errors.append(f'line {later.number}: [{m.group(1)}] is inside a free cue that starts on '
+                    result.error('cue-in-free-cue', f'line {later.number}', f'[{m.group(1)}] is inside a free cue that starts on '
                                          f'line {block[0].number}, so it would do nothing. Put a blank line before it')
             notes.extend(b.text for b in block)
             continue
@@ -214,34 +246,34 @@ def read_slide(number: int, title: str, body: list[Line], result: Result) -> dic
             for b, w in zip(block[1:], words):
                 m = CUE.match(b.text)
                 if m and m.group(1) in CUE_KEYWORDS:
-                    result.errors.append(f'line {b.number}: [{m.group(1)}] is read as words of the [Text] on line '
+                    result.error('cue-in-text-words', f'line {b.number}', f'[{m.group(1)}] is read as words of the [Text] on line '
                                          f'{block[0].number}. Put a blank line after the words')
             if not any(w.strip() for w in words):
-                result.errors.append(f'line {block[0].number}: [Text] has no words (write them on the ">" lines after it)')
+                result.error('text-no-words', f'line {block[0].number}', f'[Text] has no words (write them on the ">" lines after it)')
             texts.append({'attrs': attrs, 'words': words})
             continue
         for b in block:
             m = CUE.match(b.text)
             if not m:
-                result.errors.append(f'line {b.number}: not a machine cue, but inside the cue block that starts on line '
+                result.error('cue-block-mixed', f'line {b.number}', f'not a machine cue, but inside the cue block that starts on line '
                                      f'{block[0].number}. Put a blank line between them')
                 continue
             keyword, arg = m.group(1), m.group(2)
             if keyword not in CUE_KEYWORDS:
-                result.errors.append(f'line {b.number}: unknown cue "[{keyword}]" (known: '
+                result.error('cue-unknown', f'line {b.number}', f'unknown cue "[{keyword}]" (known: '
                                      + ', '.join(f'[{k}]' for k in CUE_KEYWORDS) + '. Do not translate them)')
                 continue
             if keyword == 'Text':
-                result.errors.append(f'line {b.number}: [Text] must start its own block. Put a blank line before it')
+                result.error('text-not-first', f'line {b.number}', f'[Text] must start its own block. Put a blank line before it')
                 continue
             if keyword == 'BGM stop':
                 if arg:
-                    result.errors.append(f'line {b.number}: [BGM stop] takes no file')
+                    result.error('bgm-stop-file', f'line {b.number}', f'[BGM stop] takes no file')
             elif not arg:
-                result.errors.append(f'line {b.number}: [{keyword}] needs a file path')
+                result.error('cue-no-file', f'line {b.number}', f'[{keyword}] needs a file path')
                 continue
             elif '\\' in arg:
-                result.errors.append(f'line {b.number}: use "/" in paths, not "\\": {arg}')
+                result.error('path-backslash', f'line {b.number}', f'use "/" in paths, not "\\": {arg}')
             if keyword == 'Picture':
                 pictures.append(arg)
             elif keyword in BGM_KEYWORDS:
@@ -258,12 +290,12 @@ def read_slide(number: int, title: str, body: list[Line], result: Result) -> dic
             else:
                 cues.append({'type': keyword.lower(), 'file': arg})
     if len(pictures) > 1:
-        result.errors.append(f'{where}: more than one [Picture]')
+        result.error('picture-twice', where, f'more than one [Picture]')
     if bgm_count > 1:
-        result.errors.append(f'{where}: more than one of [BGM] / [BGM once] / [BGM after video] / [BGM stop]')
+        result.error('bgm-twice', where, f'more than one of [BGM] / [BGM once] / [BGM after video] / [BGM stop]')
     if (any(c.get('start') == 'after-video' for c in cues)
             and not any(c['type'] == 'video' for c in cues)):
-        result.errors.append(f'{where}: [BGM after video] needs a [Video] on the same slide')
+        result.error('bgm-after-no-video', where, f'[BGM after video] needs a [Video] on the same slide')
 
     return {'number': number, 'title': title, 'picture': pictures[0] if pictures else None,
             'notes': make_notes(notes, removed), 'cues': cues, '_texts': texts}
@@ -322,12 +354,12 @@ def link_cue(arg: str, line: int, result: Result) -> dict | None:
     url, rest = words[0], words[1:]
     vid = youtube_id(url)
     if not vid:
-        result.errors.append(f'line {line}: [Video] can play a YouTube link only (got {url}). '
+        result.error('link-not-youtube', f'line {line}', f'[Video] can play a YouTube link only (got {url}). '
                              'For another video, save it as MP4 and write its path')
         return None
     said: dict[str, float] = {}
     if len(rest) % 2:
-        result.errors.append(f'line {line}: after the link, [Video] takes "start <time>", "end <time>", '
+        result.error('link-words', f'line {line}', f'after the link, [Video] takes "start <time>", "end <time>", '
                              f'"captions <language>" and "volume <dB>" (got: {" ".join(rest)})')
         return None
     captions = None
@@ -335,27 +367,27 @@ def link_cue(arg: str, line: int, result: Result) -> dict | None:
     for key, value in zip(rest[::2], rest[1::2]):
         if (key not in ('start', 'end', 'captions', 'volume') or key in said
                 or (key == 'captions' and captions) or (key == 'volume' and volume is not None)):
-            result.errors.append(f'line {line}: after the link, [Video] takes "start <time>", "end <time>", '
+            result.error('link-word', f'line {line}', f'after the link, [Video] takes "start <time>", "end <time>", '
                                  f'"captions <language>" and "volume <dB>", once each (got "{key}")')
             return None
         if key == 'volume':
             m = VOLUME.match(value)
             db = float(m.group(1)) if m else None
             if db is None or db > 0 or db < MIN_VOLUME_DB:
-                result.errors.append(f'line {line}: volume {value} is not a volume. Write how much quieter, in dB, '
+                result.error('link-volume', f'line {line}', f'volume {value} is not a volume. Write how much quieter, in dB, '
                                      f'from 0dB to {MIN_VOLUME_DB}dB, like -6dB (a linked video cannot be made louder)')
                 return None
             volume = db
             continue
         if key == 'captions':
             if not CAPTIONS.match(value):
-                result.errors.append(f'line {line}: captions {value} is not a language (write a code, like ja or en)')
+                result.error('link-captions', f'line {line}', f'captions {value} is not a language (write a code, like ja or en)')
                 return None
             captions = value
             continue
         sec = seconds(value)
         if sec is None:
-            result.errors.append(f'line {line}: {key} {value} is not a time (write seconds, like 351, or m:ss, like 5:51)')
+            result.error('link-time', f'line {line}', f'{key} {value} is not a time (write seconds, like 351, or m:ss, like 5:51)')
             return None
         said[key] = sec
     query = parse_qs(urlsplit(url).query)
@@ -365,17 +397,17 @@ def link_cue(arg: str, line: int, result: Result) -> dict | None:
             if name in query:
                 sec = link_seconds(query[name][0])
                 if sec is None:
-                    result.errors.append(f'line {line}: {name}={query[name][0]} in the link is not a time')
+                    result.error('link-time-in-link', f'line {line}', f'{name}={query[name][0]} in the link is not a time')
                     return None
                 in_link[key] = sec
     both = set(said) & set(in_link)
     if both:
-        result.errors.append(f'line {line}: [Video] has {" and ".join(sorted(both))} both in the link and after it. '
+        result.error('link-time-twice', f'line {line}', f'[Video] has {" and ".join(sorted(both))} both in the link and after it. '
                              'Write it once (after the link is easier to read)')
         return None
     cut = {**in_link, **said}
     if 'end' in cut and cut['end'] <= cut.get('start', 0):
-        result.errors.append(f'line {line}: [Video] end must come after start')
+        result.error('link-end-before-start', f'line {line}', f'[Video] end must come after start')
         return None
     cue = {'type': 'video', 'url': f'https://www.youtube.com/watch?v={vid}'}
     if cut.get('start'):
@@ -456,21 +488,21 @@ def parse_script(source: str, result: Result) -> dict | None:
         if m:
             starts.append((index, int(m.group(1)), m.group(2)))
         elif NEAR_HEADING.match(line.text):
-            result.errors.append(f'line {line.number}: looks like a slide heading but is not "## [Slide N] Title" '
+            result.error('heading-near', f'line {line.number}', f'looks like a slide heading but is not "## [Slide N] Title" '
                                  '(the marker [Slide N] is never translated)')
     if not starts:
-        result.errors.append('no slide headings ("## [Slide 1] Title") were found; nothing to build')
+        result.error('no-slides', '', 'no slide headings ("## [Slide 1] Title") were found; nothing to build')
         return None
 
     header = lines[:starts[0][0]]
     title = next((m.group(1) for line in header if (m := TITLE.match(line.text))), None)
     if title is None:
-        result.errors.append('the script has no title ("# Title" before the first slide)')
+        result.error('no-title', '', 'the script has no title ("# Title" before the first slide)')
     language = next((m.group(1) for line in header if (m := LANGUAGE.match(line.text))), None)
 
     numbers = [n for _, n, _ in starts]
     if numbers != list(range(1, len(numbers) + 1)):
-        result.errors.append('slide numbers must be 1, 2, 3, ... with no gaps or repeats; found '
+        result.error('slide-numbers', '', 'slide numbers must be 1, 2, 3, ... with no gaps or repeats; found '
                              + ', '.join(map(str, numbers)))
 
     slides = []
@@ -481,13 +513,13 @@ def parse_script(source: str, result: Result) -> dict | None:
         if cut is not None:
             after = [line for line in body[cut + 1:] if line.text.strip() and not line.only_note]
             if after:
-                result.warnings.append(f'line {after[0].number}: text after "---" of slide {number} is ignored')
+                result.warn('after-end', f'line {after[0].number}', f'text after "---" of slide {number} is ignored')
             body = body[:cut]
         slides.append(read_slide(number, slide_title, body, result))
 
     if language is None:
         language = guess_language('\n'.join(s['notes'] for s in slides))
-        result.warnings.append(f'no "> Language:" line in the header; guessed "{language}"')
+        result.warn('no-language', '', f'no "> Language:" line in the header; guessed "{language}"')
 
     return {'format': FORMAT, 'version': VERSION, 'title': title or '', 'language': language, 'slides': slides}
 
@@ -542,9 +574,9 @@ def resolve_media(work: dict, media: Path | None, result: Result) -> None:
         if picture:
             ext = Path(picture).suffix.lower()
             if ext in HEIC_EXTS:
-                result.errors.append(f'{where}: {picture} is HEIC, which players cannot show. Export it as JPEG')
+                result.error('picture-heic', where, f'{picture} is HEIC, which players cannot show. Export it as JPEG')
             elif ext not in PICTURE_EXTS:
-                result.warnings.append(f'{where}: {picture} is not JPEG, PNG or WebP')
+                result.warn('picture-format', where, f'{picture} is not JPEG, PNG or WebP')
 
         for cue in slide['cues']:
             file = cue.get('file')
@@ -552,9 +584,9 @@ def resolve_media(work: dict, media: Path | None, result: Result) -> None:
                 continue
             ext = Path(file).suffix.lower()
             if cue['type'] == 'video' and ext not in VIDEO_EXTS:
-                result.warnings.append(f'{where}: {file} is not MP4 (H.264 + AAC); listeners will not receive it')
+                result.warn('video-format', where, f'{file} is not MP4 (H.264 + AAC); listeners will not receive it')
             if cue['type'] in ('bgm', 'sound') and ext not in AUDIO_EXTS:
-                result.warnings.append(f'{where}: {file} is not MP3 or AAC (.m4a)')
+                result.warn('audio-format', where, f'{file} is not MP3 or AAC (.m4a)')
             if media is None:
                 continue
             path = media / file

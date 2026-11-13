@@ -1,0 +1,51 @@
+{
+  "work": {
+    "format": "digital-kamishibai/work",
+    "version": 1,
+    "title": "Words on the screen",
+    "language": "en",
+    "slides": [
+      {
+        "number": 1,
+        "title": "Bands",
+        "picture": "pictures/01.jpg",
+        "notes": "Narration.",
+        "cues": []
+      }
+    ]
+  },
+  "texts": {
+    "1": [
+      {
+        "attrs": {
+          "place": "top",
+          "size": "54pt",
+          "bold": true,
+          "color": "#7a4518"
+        },
+        "words": [
+          "The storm",
+          "",
+          "that night"
+        ]
+      },
+      {
+        "attrs": {
+          "left": "0.50in",
+          "top": "6.30in",
+          "width": "4.00in",
+          "height": "0.80in",
+          "size": "28pt",
+          "align": "left",
+          "anchor": "top",
+          "fill": "#1E2C4A"
+        },
+        "words": [
+          "Winter, long ago"
+        ]
+      }
+    ]
+  },
+  "errors": [],
+  "warnings": []
+}

@@ -55,4 +55,5 @@ jobs:
             echo "::notice::CLOUDFLARE_API_TOKEN is not set; skipping the deploy."
             exit 0
           fi
+          node scripts/fetch-samples.mjs   # the site's samples (examples/*/*/site.json), from the release site-media
           npx -y wrangler@4 deploy --env public

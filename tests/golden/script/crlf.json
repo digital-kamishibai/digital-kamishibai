@@ -1,0 +1,20 @@
+{
+  "work": {
+    "format": "digital-kamishibai/work",
+    "version": 1,
+    "title": "Line ends",
+    "language": "en",
+    "slides": [
+      {
+        "number": 1,
+        "title": "One",
+        "picture": "pictures/01.jpg",
+        "notes": "Windows line ends are read the same.",
+        "cues": []
+      }
+    ]
+  },
+  "texts": {},
+  "errors": [],
+  "warnings": []
+}

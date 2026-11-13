@@ -1,0 +1,2 @@
+# 答え合わせの台本: Windows の改行と BOM のまま読めるかを見る1本は、git に改行を直させない
+tests/golden/script/crlf.md -text

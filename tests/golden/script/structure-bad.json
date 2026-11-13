@@ -1,0 +1,13 @@
+{
+  "work": null,
+  "texts": {},
+  "errors": [
+    "note-open line 11",
+    "heading-near line 7",
+    "no-title",
+    "slide-numbers"
+  ],
+  "warnings": [
+    "no-language"
+  ]
+}

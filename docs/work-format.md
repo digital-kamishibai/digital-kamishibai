@@ -6,13 +6,14 @@ Three tools follow it and nothing else:
 | Tool | Role |
 |---|---|
 | Builder (`skills/digital-kamishibai/scripts/build_work.py`) | writes `work.json` from `script.md` |
-| Room player (`player/`) | reads `work.json` and the media files |
+| Room player (`player/`) | reads `work.json` and the media files; reads `script.md` too when it is pasted or opened as a file (§2.7) |
 | Exporters of older works (outside this repository) | write `work.json` and media |
 
 To change the format, change this file first, then the tools.
 All three are tested against the same example, [`examples/sample-story/`](../examples/sample-story/).
+The two readers of `script.md` (the builder in Python, the player in JavaScript) are held to one shared set of answers (§2.7).
 
-Status: **v1, first edition (2026-10-22)**; `[BGM once]` added 2026-10-24 (player stage 4). Several `[Video]` on one slide allowed 2026-10-24 (the narrator picks which one to play). `overlays`, `draft` and the correction sheet (§6) added 2026-10-25 (practising and correcting in the player). `slide_size`, `overlay_base`, `overlay_layout` and the `layout` correction added 2026-10-25 (moving the words on the picture). `[Text]` (words on the screen, written in `script.md`, §2.6) added 2026-10-25, and drawn into the picture by the builder the same day. `role`, `seats` and `source_segments` of a video (§3.3) and the `picture`, `video K` and `ending seat N` corrections (§6) added 2026-10-26 (pointing at pictures and videos while practising). `[BGM after video]` added 2026-10-29 (music that the old works start by a click once the video is over). `Use` of a `picture` correction (choosing a candidate in the player) added 2026-10-29. `color` and `fill` of a `layout` correction, the colour of a box and the light-against-dark guide (§3.2) added 2026-10-30 (correcting the colours of the words on the picture). `picture_source` of a slide (§3.2) added 2026-11-01 (a picture correction was taken as changed after a rebuild). `[Video]` with a YouTube link — a **linked video** (§2.4, §3.3) — added 2026-11-09, and its `captions` the same day (listeners cannot choose captions themselves), (a work handed out to other families shows published videos without packing them, and listeners on their own devices see them too). Music that is too loud is played quieter (§4) from 2026-11-09 (a song from a CD put in place of a sample's music drowned out the narration). `volume` of a linked video added 2026-11-10 (a talk on YouTube played about 6 dB louder than the video files beside it, and the player cannot measure it), and the `Volume` correction (§6) the same day (a maker who does not know dB sets it by ear while practising). Covers what stage 1 of the player needs (pictures, slide order, narrator notes)
+Status: **v1, first edition (2026-10-22)**; `[BGM once]` added 2026-10-24 (player stage 4). Several `[Video]` on one slide allowed 2026-10-24 (the narrator picks which one to play). `overlays`, `draft` and the correction sheet (§6) added 2026-10-25 (practising and correcting in the player). `slide_size`, `overlay_base`, `overlay_layout` and the `layout` correction added 2026-10-25 (moving the words on the picture). `[Text]` (words on the screen, written in `script.md`, §2.6) added 2026-10-25, and drawn into the picture by the builder the same day. `role`, `seats` and `source_segments` of a video (§3.3) and the `picture`, `video K` and `ending seat N` corrections (§6) added 2026-10-26 (pointing at pictures and videos while practising). `[BGM after video]` added 2026-10-29 (music that the old works start by a click once the video is over). `Use` of a `picture` correction (choosing a candidate in the player) added 2026-10-29. `color` and `fill` of a `layout` correction, the colour of a box and the light-against-dark guide (§3.2) added 2026-10-30 (correcting the colours of the words on the picture). `picture_source` of a slide (§3.2) added 2026-11-01 (a picture correction was taken as changed after a rebuild). `[Video]` with a YouTube link — a **linked video** (§2.4, §3.3) — added 2026-11-09, and its `captions` the same day (listeners cannot choose captions themselves), (a work handed out to other families shows published videos without packing them, and listeners on their own devices see them too). Music that is too loud is played quieter (§4) from 2026-11-09 (a song from a CD put in place of a sample's music drowned out the narration). `volume` of a linked video added 2026-11-10 (a talk on YouTube played about 6 dB louder than the video files beside it, and the player cannot measure it), and the `Volume` correction (§6) the same day (a maker who does not know dB sets it by ear while practising). Planned 2026-11-11 for opening the site's samples in one press (the tools follow stage by stage; none of these is in a tool yet): samples on the site (§1), a zip read and written by the player (§1), the player reading a pasted `script.md` (§2.7), numbered holes `~N ` (§2.3), a changed version of a handed-out sample kept as `script.md` (§6), SVG pictures (§4) and substitute fonts for drawing words (§3.2). Covers what stage 1 of the player needs (pictures, slide order, narrator notes)
 and fixes the shape of sound and video cues. Size limits for video are provisional until stage 2 measures them.
 
 **Not in v1** (decided, not forgotten): sound effects the narrator triggers by tapping, and music volume per slide.
@@ -26,14 +27,15 @@ A work has two parts that travel separately.
 
 | Part | What | Made by | Goes where |
 |---|---|---|---|
-| **Text** | `work.json` (and its source, `script.md`) | the builder, or a chat AI | anywhere — it holds no pictures |
-| **Media** | pictures, videos, music, sound effects | the family | **stays on the family's own devices** |
+| **Text** | `script.md`, and `work.json` made from it | the family or a chat AI writes `script.md`; the builder (or the player, §2.7) makes `work.json` from it | anywhere — it holds no pictures |
+| **Media** | pictures, videos, music, sound effects | the family | **a family's media stays on the family's own devices.** Only the published samples' media is on the site (below) |
 
-The player puts them together: the narrator opens `work.json` and picks the folder that holds the media.
+The player puts them together: the narrator opens `work.json` (or pastes `script.md`, §2.7) and picks the folder that holds the media.
 Files are matched by the relative paths written in `work.json`.
 
 Why split: family photos and videos should never have to be uploaded anywhere — not to a chat AI to be packed,
-not to a server to be shown. A chat AI only ever needs to produce text.
+not to a server to be shown. A chat AI only ever needs to produce text: it writes `script.md`, never `work.json`
+(a chat AI that has the skill may run the builder; what it writes is still `script.md`).
 
 A **linked video** (§2.4) is the one exception to "media are files": it is a link to a video already published on
 YouTube, written in the text. It is not a file at all, so nothing is sent between devices for it.
@@ -43,7 +45,7 @@ YouTube, written in the text. It is not a file at all, so nothing is sent betwee
 ```
 my-story/
 ├── work.json
-├── script.md          (source; the player does not read it)
+├── script.md          (source; the player reads it only when pasted or opened as a file, §2.7)
 ├── pictures/          01.jpg, 02.jpg, ...
 ├── videos/
 └── sounds/            music and sound effects
@@ -51,14 +53,33 @@ my-story/
 
 Text and media may also sit in two different folders; only the relative paths inside `work.json` matter.
 
+### Samples on the site
+
+The published samples (`examples/` of this repository, under their own licences) are also put on the site, ready to be
+opened in one press. They are the one kind of work whose media is not on the family's devices.
+
+- Their files are at `samples/<slug>/<lang>/<version>/` on the site, laid out as the sample's folder (`work.json`,
+  `script.md`, `pictures/`, ...). Each file is at most 25 MiB.
+- `<version>` is a whole number. Whenever any file of a sample changes, it goes up; a file under one version never changes,
+  and **a version is never taken off the site**: `samples/<slug>/<lang>/` only ever gains versions.
+  A changed version of a sample (§6) names the version it was made from.
+- **Every device takes a sample's media from the site itself**: the narrator's device, and each listener's device too
+  (nothing of it is sent from the narrator's device, so it costs no relay). If a listener's device cannot get a file
+  from the site, the narrator's device sends it as for any work.
+- Whether a work is a site's sample is decided by **where it was opened** (from the site's sample list, or a changed
+  version naming a sample, §6), never by what `work.json` says. A work opened from a folder or a zip never tells
+  listeners anything about the site.
+
 ### Zip
 
-The player also accepts a `.zip`:
+The player also opens a `.zip` (a single file is all that some devices can open — an iPad cannot open a folder):
 
-- `work.json` at the root of the zip, or inside exactly one top-level folder.
-- Media may be in the same zip **only when the zip was made on the family's own device.**
-  A zip from a chat AI holds `work.json` (and `script.md`) only.
+- `work.json` at the root of the zip, or inside exactly one top-level folder. Or `script.md` there instead (§2.7);
+  when both are there, `work.json` is read.
 - Paths in `work.json` are resolved inside the zip first, then in the media folder the narrator picks.
+- Files may be stored or compressed (deflate). The player writes zips with stored files only.
+- **Do not give a family's media to a chat AI to pack into a zip.** A chat AI writes `script.md` only (above).
+  The player cannot tell where a zip was made and does not try.
 
 ---
 
@@ -76,6 +97,7 @@ Plain Markdown. Everything before the first slide heading is the **header**.
 
 - `# Title` — the first level-1 heading is the work's title. Required.
 - `> Language: xx` — optional BCP 47 tag (`en`, `ja`, ...). If missing, the builder guesses from the text.
+- `> Based on: ...` and `> Changed: ...` — written by the player in a changed version of a handed-out sample (§6).
 - Any other header lines are free notes for the family. Nothing in the header reaches the narrator's screen.
 
 ### 2.2 Slide heading
@@ -93,7 +115,7 @@ Plain Markdown. Everything before the first slide heading is the **header**.
 | Kind | How to write | On the narrator's screen | Sent to listeners |
 |---|---|---|---|
 | Narration | plain text | yes | **never** |
-| A hole's narration | `~ ` at the start of each line (below) | yes, as narration, **highlighted** | **never** |
+| A hole's narration | `~ ` or `~N ` at the start of each line (below) | yes, as narration, **highlighted** | **never** |
 | Free cue (for the narrator's eyes) | a `>` line not listed below | yes, marked as a cue | never |
 | **Machine cue** | `> [Keyword] ...` (§2.4) | yes, marked as a cue | the player acts on it |
 | Production note | `<!-- ... -->` | **no** | never |
@@ -118,7 +140,23 @@ Plain Markdown. Everything before the first slide heading is the **header**.
   ```
 
   - When the hole is filled with the maker's own words and nobody should change it any more, the mark comes off.
-  - A line that starts with `～ `, `〜 ` (full-width) or with `~` and no space is plain narration; the builder warns.
+  - **A numbered hole: `~N `** (`N` from `1` to `99`, half-width digits, no leading zero, then a space). The paragraph
+    belongs to hole N — the same number as the hole in the sample's guide to its holes (`holes.md`). One hole may span
+    several paragraphs and several slides, and one slide may hold paragraphs of several holes. The player can then help
+    with one hole at a time. `~ ` with no number is highlighted the same way and belongs to no numbered hole.
+    The marked lines of a paragraph carry **the same** mark. A paragraph may also hold lines with no mark (plain
+    narration around the hole); only the marked lines are the hole's.
+
+    ```markdown
+    ~2 First came the banana,
+    ~2 and then the milk.
+    ```
+
+  - The guide's table still says where each hole is, for people to read. The samples' tests check that the slides
+    holding `~N ` are the places the guide gives for hole N.
+  - A line that starts with `～ `, `〜 ` (full-width), with `~` and no space, or with `~` and full-width digits is plain
+    narration; the builder warns. A player reading a pasted `script.md` (§2.7) counts such lines and **asks once whether
+    to make them half-width marks**, done in one press; it never changes them silently.
 
 ### 2.4 Machine cues
 
@@ -261,6 +299,27 @@ there; the original picture is never changed. Only slides with `[Text]` get a bu
   `wrap` true; one paragraph entry per paragraph with `space_before` 0 and the box's `size`, `bold`, `align`, `color`;
   `font` by the work's language (`ja` Meiryo, `ko` Malgun Gothic, `zh` Microsoft YaHei, others Arial); `fill` when written.
 
+### 2.7 The player reading `script.md`
+
+When a `script.md` is pasted into the player, opened as a file (or in a zip, §1), or is a changed version of a sample
+(§6), the player reads it itself and makes `work.json` in memory, by the same rules as the builder (§2, §3, and the
+builder's column of §5). A work opened from a folder with `work.json` is read from `work.json`, as before.
+
+- **Two readers, one set of answers.** The builder (Python) and the player (JavaScript) are held to one shared set of
+  scripts with the `work.json` or the error each must give. An error or a warning has a short code and where it is (for
+  example `slide-numbers`, `cue-unknown line 7`), the same in both readers. The set of scripts and their answers are
+  `tests/golden/` of this repository. The readings of a linked video's line are in the same set.
+- **The first version reads only what the published samples use**: the header (`# Title`, `Language`, free lines),
+  narration, holes (`~ `, `~N `), free cues, production notes, `[Picture]`, `[BGM]`, `[BGM once]`, `[BGM stop]`,
+  `[Sound]`, `[Video]` (a file, or a link with `start`, `end`, `captions`, `volume`) and `[Text]`. Anything else
+  stops with a message to build the work with the builder; the player **never reads it some other way in silence**.
+- `[Text]`: the player does not draw words into pictures. A slide whose `[Picture]` and `[Text]` lines are word for word
+  those of the same slide of the sample it is based on uses that sample's built picture. Any other `[Text]` stops as above.
+- A script that changes more than a sample's highlighted paragraphs opens with the sample's media only when its skeleton
+  is the sample's (§6, "A script written from a sample").
+- Media: from the site for a changed version of a sample (§1, §6); otherwise from the folder the narrator picks, or the zip.
+- What it makes is never written out as `work.json`; the source stays the one `script.md`.
+
 ---
 
 ## 3. `work.json` — what the player reads
@@ -322,7 +381,7 @@ UTF-8 JSON. The builder writes it from `script.md`; a person never needs to edit
 2. Remove machine cue lines (§2.4), each with its line break. For `[Text]`, the whole block (its words too).
 3. Remove `**` around bold text. **Keep the leading `> ` of free cues**, so the player can show them as cues
    rather than as words to read aloud. (A tool that writes speaker notes for slides, such as the `--pptx` export,
-   may remove it there.) **Keep the leading `~ ` of a hole's narration too** (§2.3), so the player can highlight it
+   may remove it there.) **Keep the leading `~ ` or `~N ` of a hole's narration too** (§2.3), so the player can highlight it
    and a correction sheet's paragraphs match `script.md`. It is a mark, not words: a player shows the line without it,
    and a tool that writes the notes out as text to read (speaker notes, a printed script) **must remove it**.
 4. **Only if something was removed in steps 1–2**: where blank lines now run two or more in a row,
@@ -384,6 +443,12 @@ Drawn this way with the same font, the words land within a few pixels of the sli
 moving the words**: what listeners see is always the picture drawn by the slide software — or, for a work built from
 `[Text]` (§2.6), by the builder with this same drawing, so the draft and the listeners' picture match.
 **Like `overlays`, a player must never send `overlay_layout` or `overlay_base` to a listener's device.**
+
+**A substitute font.** When the device does not have the `font` of a paragraph (Meiryo is on Windows only; an iPad has
+none of the builder's fonts), the player draws with a font the site serves instead, chosen by the work's language: `ja`
+Noto Sans JP, `ko` Noto Sans KR, `zh` Noto Sans SC, others Noto Sans (SIL Open Font License). Every device that draws
+then draws the same letters. The lines may then break differently from the picture drawn with the named font, and the
+narrator's screen says so once. `font` in `work.json` stays the font the picture was drawn with.
 
 **The colour of a box** (for the `color` of a `layout` correction, §6) is the `color` of its paragraphs **that have
 words** (a paragraph whose lines in `overlays` are all empty or spaces does not count: an empty paragraph may inherit
@@ -466,11 +531,15 @@ Sounds and videos of earlier slides are not replayed.
 
 | Kind | Formats | Limits |
 |---|---|---|
-| Pictures | JPEG, PNG, WebP (`.jpg` `.jpeg` `.png` `.webp`) | long side ≤ 1920 px recommended. Any shape; 16:9 fills the screen best |
+| Pictures | JPEG, PNG, WebP (`.jpg` `.jpeg` `.png` `.webp`); SVG (`.svg`) as a picture only (below) | long side ≤ 1920 px recommended. Any shape; 16:9 fills the screen best. SVG ≤ 200 KB |
 | Music, sound effects | MP3, AAC (`.mp3` `.m4a`) | — |
 | Video | MP4 with H.264 video and AAC audio (`.mp4`) | **≤ 1080p. ≤ 300 MB per file and ≤ 1 GB per work (provisional — set in player stage 2)** |
 
 - **iPhone photos (HEIC) are not accepted.** Export them as JPEG first.
+- **SVG is a picture and nothing more.** The player shows it as an image (never puts its markup into the page, so
+  scripts, links and outside files in it do nothing). The file must start with `<svg` (after an optional XML
+  declaration and blank space). It is not sent to listeners as SVG: the narrator's device draws it as a JPEG
+  (1920 × 1080, fitted as in §2.6) and sends that. The builder does not draw `[Text]` on an SVG.
 - A linked video (§2.4) is not a file: it has no format or size limit here, and nothing is sent for it.
 - **Music that is too loud is played quieter.** Before the show, the narrator's player measures each song of a `[BGM]`,
   `[BGM once]` or `[BGM after video]` (integrated loudness, ITU-R BS.1770). A song louder than **−29 LUFS** is played at **−30 LUFS**
@@ -486,6 +555,8 @@ Sounds and videos of earlier slides are not replayed.
 
 ## 5. Checks
 
+A player reading a pasted `script.md` (§2.7) makes every check of the Builder column the same way, with the same code.
+
 | Check | Builder | Player |
 |---|---|---|
 | No slide headings | error, stop | — |
@@ -494,7 +565,9 @@ Sounds and videos of earlier slides are not replayed.
 | A machine cue block with a line that is not a machine cue, or a free cue block with a machine cue on a later line (§2.3) | error, stop | — |
 | Two `[Picture]` or `[BGM]`/`[BGM once]`/`[BGM after video]` on one slide | error, stop | — |
 | `[BGM after video]` (`start: "after-video"`) on a slide with no `[Video]` | error, stop | error |
-| A line that looks like the mark of a hole's narration but is not (`～ `, `〜 `, `~` with no space), or `~ ` with no words (§2.3) | warning (it is read as plain narration) | — |
+| A line that looks like the mark of a hole's narration but is not (`～ `, `〜 `, `~` with no space, `~` with full-width digits), or `~ ` / `~N ` with no words (§2.3) | warning (it is read as plain narration) | for a pasted `script.md`: asks once whether to make the full-width ones half-width marks |
+| `~N ` with `N` not from 1 to 99 or with a leading zero (`~0 `, `~100 `, `~01 `), or a paragraph whose marked lines carry different marks (§2.3) | error, stop | — |
+| Something the player's reader does not read yet (§2.7) | — | stops; points to the builder |
 | `<!--` without `-->` | error, stop (the rest of the script would vanish from the notes) | — |
 | `[Text]` with no words, an unknown word on its line, neither or both of `place` and the four lengths, or only some of the four (§2.6) | error, stop | — |
 | A word line of `[Text]` that looks like a machine cue | error, stop (a blank line was forgotten) | — |
@@ -505,6 +578,8 @@ Sounds and videos of earlier slides are not replayed.
 | `url` not a YouTube link, both `url` and `file`, `start < 0`, `end` not after `start`, `captions` not a language code, `volume` not a number from `-40` to `0`, or `role`/`seats`/`source_segments` on a linked video (§3.3) | — | error |
 | Linked video that cannot be played (the owner does not allow other sites, gone, no internet) | — (it cannot see YouTube) | shown to the narrator, for this device and for each listener; never an error window |
 | Picture is HEIC | error | error |
+| SVG picture that does not start with `<svg`, or over 200 KB (§4) | error, if it can see the media folder | error |
+| `[Text]` on a slide whose picture is SVG | error, stop | — |
 | `overlays` not boxes → paragraphs → lines of text (§3.2) | — | error |
 | `draft` other than `true` | — | error |
 | `overlay_layout` without `overlays`, of another length, or a box or paragraph not as in §3.2 | — | error |
@@ -522,6 +597,7 @@ overlay words of a slide, and — when the work has `overlay_layout` — move an
 (`script.md`, or the slides of an older work), and a second copy to edit would drift from it.
 The player writes a **correction sheet** instead: plain Markdown that a person reads and that can be pasted into
 a chat AI, which then edits the source. The work is built again and opened again in the player.
+(The one other thing the player writes is a changed version of a handed-out sample — a `script.md`, at the end of this section.)
 
 The player keeps the sheet in the browser, keyed by the work's `title`, and reads or writes it **only for a draft**
 (so a family member practising the handed-out version of the same work never sees unfinished corrections).
@@ -694,3 +770,67 @@ sheet writes them (inches to two decimals, points to whole numbers, colours in c
 `fill none`): **Done** when every value equals After;
 **Not done** when every value equals Before; otherwise **Done, but reworded**.
 A `color` correction on a box that now has no single colour (§3.2) is **Done, but reworded**.
+
+### A changed version of a handed-out sample
+
+A sample opened from the site (§1) is a handed-out version, not a draft: there is no correction sheet for it. While
+practising (audience not yet invited), the narrator may change **the highlighted paragraphs only** (a hole's narration,
+`~ ` or `~N `, §2.3). Other narration, cues and the words on the screen cannot be changed here — they were checked by
+the sample's maker against its sources; changing them is the maker's path (the builder).
+
+- The player does not change `work.json`. It keeps a **`script.md`**: the sample's own `script.md` with those paragraphs
+  replaced. The mark goes back on every line of a changed paragraph; line breaks stay as typed; nothing else changes.
+- The player writes two header lines (§2.1), and replaces them when it writes the version again:
+
+  ```markdown
+  > Based on: Six Friends Smoothie ~ How Passes Connect Inside Your Body ~ (six-friends-smoothie/en, version 1) — Digital Kamishibai, by Fast Focus Technologies, CC BY 4.0, https://digitalkamishibai.org
+  > Changed: hole 1 (slides 1, 4, 5)
+  ```
+
+  `Based on` and `Changed` are fixed words. The last part in round brackets before the dash, `(<slug>/<lang>, version <N>)`, is what
+  the player reads back; the rest is the credit the licence asks for. `Changed` lists, for people, the holes changed
+  and the slides they are on (a paragraph of `~ ` by its slide only), in the work's language.
+- It is kept in this browser on this device, apart from correction sheets, and leaves the device only when the narrator
+  copies it or saves it to a file. Like `notes`, it is never sent to a listener's device.
+- Opened again (pasted, from a file or a zip, or from the browser), the player reads `Based on`, takes that version of the
+  sample's media from the site and reads the script itself (§2.7). If that version still cannot be found (§1 keeps
+  every version), the player uses the newest version's media **only when it has the same number of slides and every
+  slide's `[Picture]` line is the same**, and says so. Otherwise it stops and says that the sample has changed too much
+  for this version to be opened with it. It never changes the script by itself.
+
+### A script written from a sample (with a chat AI)
+
+A chat AI given a sample's `script.md` may write a new story on the same skeleton: other narration, the same pictures and
+sounds. When a pasted or opened `script.md` changes more than the highlighted paragraphs of its sample, the player opens it
+with the sample's media **only when the skeleton is the sample's**:
+
+- the same number of slides, and on every slide the same `[Picture]`, the same machine cues (`[BGM…]`, `[Sound]`, `[Video]`)
+  and the same `[Text]` as the sample, **as read** (§2.7) — so the sample's built pictures and media fit as they are;
+- narration (highlighted or not), free cues, production notes, slide titles and the work's title may differ.
+
+Otherwise it stops and lists every slide that differs and why, at once (a slide whose `[Text]` differs: the words on the
+screen are the maker's path, the builder). It says, when it opens such a script, that its narration is not the one the
+sample's maker checked against the sources, and that the pictures and the words on them are still the sample's.
+
+- Which sample: the `Based on` line (§6 above) when there is one. Without it, the player compares the script with the newest
+  version of each sample on the site in the script's `Language` (every sample when it has none). It opens with the one sample
+  whose skeleton is the same, and says which. With none, it stops; when one sample with the same number of slides differs
+  in fewer places than every other, it names that sample and lists what differs from it, so the narrator knows what to put
+  back. With more than one, it stops and asks for a `Based on` line.
+  A script written from nothing is not opened this way.
+- The work's title shown is the script's. The ids by which a listener's device keeps media are still made from the sample's
+  title, so that a listener's device can use what it already keeps of that sample.
+- It is kept like a changed version (same browser slot, replacing the one kept there; saved to a file as `script.md`).
+  When it is saved, the player writes `Based on` (adding it when it was missing) and `Changed` naming the slides whose
+  narration changed (`> Changed: narration (slides 1–8)`); nothing else in the script changes.
+- The highlighted paragraphs of this script (if the chat AI kept the marks) can be changed as for a changed version.
+  The sample's hole guide is not offered for it: it was written for the sample's story.
+- Like any narration, it is never sent to a listener's device.
+- A pasted script that is one fenced code block as a whole (a chat AI's answer copied with its fence) is read without
+  the fence lines.
+- The prompt for it: on a sample opened from the site, the player offers a prompt to copy into a chat AI. It holds the
+  sample's `script.md` as a whole, what each of the sample's pictures shows (the first paragraph of the code block under
+  each `### [Prompt N]` of the sample's `plan.md`, as the picture of slide N; `plan.md` is put on the site with the sample
+  for this), and the rules above as asks: ask the narrator first and do not make the story up; call family members only
+  by the narrator's words; keep the skeleton letter for letter; mark the narrator's own lines with `~ `; answer in one
+  code block. The answer is opened as a pasted script. The prompt holds no family names or photos and says none are needed.
