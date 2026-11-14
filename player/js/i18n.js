@@ -198,7 +198,9 @@ const S = {
   zipOpening: (got, all) => [`Opening the zip… ${(got / 1e6).toFixed(1)} / ${(all / 1e6).toFixed(1)} MB`, `zip を開いています… ${(got / 1e6).toFixed(1)} / ${(all / 1e6).toFixed(1)} MB`],
   pasteScript: ['Paste a script', '台本を貼る'],
   pasteOpen: ['Open', '開く'],
-  scriptNotVariant: ['This script is not written on a sample of this site (it has no “Based on” line, and no sample has the same pictures and sounds). To open your own work, choose its folder.', 'この台本は、このサイトの見本を元にしたものではありません（「Based on」の行が無く、絵と音が同じ見本もありません）。自分の作品は、作品フォルダを選んで開いてください。'],
+  scriptNotVariant: ['This script is not written on a sample of this site (it has no “Based on” line, and no sample has the same pictures and sounds). “Open a script or a zip” and “Paste a script” open only scripts written on a sample, and zips.', 'この台本は、このサイトの見本を元にしたものではありません（「Based on」の行が無く、絵と音が同じ見本もありません）。「台本・zip のファイルを開く」と「台本を貼る」で開けるのは、見本を元にした台本と zip だけです。'],
+  scriptOwnFolder: ['To open your own work, choose its work folder (the folder with work.json), not the script. This button is the same as “Choose the work folder” above.', '自分の作品は、台本ではなく作品フォルダ（work.json のあるフォルダ）を選んで開きます。このボタンは、上の「作品フォルダを選ぶ」と同じです。'],
+  scriptOwnZip: ['To open your own work on this device, which cannot choose folders, put the whole work folder (with work.json) into a zip and open the zip with “Open a script or a zip”.', 'この端末はフォルダを選べないので、自分の作品は、作品フォルダ（work.json のあるフォルダ）を丸ごと zip にして、「台本・zip のファイルを開く」で開いてください。'],
   scriptErrors: ['This script cannot be read:', 'この台本は読めません:'],
   // 見本を元に書いた台本（段4a。work-format §6「A script written from a sample」）
   madeSkeleton: ['This script cannot be opened with the sample’s pictures and sounds. Keep these as they are in the sample:', 'この台本は、見本の絵と音では開けません。次の所を見本のままにしてください:'],

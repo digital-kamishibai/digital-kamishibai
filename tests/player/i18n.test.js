@@ -35,3 +35,15 @@ test('リンクの動画の言葉: 流せない理由はどれも英日がそろ
   for (const key of ['chipLinkNo', 'linkPrepNo', 'linkStall']) assert.ok(pair(key)[0] && pair(key)[1], key);
   for (const key of ['linkPeersNo', 'linkPeerNo', 'linkCannot', 'linkName']) assert.ok(pair(key, 'x')[0] && pair(key, 'x')[1], key);
 });
+
+test('見本を元にしていない台本の案内: どのボタンで開けるか・自分の作品はどのボタンかを、英日とも名指しする', () => {
+  const [en, ja] = pair('scriptNotVariant');
+  assert.match(en, /Open a script or a zip/);
+  assert.match(ja, /「台本・zip のファイルを開く」と「台本を貼る」/);
+  assert.equal(pair('openScript')[1], '台本・zip のファイルを開く');   // 案内の名指しとボタンの名前がずれない
+  const folder = pair('scriptOwnFolder');
+  assert.ok(folder[0].includes(`“${pair('pickWork')[0]}”`) && folder[1].includes(`「${pair('pickWork')[1]}」`));
+  const zip = pair('scriptOwnZip');
+  assert.ok(zip[0].includes(`“${pair('openScript')[0]}”`) && zip[1].includes(`「${pair('openScript')[1]}」`));
+  assert.match(zip[1], /zip/);
+});
