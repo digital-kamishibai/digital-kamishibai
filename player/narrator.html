@@ -54,6 +54,11 @@
     </div>
     <div id="sampleNote" class="card" hidden></div>
     <div id="loadError" class="card error" hidden></div>
+    <!-- 見本を元にしていない台本を開いたとき、案内の箱の中へ移して出す（作品フォルダを選ぶボタンとの違いが分からず止まった。実機で）。
+         押すと、その場でフォルダを選ぶ窓。フォルダを選べない端末では出さず、zip で開くよう案内する -->
+    <label id="pickWorkHereLabel" class="file" hidden><span data-i18n="pickWork">Choose the work folder</span>
+      <input id="pickWorkHere" type="file" webkitdirectory multiple>
+    </label>
     <div id="missing" class="card error" hidden></div>
     <div id="videoWarn" class="card error" hidden></div>
     <div id="linkWarn" class="card error" hidden></div>

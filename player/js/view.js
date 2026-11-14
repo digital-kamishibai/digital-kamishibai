@@ -111,6 +111,12 @@ export function mustStopFor(next, playingId) {
   return !!playingId && (!next || next.id !== playingId);
 }
 
+/** その場で作品フォルダを選ばせてよいか。showDirectoryPicker があれば選べる。無ければ <input webkitdirectory> だが、
+ *  iPad・iPhone・Android ではフォルダを選べない（作品を zip にして「台本・zip のファイルを開く」で開く） */
+export function canPickFolder({ picker, kind }) {
+  return !!picker || !/iPhone|iPad|Android/.test(String(kind || ''));
+}
+
 /** 切り替えのボタンに出す短い名前（パスとファイルの種類を落とす）。長いものは切る */
 export function videoName(key, max = 28) {
   const base = String(key || '').split('/').pop().replace(/\.[^.]+$/, '');

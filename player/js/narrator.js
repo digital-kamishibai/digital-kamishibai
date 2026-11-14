@@ -8,7 +8,7 @@ import {
   mayOpenBulk, onHave, onVideoFail, playVideo, onSync,
   knownToken, staleTwins, startShow, slideAudio, videoAudio, videoEndAudio, talkMessage, audioTick, setVolume, onView, onHeard, onLink, setRecording,
 } from './protocol.js';
-import { chipState, nextScreen, bannerFor, videosOn, pickVideo, mustStopFor, videoName, clampSplit, splitAt, SPLIT_DEFAULT, SPLIT_MIN, SPLIT_MAX, SPLIT_STEP, clampNotesSize, NOTES_DEFAULT, NOTES_STEP } from './view.js';
+import { chipState, nextScreen, bannerFor, videosOn, pickVideo, mustStopFor, videoName, clampSplit, splitAt, SPLIT_DEFAULT, SPLIT_MIN, SPLIT_MAX, SPLIT_STEP, clampNotesSize, NOTES_DEFAULT, NOTES_STEP, canPickFolder } from './view.js';
 import { createVoice, heardFrom, routes, voiceMessages, rollOrder, judgeRollCall } from './voice.js';
 import { createMixer } from './mixer.js';
 import { createRecorder } from './recorder.js';
@@ -28,7 +28,7 @@ import {
   editOf, applyEdit, moveBy, resizeBy, nudge, resize, toIn, fromIn, sheetValues, KEYS as LAYOUT_KEYS, workPalette, meanLuma, contrast,
 } from './layout.js';
 import { boxElement } from './overlay-dom.js';
-import { openRoom, keepSignaling, keepAwake, iceState, iceLine, relayOffered, relayPaused, routeState } from './net.js';
+import { openRoom, keepSignaling, keepAwake, iceState, iceLine, relayOffered, relayPaused, routeState, deviceKind } from './net.js';
 import { whyBlocked, isAndroid, relayNote } from './ice.js';
 import qrcode from '../vendor/qrcode.mjs';
 import { LinkPlayer, loadApi, MIN_VOLUME_DB } from './ytlink.js';
@@ -179,6 +179,7 @@ async function readWorkFolder(entries, dir) {
 }
 
 pickFolder($('pickWork'), (entries, dir) => openEntries(entries, dir));
+pickFolder($('pickWorkHere'), (entries, dir) => openEntries(entries, dir));   // 見本を元にしていない台本の案内の中のボタン
 
 /** 選んだファイル群（作品フォルダ、または zip の中身）から作品を開く */
 async function openEntries(entries, dir) {
@@ -607,9 +608,21 @@ async function openScriptText(text) {
   if (p.none && p.nearest) {
     return showLoadError([t('madeNearest', p.nearest.entry.title), ...p.nearest.diffs.map((d) => t('madeDiff_' + d.what, d.slide ?? d.sample, d.script))]);
   }
-  if (p.none) return showLoadError([t('scriptNotVariant')]);
+  if (p.none) return showNotVariant();
   if (p.many) return showLoadError([t('madeMany', p.many.map((e) => e.title))]);
   await openSample({ slug: p.entry.slug, lang: p.entry.lang, version: p.entry.version, script: text, matched: true });
+}
+
+/** 見本を元にしていない台本: 自分の作品なら作品フォルダから開く。どのボタンかを名指しし、案内の中にも同じボタンを置く。
+ *  台本のファイルを選んで止まり、案内を読んでも「作品フォルダを選ぶ」へたどり着けなかった（実機で）。
+ *  フォルダを選べない端末（iPad など）には、作品を zip にして開くよう言う */
+function showNotVariant() {
+  if (!canPickFolder({ picker: typeof window.showDirectoryPicker === 'function', kind: deviceKind() })) {
+    return showLoadError([t('scriptNotVariant'), t('scriptOwnZip')]);
+  }
+  const label = $('pickWorkHereLabel');
+  label.hidden = false;
+  showLoadError([t('scriptNotVariant'), t('scriptOwnFolder')], label);
 }
 
 $('openScript').addEventListener('change', async (e) => {
@@ -827,11 +840,12 @@ async function resolve(opts = {}) {
   renderRec();
 }
 
-function showLoadError(lines) {
+/** extra: 理由の下に置く要素（ボタンなど）。箱へ移して出す——次に理由を出すときに箱から外れる */
+function showLoadError(lines, extra = null) {
   const para = () => lines.map((l) => { const p = document.createElement('p'); p.textContent = l; return p; });
   const box = $('loadError');
   box.hidden = false;
-  box.replaceChildren(...para());
+  box.replaceChildren(...para(), ...(extra ? [extra] : []));
   // AI と台本を書く箱から開いたときは、上演の画面に居るので、箱の中にも理由を出す
   if (!$('composePane').hidden) { $('composeErr').hidden = false; $('composeErr').replaceChildren(...para()); }
 }

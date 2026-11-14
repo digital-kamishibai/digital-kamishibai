@@ -4,6 +4,7 @@
  知らせが出る → ファイルに保存（保存の窓は差し替え）した中身が Based on・Changed 付きの script.md → 開き直しても残っている →
  2枚目には欄が無い（黄色い所の無い枚）→ 玄関のカードに「変えた版で開く」→ variant=1 が無ければ見本のまま →
  このブラウザから消しても、保存した台本を貼る・ファイルで開くと変えた版で開く → 合図を変えた台本は開かない →
+ 見本から作っていない台本は、案内の中の「作品フォルダを選ぶ」で作品を開ける（iPad では zip の案内）→
  全部を見本に戻すと元の語り → zip を開く（作品の zip は作品として・台本だけの zip は変えた版として）→
  AI に相談（段3）: 穴1のプロンプト（かかる枚・問いを先に）→ 答えを貼ると、開いていない枚の語りまで替わる。ページに例外が無いこと。
  DK_E2E_BASE を置くと、その箱で確かめる。"""
@@ -174,6 +175,39 @@ try:
     nar.evaluate("document.getElementById('pasteScriptBtn').click(); document.getElementById('pasteText').value = "
                  + json.dumps('# Mine\n\n## [Slide 1] A\n\nhello\n') + "; document.getElementById('pasteOpen').click(); true")
     ok('見本から作っていない台本は、理由を出す', wait(nar, "!document.getElementById('loadError').hidden && document.getElementById('loadError').textContent.includes('Based on')", 'not variant'))
+    # 自分の作品の台本を選んで止まり、案内を読んでも「作品フォルダを選ぶ」へたどり着けなかった（実機で）: 案内の中に同じボタンを置く
+    ok('案内の中に「作品フォルダを選ぶ」ボタン（上のボタンと同じと名指し）',
+       nar.evaluate("(() => { const l = document.getElementById('pickWorkHereLabel'), box = document.getElementById('loadError'); "
+                    "return !l.hidden && box.contains(l) && l.textContent.includes('作品フォルダを選ぶ') "
+                    "&& box.textContent.includes('上の「作品フォルダを選ぶ」と同じ'); })()"))
+    if base.startswith('http://localhost'):
+        # フォルダを選ぶ窓は押せないので、選んだあとの input の change を差し替えて渡す（作品は見本の版のフォルダ）
+        src = ROOT / 'player' / 'samples' / 'six-friends-smoothie' / 'ja'
+        src = sorted(src.iterdir(), key=lambda p: int(p.name))[-1]
+        files = [{'url': '/' + f.relative_to(ROOT / 'player').as_posix(), 'rel': 'my-work/' + f.relative_to(src).as_posix()}
+                 for f in sorted(src.rglob('*')) if f.is_file() and f.name not in ('script.md', 'version.json')]
+        nar.evaluate(f"""(async (files) => {{
+          const list = [];
+          for (const f of files) {{
+            const file = new File([await (await fetch(f.url)).blob()], f.rel.split('/').pop());
+            Object.defineProperty(file, 'webkitRelativePath', {{ value: f.rel }});
+            list.push(file);
+          }}
+          const input = document.getElementById('pickWorkHere');
+          Object.defineProperty(input, 'files', {{ value: list, configurable: true }});
+          input.dispatchEvent(new Event('change'));
+        }})({json.dumps(files)}); true""")
+        ok('案内の中のボタンで選んだ作品フォルダが開く（理由の箱は消える）',
+           wait(nar, "document.getElementById('workTitle').textContent.length > 0 && __dk.screen() !== 'prep'", 'pick here', 1200)
+           and nar.evaluate("document.getElementById('loadError').hidden && __dk.site() === null"),
+           nar.evaluate("document.getElementById('loadError').textContent"))
+    open_prep(nar)
+    # フォルダを選べない端末（iPad）: ボタンは出さず、作品フォルダを zip にして開くよう言う
+    nar.evaluate("Object.defineProperty(navigator, 'userAgent', { get: () => 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15' }); "
+                 "window.showDirectoryPicker = undefined; document.getElementById('pasteScriptBtn').click(); document.getElementById('pasteText').value = "
+                 + json.dumps('# Mine\n\n## [Slide 1] A\n\nhello\n') + "; document.getElementById('pasteOpen').click(); true")
+    ok('iPad では、ボタンの代わりに zip で開く案内', wait(nar, "!document.getElementById('loadError').hidden && document.getElementById('loadError').textContent.includes('丸ごと zip にして')", 'ipad')
+       and nar.evaluate("!document.getElementById('loadError').contains(document.getElementById('pickWorkHereLabel'))"))
 
     print('5. 全部を見本に戻す')
     ok('variant=1 で開き直した', open_sample(nar, '&variant=1') and has_mine(nar))

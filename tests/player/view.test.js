@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { makeView, viewChanged, cleanView, chipState, nextScreen, bannerFor, videosOn, pickVideo, mustStopFor, videoName, clampSplit, splitAt, SPLIT_DEFAULT, SPLIT_MIN, SPLIT_MAX, clampNotesSize, NOTES_DEFAULT, NOTES_MIN, NOTES_MAX } from '../../player/js/view.js';
+import { makeView, viewChanged, cleanView, chipState, nextScreen, bannerFor, videosOn, pickVideo, mustStopFor, videoName, clampSplit, splitAt, SPLIT_DEFAULT, SPLIT_MIN, SPLIT_MAX, clampNotesSize, NOTES_DEFAULT, NOTES_MIN, NOTES_MAX, canPickFolder } from '../../player/js/view.js';
 import { resolveVideos, validateWork } from '../../player/js/work.js';
 import { createSession, onHello, approve, reject, onView, knownToken } from '../../player/js/protocol.js';
 
@@ -244,4 +244,13 @@ test('台本の字の大きさは 1〜2.6rem に収め、数でなければ既�
   assert.equal(clampNotesSize(0.4), NOTES_MIN);
   assert.equal(clampNotesSize(9), NOTES_MAX);
   for (const bad of [null, undefined, '', 'abc', NaN, Infinity]) assert.equal(clampNotesSize(bad), NOTES_DEFAULT, String(bad));
+});
+
+test('その場で作品フォルダを選ばせるか: フォルダを選ぶ窓があれば選べる。無ければ PC だけ（iPad・iPhone・Android は zip で開く）', () => {
+  assert.equal(canPickFolder({ picker: true, kind: 'Windows PC' }), true);
+  assert.equal(canPickFolder({ picker: false, kind: 'Mac' }), true);        // Firefox・Safari の PC は <input webkitdirectory>
+  assert.equal(canPickFolder({ picker: false, kind: 'iPad' }), false);
+  assert.equal(canPickFolder({ picker: false, kind: 'iPhone' }), false);
+  assert.equal(canPickFolder({ picker: false, kind: 'Android tablet' }), false);
+  assert.equal(canPickFolder({ picker: true, kind: 'Android tablet' }), true);
 });
