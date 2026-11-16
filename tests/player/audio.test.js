@@ -1,6 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
-import { bgmAt, soundsAt, createAudio, start, retune, cutForVideo, afterVideo, astate, bgmPosition, talkStep, TALK_ON_MS, TALK_OFF_MS } from '../../player/js/audio.js';
+import { bgmAt, soundsAt, createAudio, start, retune, cutForVideo, afterVideo, astate, bgmPosition, talkStep, TALK_ON_MS, TALK_OFF_MS, showPhase, pause, resume, soundMessages } from '../../player/js/audio.js';
 
 // 実際の作品の書き出しと同じ並び（BGM は S1・S3・S5、停止は S7）
 const w = {
@@ -151,4 +151,44 @@ test('[BGM after video] の枚を離れて戻ったら、また動画を待つ',
   assert.equal(st.id, 'B1');
   st = retune(st, wa, 2, idOf, 3000);
   assert.equal(st.id, null);
+});
+
+// ---------- 一時停止・再開（plans/show-pause.md） ----------
+
+test('開演前 → 上演中 → 一時停止 → 再開。止めているあいだは位置が進まず、再開でその位置から', () => {
+  let st = createAudio();
+  assert.equal(showPhase(st), 'before');
+  assert.equal(pause(st, 0), st, '開演前は止めない');
+  st = start(st, w, 5, idOf, 0);
+  assert.equal(showPhase(st), 'playing');
+  assert.equal(resume(st, 1000), st, '止めていなければ何もしない');
+  st = pause(st, 10000);
+  assert.equal(showPhase(st), 'paused');
+  assert.deepEqual(astate(st, 10000), { t: 'astate', id: 'B5', loop: true, playing: false, pos: 10 });
+  assert.equal(astate(st, 99000).pos, 10, '止めているあいだは進まない');
+  assert.equal(pause(st, 20000), st, '2回押しても位置は変わらない');
+  st = resume(st, 60000);
+  assert.equal(showPhase(st), 'playing');
+  assert.deepEqual(astate(st, 63000), { t: 'astate', id: 'B5', loop: true, playing: true, pos: 13 });
+});
+
+test('一時停止中に枚を動かしても鳴らさない: 同じ曲なら止めた位置、別の曲なら頭で待ち、再開で鳴る', () => {
+  let st = pause(start(createAudio(), w, 1, idOf, 0), 4000);
+  st = retune(st, w, 2, idOf, 5000);                    // 同じ曲の続く枚
+  assert.deepEqual(astate(st, 5000), { t: 'astate', id: 'B1', loop: false, playing: false, pos: 4 });
+  st = retune(st, w, 3, idOf, 6000);                    // 別の曲
+  assert.deepEqual(astate(st, 9000), { t: 'astate', id: 'B3', loop: false, playing: false, pos: 0 });
+  assert.equal(showPhase(st), 'paused');
+  st = resume(st, 10000);
+  assert.deepEqual(astate(st, 12000), { t: 'astate', id: 'B3', loop: false, playing: true, pos: 2 });
+  st = pause(st, 13000);
+  st = retune(st, w, 7, idOf, 14000);                   // [BGM stop] の枚
+  st = resume(st, 15000);
+  assert.deepEqual(astate(st, 15000), { t: 'astate', id: null, loop: false, playing: false, pos: 0 }, '止める合図の枚なら、再開しても鳴らない');
+});
+
+test('一時停止中は効果音を出さない', () => {
+  const st = start(createAudio(), w, 6, idOf, 0);
+  assert.deepEqual(soundMessages(st, w, 6, idOf), [{ t: 'sound', id: 'S6' }, { t: 'sound', id: 'S6B' }]);
+  assert.deepEqual(soundMessages(pause(st, 1000), w, 6, idOf), []);
 });

@@ -69,10 +69,32 @@ export function soundsAt(work, n) {
 }
 
 /** 語り手の側の状態。started＝開演を押したか（押すまでは鳴らさない＝P1）。
- *  cut＝動画を流し始めて止めた曲（{ file, from }）。次の [BGM] の合図まで鳴らし直さない */
+ *  cut＝動画を流し始めて止めた曲（{ file, from }）。次の [BGM] の合図まで鳴らし直さない。
+ *  paused＝語り手が上演を一時停止している（plans/show-pause.md）。止めているあいだに決め直した曲は鳴らさずに覚えておく */
 export function createAudio() {
-  return { started: false, id: null, loop: true, from: 0, playing: false, pos: 0, at: 0, cut: null };
+  return { started: false, paused: false, id: null, loop: true, from: 0, playing: false, pos: 0, at: 0, cut: null };
 }
+
+/** 開演の前・上演中・一時停止中（開演のボタンの文言と「最初から」を出すかの土台） */
+export function showPhase(st) {
+  if (!st.started) return 'before';
+  return st.paused ? 'paused' : 'playing';
+}
+
+/** 上演を一時停止する: 曲をいまの位置で止める。開演前・止めているときはそのまま */
+export function pause(st, now) {
+  if (!st.started || st.paused) return st;
+  return { ...st, paused: true, playing: false, pos: positionAt(st, now), at: now };
+}
+
+/** 一時停止を解く: 止めた位置から（止めているあいだに別の曲へ決め直していれば、その曲の頭から） */
+export function resume(st, now) {
+  if (!st.started || !st.paused) return st;
+  return { ...st, paused: false, playing: st.id !== null, at: now };
+}
+
+/** 新しく鳴らし始める曲。一時停止中は鳴らさずに頭で待たせる（再開で鳴る） */
+const begin = (st, id, loop, from, now) => ({ ...st, id, loop, from, playing: !st.paused, pos: 0, at: now, cut: null });
 
 const silent = (st, now, cut) => ({ ...st, id: null, playing: false, pos: 0, at: now, from: 0, cut });
 const sameSong = (a, b) => !!a && !!b && a.file === b.file && a.from === b.from;
@@ -91,7 +113,7 @@ export function retune(st, work, n, idOf, now) {
   //  鳴らし始めたあとは上の「同じ曲」で続く——だから枚を離れて戻れば、また動画を待つ
   if (want && want.after && want.from === n) return st.id === null && !st.cut ? st : silent(st, now, cut);
   if (!id) return st.id === null && !st.cut ? st : silent(st, now, cut);
-  return { ...st, id, loop: want.loop, from: want.from, playing: true, pos: 0, at: now, cut };
+  return begin(st, id, want.loop, want.from, now);
 }
 
 /** 枚 n で動画を流し始めた: BGM を止め（聞き手の端末はフェードアウト）、その曲を動画のあとに鳴らし直さない。
@@ -111,7 +133,7 @@ export function afterVideo(st, work, n, idOf, now) {
   if (!want || !want.after || want.from !== n) return st;
   const id = idOf(want.file);
   if (!id || (st.id === id && st.from === n)) return st;
-  return { ...st, id, loop: want.loop, from: n, playing: true, pos: 0, at: now, cut: null };
+  return begin(st, id, want.loop, n, now);
 }
 
 /** 開演（P1）。押した時点の枚から鳴らし始める */
@@ -124,9 +146,9 @@ export function astate(st, now) {
   return { t: 'astate', id: st.started ? st.id : null, loop: st.loop, playing: st.playing, pos: st.started ? positionAt(st, now) : 0 };
 }
 
-/** 枚に入ったときの効果音の合図（開演前は鳴らさない） */
+/** 枚に入ったときの効果音の合図（開演前・一時停止中は鳴らさない） */
 export function soundMessages(st, work, n, idOf) {
-  if (!st.started) return [];
+  if (!st.started || st.paused) return [];
   return soundsAt(work, n).map((f) => idOf(f)).filter(Boolean).map((id) => ({ t: 'sound', id }));
 }
 

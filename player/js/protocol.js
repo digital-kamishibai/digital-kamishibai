@@ -4,7 +4,7 @@
 
 import { planTransfers } from './transfer.js';
 import { createPlayback, command, vstate } from './playback.js';
-import { createAudio, start, retune, cutForVideo, afterVideo, astate, soundMessages } from './audio.js';
+import { createAudio, start, retune, cutForVideo, afterVideo, astate, soundMessages, pause as pauseAudio, resume as resumeAudio } from './audio.js';
 import { cleanView } from './view.js';
 import { resolveLinks } from './work.js';
 import { safeGain } from './loudness.js';
@@ -195,6 +195,25 @@ export function startShow(s, work, idOf, now) {
   if (s.audio.started) return [];
   s.audio = start(s.audio, work, s.slide, idOf, now);
   return toApproved(s, [astate(s.audio, now), ...soundMessages(s.audio, work, s.slide, idOf)]);
+}
+
+/** 上演を一時停止する・再開する（plans/show-pause.md）。BGM の合図だけを送る（動画は語り手の再生口の pause／play から合図が出る） */
+export function pauseShow(s, now) {
+  const before = s.audio;
+  s.audio = pauseAudio(s.audio, now);
+  return s.audio === before ? [] : toApproved(s, [astate(s.audio, now)]);
+}
+
+export function resumeShow(s, now) {
+  const before = s.audio;
+  s.audio = resumeAudio(s.audio, now);
+  return s.audio === before ? [] : toApproved(s, [astate(s.audio, now)]);
+}
+
+/** 最初から: 聞き手はつないだまま、開演の前の1枚目へ戻す（全員の音を止める）。もう一度開演を押せば表紙の曲が頭から鳴る */
+export function resetShow(s, now) {
+  s.audio = createAudio();
+  return [...toApproved(s, [astate(s.audio, now)]), ...goTo(s, 1, 1)];
 }
 
 /** 枚を動かしたあとに呼ぶ: BGM を決め直し（変わったときだけ合図）、その枚の効果音を鳴らす（P3） */

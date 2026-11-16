@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import {
-  MIMES, pickMime, recordName, fitRect, stageSource, createClock, clockStart, clockSlide, clockRead, isPractice, recordable,
+  MIMES, pickMime, recordName, fitRect, stageSource, createClock, clockStart, clockSlide, clockRead, clockPause, clockResume, isPractice, recordable,
 } from '../../player/js/record.js';
 import { createSession, onHello, approve, reject, setRecording, goTo } from '../../player/js/protocol.js';
 
@@ -136,4 +136,21 @@ test('枚を動かしても録画中の状態は変わらない', () => {
   setRecording(s, true);
   goTo(s, 2, 3);
   assert.equal(s.recording, true);
+});
+
+// ---------- 経過時間の一時停止（plans/show-pause.md） ----------
+
+test('一時停止中は経過時間が進まず、再開でその続きから。止めているあいだに枚を動かしたら、この枚は 0 から', () => {
+  let c = clockStart(createClock(), 0);
+  assert.equal(clockPause(createClock(), 5000).pausedAt, null, '開演前は止めない');
+  c = clockSlide(c, 10000);
+  c = clockPause(c, 30000);
+  assert.deepEqual(clockRead(c, 90000), { total: 30, slide: 20 });
+  c = clockResume(c, 100000);
+  assert.deepEqual(clockRead(c, 105000), { total: 35, slide: 25 });
+  c = clockPause(c, 110000);
+  c = clockSlide(c, 120000);
+  assert.deepEqual(clockRead(c, 130000), { total: 40, slide: 0 });
+  c = clockResume(c, 200000);
+  assert.deepEqual(clockRead(c, 203000), { total: 43, slide: 3 });
 });

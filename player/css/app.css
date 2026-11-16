@@ -167,6 +167,7 @@ textarea.paste { width: 100%; box-sizing: border-box; font: inherit; }
 .vary-field textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 1.2rem; line-height: 1.6; padding: 8px 10px; background: var(--hole-bg); color: var(--fg); resize: vertical; }
 .script .row .grow { flex: 1; }
 .clock { color: var(--muted); font-variant-numeric: tabular-nums; font-size: .95rem; }
+button.restart { font-size: 0.85em; padding: 4px 10px; }   /* 一時停止中だけ出る「最初から」。押し間違えにくいよう小さく */
 .toolbar button.rec { background: var(--warn-bg); border-color: var(--ng); color: var(--ng); }
 .recinfo { color: var(--ng); font-variant-numeric: tabular-nums; font-size: .95rem; white-space: nowrap; }
 p.rec-note { margin: 6px 0 0; }

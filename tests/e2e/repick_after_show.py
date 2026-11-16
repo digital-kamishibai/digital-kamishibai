@@ -1,7 +1,7 @@
 """開演したあとに作品フォルダを選び直すと、開演の前に戻ることを確かめる（1台。Edge・ffmpeg が要る）:
     python tests/e2e/repick_after_show.py [作業フォルダ]
  見本の写しを2つ（1枚目の BGM が違う）作る → 1つ目を選んで練習で開演（本物のクリック）→
- 「作品を読み直す」のあとも「上演中」のまま BGM が鳴り続ける →
+ 「作品を読み直す」のあとも上演中（ボタンは「一時停止」）のまま BGM が鳴り続ける →
  準備の画面で2つ目を選び直す → 開演のボタンが押せる・BGM が止まる・時計が消える →
  もう一度開演すると、2つ目の1枚目の曲が鳴る。
  ⚠️ 開演は本物のクリックで押す（JS の click() では engine.unlock() の resume が終わらず、開演まで進まない）。
@@ -94,7 +94,7 @@ PICK = """(async (id, files) => {
 })"""
 TRAP = ("window.__errs = []; addEventListener('error', (e) => __errs.push(e.message)); "
         "addEventListener('unhandledrejection', (e) => __errs.push(String(e.reason))); true")
-BUTTONS = "[...['startShow', 'startShowBar']].map((id) => { const b = document.getElementById(id); return { disabled: b.disabled, text: b.textContent }; })"
+BUTTONS = "[...['startShow', 'startShowBar']].map((id) => { const b = document.getElementById(id); return { disabled: b.disabled, text: b.textContent, phase: b.dataset.phase }; })"
 
 
 def wait(b, js, what, tries=400, step=0.05):
@@ -139,13 +139,13 @@ try:
     ok('開演すると1つ目の1枚目の曲が鳴る', wait(nar, f"__dk.audio().playing && __dk.audio().bgm === {json.dumps(idA)}", 'bgm A'),
        json.dumps(nar.evaluate("__dk.audio()")))
     started = nar.evaluate(BUTTONS)
-    ok('開演のボタンは両方とも「上演中」で押せない', all(b['disabled'] and b['text'] != before for b in started), json.dumps(started, ensure_ascii=False))
+    ok('開演のボタンは両方とも「一時停止」になる（plans/show-pause.md）', all(b['phase'] == 'playing' and not b['disabled'] and b['text'] != before for b in started), json.dumps(started, ensure_ascii=False))
     ok('上演の時計が進む', wait(nar, "document.getElementById('clock').textContent.length > 0", 'clock'))
 
     # ---------- 作品を読み直す（E10）: 開演を続ける ----------
     nar.evaluate(f"{PICK}('reloadWork', {json.dumps(FILES_A)})")
     time.sleep(1.5)
-    ok('読み直したあとも「上演中」のまま', nar.evaluate(BUTTONS) == started, json.dumps(nar.evaluate(BUTTONS), ensure_ascii=False))
+    ok('読み直したあとも上演中（「一時停止」）のまま', nar.evaluate(BUTTONS) == started, json.dumps(nar.evaluate(BUTTONS), ensure_ascii=False))
     ok('読み直したあとも開演済みで、曲が鳴り続ける',
        nar.evaluate("__dk.session().audio.started") and wait(nar, f"__dk.audio().playing && __dk.audio().bgm === {json.dumps(idA)}", 'bgm A again'),
        json.dumps(nar.evaluate("__dk.audio()")))
@@ -169,7 +169,7 @@ try:
     idB = nar.evaluate("__dk.audioId('sounds/second.mp3')")
     ok('もう一度開演すると2つ目の1枚目の曲が鳴る', wait(nar, f"__dk.audio().playing && __dk.audio().bgm === {json.dumps(idB)}", 'bgm B'),
        json.dumps(nar.evaluate("__dk.audio()")))
-    ok('もう一度「上演中」になる', all(b['disabled'] for b in nar.evaluate(BUTTONS)))
+    ok('もう一度上演中（「一時停止」）になる', all(b['phase'] == 'playing' for b in nar.evaluate(BUTTONS)))
     ok('時計がまた進む', wait(nar, "document.getElementById('clock').textContent.length > 0", 'clock again'))
     ok('ページに例外が0件', nar.evaluate("window.__errs.length") == 0, json.dumps(nar.evaluate("window.__errs")))
 finally:

@@ -112,6 +112,8 @@
         <p id="rollResult" class="roll"></p>
         <div class="row" style="margin-top: 16px">
           <button id="startShow" class="primary" data-i18n="startShow">Start the show (music and sounds)</button>
+          <!-- 一時停止中だけ出す（上演中の押し間違いでやり直しにならないように。plans/show-pause.md） -->
+          <button id="restartShow" class="restart" data-i18n="restartShow" data-i18n-title="restartShowHint" hidden>Start over</button>
           <button data-goto="show" data-i18n="toShow">Go to the show screen</button>
         </div>
         <div id="waitCard" hidden>
@@ -156,6 +158,7 @@
     <!-- 上の帯（U9）: 準備・設定・ときどき開くもの。上演中に押し続ける「次へ」から離す -->
     <div class="toolbar">
       <button id="startShowBar" class="start" data-i18n="startShow">Start the show (music and sounds)</button>
+      <button id="restartShowBar" class="start restart" data-i18n="restartShow" data-i18n-title="restartShowHint" hidden>Start over</button>
       <!-- 録画（G5）。受付を開いていなくても使える。録るのは聞き手の画面と音だけ（台本は録らない） -->
       <button id="recBtn" class="start" data-i18n="recStart">Record</button>
       <span id="recInfo" class="recinfo" hidden></span>

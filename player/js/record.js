@@ -57,8 +57,22 @@ export function stageSource(st) {
 
 // ---------- 経過時間（P3。本番でも出す） ----------
 
-/** 時計。開演を押したときに全体が、枚を動かしたときに「この枚」が始まる。開演前は両方とも出さない */
-export const createClock = () => ({ startedAt: null, slideAt: null });
+/** 時計。開演を押したときに全体が、枚を動かしたときに「この枚」が始まる。開演前は両方とも出さない。
+ *  pausedAt＝一時停止した時刻（止めているあいだは進まない。plans/show-pause.md） */
+export const createClock = () => ({ startedAt: null, slideAt: null, pausedAt: null });
+
+/** 一時停止: その時刻で読みを止める */
+export function clockPause(c, now) {
+  if (c.startedAt == null || c.pausedAt != null) return c;
+  return { ...c, pausedAt: now };
+}
+
+/** 再開: 止めていた長さだけ始まりをずらす（止めた時点の続きから進む） */
+export function clockResume(c, now) {
+  if (c.startedAt == null || c.pausedAt == null) return c;
+  const d = Math.max(0, now - c.pausedAt);
+  return { startedAt: c.startedAt + d, slideAt: c.slideAt + d, pausedAt: null };
+}
 
 export function clockStart(c, now) {
   if (c.startedAt != null) return c;
@@ -67,12 +81,13 @@ export function clockStart(c, now) {
 
 export function clockSlide(c, now) {
   if (c.startedAt == null) return c;
-  return { ...c, slideAt: now };
+  return { ...c, slideAt: c.pausedAt != null ? c.pausedAt : now }; // 一時停止中に動かしたら、この枚は 0 のまま再開を待つ
 }
 
 /** 秒で返す（開演前は null） */
 export function clockRead(c, now) {
   if (c.startedAt == null) return { total: null, slide: null };
+  if (c.pausedAt != null) now = c.pausedAt;
   return { total: Math.max(0, (now - c.startedAt) / 1000), slide: Math.max(0, (now - c.slideAt) / 1000) };
 }
 

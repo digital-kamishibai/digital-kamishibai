@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   createSession, onHello, approve, reject, goTo, onGot, wouldExceed, welcomeMessage,
   mayOpenBulk, onHave, onVideoFail, playVideo, onSync,
-  knownToken, staleTwins, startShow, slideAudio, videoAudio, talkMessage, audioTick, setVolume, onLink,
+  knownToken, staleTwins, startShow, slideAudio, videoAudio, talkMessage, audioTick, setVolume, onLink, pauseShow, resumeShow, resetShow,
 } from '../../player/js/protocol.js';
 
 const work = {
@@ -406,4 +406,35 @@ test('welcome: 変えた語りの作品でも notes を送らない', async () =
   assert.ok(w.slides[0].notes.includes('MY OWN SECRET STORY'));
   const out = welcomeMessage(w, new Map([[1, { mime: 'image/jpeg', size: 1 }]]));
   assert.ok(!everything(out).includes('SECRET'));
+});
+
+// ---------- 一時停止・再開・最初から（plans/show-pause.md） ----------
+
+test('一時停止・再開は BGM の合図だけを承認済みの端末へ送る。最初からは聞き手をつないだまま開演前の1枚目・無音へ戻す', () => {
+  const s = createSession(2);
+  onHello(s, 'a', {});
+  onHello(s, 'b', {});
+  approve(s, 'a', audioWork, pictures, []);
+  assert.deepEqual(pauseShow(s, 0), [], '開演前は送らない');
+  startShow(s, audioWork, idOf, 0);
+  goTo(s, 2, 3);
+  slideAudio(s, audioWork, idOf, 1000);
+  const p = pauseShow(s, 3000);
+  assert.deepEqual(p, [{ to: 'a', msg: { t: 'astate', id: 'A', loop: false, playing: false, pos: 3 } }]);
+  assert.deepEqual(pauseShow(s, 4000), [], '2回目は送らない');
+  assert.deepEqual(slideAudio(s, audioWork, idOf, 5000).map((o) => o.msg), [], '止めているあいだの枚送りは、曲も効果音も鳴らさない（同じ曲）');
+  assert.deepEqual(resumeShow(s, 9000).map((o) => o.msg), [{ t: 'astate', id: 'A', loop: false, playing: true, pos: 3 }]);
+  pauseShow(s, 10000);
+  const r = resetShow(s, 11000);
+  assert.deepEqual(r, [
+    { to: 'a', msg: { t: 'astate', id: null, loop: true, playing: false, pos: 0 } },
+    { to: 'a', msg: { t: 'slide', n: 1 } },
+  ]);
+  assert.equal(s.slide, 1);
+  assert.equal(s.peers.get('a').status, 'approved', 'つないだまま');
+  assert.deepEqual(slideAudio(s, audioWork, idOf, 12000), [], '開演前に戻ったので鳴らさない');
+  assert.deepEqual(startShow(s, audioWork, idOf, 20000).map((o) => o.msg), [
+    { t: 'astate', id: 'A', loop: false, playing: true, pos: 0 },
+    { t: 'sound', id: 'S' },
+  ], 'もう一度開演すれば、表紙の曲が頭から');
 });

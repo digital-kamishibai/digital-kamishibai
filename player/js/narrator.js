@@ -7,16 +7,17 @@ import {
   createSession, onHello, approve, reject, onGot, onGone, goTo, approvedCount, wouldExceed,
   mayOpenBulk, onHave, onVideoFail, playVideo, onSync,
   knownToken, staleTwins, startShow, slideAudio, videoAudio, videoEndAudio, talkMessage, audioTick, setVolume, onView, onHeard, onLink, setRecording,
+  pauseShow, resumeShow, resetShow,
 } from './protocol.js';
 import { chipState, nextScreen, bannerFor, videosOn, pickVideo, mustStopFor, videoName, clampSplit, splitAt, SPLIT_DEFAULT, SPLIT_MIN, SPLIT_MAX, SPLIT_STEP, clampNotesSize, NOTES_DEFAULT, NOTES_STEP, canPickFolder } from './view.js';
 import { createVoice, heardFrom, routes, voiceMessages, rollOrder, judgeRollCall } from './voice.js';
 import { createMixer } from './mixer.js';
 import { createRecorder } from './recorder.js';
-import { pickMime, recordName, stageSource, createClock, clockStart, clockSlide, clockRead, isPractice, recordable } from './record.js';
+import { pickMime, recordName, stageSource, createClock, clockStart, clockSlide, clockRead, clockPause, clockResume, isPractice, recordable } from './record.js';
 import { beep, measure } from './tone.js';
 import { CHUNK, mustWait, sendable, progress, fmtMB, fmtTime, picReady, nextPicture } from './transfer.js';
 import { TICK_MS, vstate } from './playback.js';
-import { createAudio, astate, soundsAt, talkStep } from './audio.js';
+import { createAudio, astate, soundsAt, talkStep, showPhase } from './audio.js';
 import { createEngine } from './engine.js';
 import {
   editable, sheetEnabled, mayReload, keepSlide, editorStep, boxFromFields, fieldsFromBox, boxText, paragraphs,
@@ -2300,6 +2301,8 @@ function chooseVideo(id) {
 function control(action) {
   // 再生を始める前の頭出し・止めたあとに遅れて届く pause は合図にしない
   if (!vCurrent || (action !== 'play' && !session.playback.id)) return;
+  // 一時停止中に語り手が動画の再生を押したら、上演も再開する（BGM・時計も動き出す。plans/show-pause.md）
+  if (action === 'play' && showPhase(session.audio) === 'paused') { resumeVideo = null; doResumeShow(); }
   send(playVideo(session, action, { id: vCurrent.id, pos: cur().currentTime, now: Date.now() }));
   if (session.playback.playing) {
     // 動画を流し始めたら BGM を止める・動画のあとも鳴らし直さない（2026-10-26 練習の修正票）
@@ -2594,7 +2597,7 @@ function streamTo(id) {
 function playHere(sounds) {
   if (!session.audio.started) return;
   engine.setBgm(astate(session.audio, Date.now()), (id) => audioUrls.get(id), gainOf);
-  if (sounds) for (const f of soundsAt(work, session.slide)) engine.playSound(audioUrls.get(idOf(f)));
+  if (sounds && !session.audio.paused) for (const f of soundsAt(work, session.slide)) engine.playSound(audioUrls.get(idOf(f)));
 }
 
 let audioTimer = 0;
@@ -2606,7 +2609,7 @@ async function doStartShow() {
   logWait(t('logStarted'));
   clock = clockStart(clock, Date.now());
   renderClock();
-  for (const b of [$('startShow'), $('startShowBar')]) { b.disabled = true; b.textContent = t('started'); }
+  renderShowButtons();
   clearInterval(audioTimer);
   audioTimer = setInterval(() => send(audioTick(session, Date.now())), TICK_MS);
   go({ type: 'started' }); // 受付の画面で押したら上演の画面へ
@@ -2625,8 +2628,77 @@ function stopShow() {
   engine.setBgm(null, () => null);
   clock = createClock();
   renderClock();
-  for (const b of [$('startShow'), $('startShowBar')]) { b.disabled = false; b.textContent = t('startShow'); }
+  resumeVideo = null;
+  renderShowButtons();
   updateVoice();
+}
+
+// ---------- 一時停止・再開・最初から（plans/show-pause.md） ----------
+// 開演のボタン（2か所）を、開演 → 一時停止 → 再開 と切り替える。「最初から」は一時停止中だけ出す。
+// 録画には触らない（録画は録画のボタンだけで止める。持ち主の決定）
+
+let resumeVideo = null;   // 一時停止で止めた動画の再生口（再開でそれだけ流し直す）
+
+function renderShowButtons() {
+  const phase = showPhase(session.audio);
+  const label = { before: 'startShow', playing: 'pauseShow', paused: 'resumeShow' }[phase];
+  for (const b of [$('startShow'), $('startShowBar')]) {
+    b.disabled = false;
+    b.textContent = t(label);
+    b.dataset.phase = phase;
+  }
+  for (const b of [$('restartShow'), $('restartShowBar')]) b.hidden = phase !== 'paused';
+}
+
+function doPauseShow() {
+  if (!work || showPhase(session.audio) !== 'playing') return;
+  const now = Date.now();
+  send(pauseShow(session, now));
+  playHere(false);
+  clock = clockPause(clock, now);
+  renderClock();
+  // 流している動画も止める（再生口の pause から聞き手へ合図が出る）。先に showPhase を変えておく——pause のできごとを再開と取り違えない
+  const el = session.playback.playing && vCurrent ? cur() : null;
+  resumeVideo = el;
+  if (el && !el.paused) el.pause();
+  logWait(t('logPaused'));
+  renderShowButtons();
+  updateVoice();
+}
+
+function doResumeShow() {
+  if (!work || showPhase(session.audio) !== 'paused') return;
+  const now = Date.now();
+  send(resumeShow(session, now));
+  playHere(false);
+  clock = clockResume(clock, now);
+  renderClock();
+  const el = resumeVideo;
+  resumeVideo = null;
+  if (el && el === cur() && session.playback.id && el.paused) Promise.resolve(el.play()).catch(() => {});
+  logWait(t('logResumed'));
+  renderShowButtons();
+  updateVoice();
+}
+
+/** 最初から: 聞き手の端末はつないだまま、開演前の1枚目へ戻す（全員の音を止める）。ボタンは「開演」に戻る */
+function doRestartShow() {
+  if (!work || showPhase(session.audio) !== 'paused') return;
+  if (editing != null) closeEditor({ type: 'move' });
+  if (varying != null) closeVary();
+  if (session.playback.id) stopVideo();
+  chosenVideo = null;
+  send(resetShow(session, Date.now()));
+  stopShow();
+  renderSlide();
+  logWait(t('logRestarted'));
+}
+
+async function onShowButton() {
+  const phase = showPhase(session.audio);
+  if (phase === 'before') await doStartShow();
+  else if (phase === 'playing') doPauseShow();
+  else doResumeShow();
 }
 
 // ---------- 語っているあいだ BGM を下げる（plans/kamishibai-player-talk-duck.md。2026-10-26） ----------
@@ -2699,8 +2771,10 @@ function talkDetach() {
   talk.stream = null;
   setTalking(false);
 }
-$('startShow').addEventListener('click', doStartShow);
-$('startShowBar').addEventListener('click', doStartShow);
+$('startShow').addEventListener('click', onShowButton);
+$('startShowBar').addEventListener('click', onShowButton);
+$('restartShow').addEventListener('click', doRestartShow);
+$('restartShowBar').addEventListener('click', doRestartShow);
 
 // 音のつまみは常時は要らないので畳んでおく（U4）
 $('soundToggle').addEventListener('click', () => {
