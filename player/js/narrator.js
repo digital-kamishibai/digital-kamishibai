@@ -566,7 +566,7 @@ $('varyResetAll').addEventListener('click', () => {
   renderVaryNote();
 });
 
-// ---------- 台本のファイルを開く・貼る（段2: 変えた版を開き直す） ----------
+// ---------- 前に保存したものを開く（段2: 変えた版を開き直す・作品の zip）。台本を貼るのは AI と書く箱だけ ----------
 
 async function openFromScript(text) {
   text = unfence(text);   // チャット AI の答えを、コードブロックの記号ごと貼ったとき
@@ -667,16 +667,9 @@ async function openZip(f) {
   if (script) return openFromScript(await (await script.file()).text());
   showLoadError([t('zipEmpty')]);
 }
-$('pasteScriptBtn').addEventListener('click', () => { $('pasteBox').hidden = !$('pasteBox').hidden; });
-$('pasteOpen').addEventListener('click', async () => {
-  const text = $('pasteText').value;
-  if (!text.trim()) return;
-  await openFromScript(text);
-  if (site && site.variant) { $('pasteText').value = ''; $('pasteBox').hidden = true; }
-});
 
 // ---------- この見本を元に、AI と台本を書く（段4a の後半） ----------
-// 見本の台本と絵の説明（plan.md）をプロンプトにして渡し、返ってきた台本は「台本を貼る」と同じ道で開く
+// 見本の台本と絵の説明（plan.md）をプロンプトにして渡し、返ってきた台本は、保存した版を開くのと同じ道（openFromScript）で開く
 
 $('composeBtn').addEventListener('click', () => {
   if (!site) return;

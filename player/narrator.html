@@ -32,19 +32,20 @@
       </label>
       <strong id="workTitle"></strong>
     </div>
-    <!-- 変えた版（段2）を開き直す: 保存した script.md を開くか、貼る。Based on の見本と版の素材で開く。
-         zip も受ける: work.json があれば作品として（iPad はフォルダを選べない）、script.md だけなら変えた版として -->
-    <div class="row">
-      <label class="file"><span data-i18n="openScript">Open a script file</span>
-        <input id="openScript" type="file" accept=".md,.zip,text/markdown,text/plain,application/zip">
-      </label>
-      <button id="pasteScriptBtn" data-i18n="pasteScript">Paste a script</button>
+    <!-- 前に保存したものを開き直す入口（控えめに。新しく始めるボタンに見えて、何のためか分からなかった——練習した人）:
+         「ファイルに保存」した変えた版（script.md）を、別の端末やブラウザの記録が消えたあとに開く。Based on の見本と版の素材で開く。
+         zip も受ける: work.json があれば作品として（iPad はフォルダを選べない）、script.md だけなら変えた版として。
+         台本を貼るのは、練習の画面の「この見本を元に、AI と台本を書く」だけ（同じ openFromScript） -->
+    <div id="openSaved" class="open-saved">
+      <div class="label" data-i18n="openSavedHead">Open something you saved before</div>
+      <div class="row">
+        <label class="file"><span data-i18n="openScript">Open a saved version or a work zip</span>
+          <input id="openScript" type="file" accept=".md,.zip,text/markdown,text/plain,application/zip">
+        </label>
+        <small class="muted" data-i18n="openScriptHint">A work folder put into a zip opens too.</small>
+      </div>
     </div>
-    <div id="pasteBox" class="card" hidden>
-      <textarea id="pasteText" class="paste" rows="8" spellcheck="false"></textarea>
-      <div class="row"><button id="pasteOpen" class="primary" data-i18n="pasteOpen">Open</button></div>
-    </div>
-    <!-- 貼った・開いた台本の、行頭の全角の印（「～ 」）: 直すかを聞く（黙って直さない） -->
+    <!-- 開いた・AI と書いた台本の、行頭の全角の印（「～ 」）: 直すかを聞く（黙って直さない） -->
     <div id="wideBox" class="card" hidden>
       <p id="wideText"></p>
       <div class="row">
@@ -136,7 +137,7 @@
       <button data-goto="room" data-i18n="toRoom">Connect family devices</button>
       <button id="composeBtn" data-i18n="composeBtn" hidden>Write a script with an AI, from this sample</button>
     </div>
-    <!-- この見本を元に、AI と台本を書く（段4a の後半）: プロンプトを渡し、AI が書いた台本を「台本を貼る」と同じ道で開く -->
+    <!-- この見本を元に、AI と台本を書く（段4a の後半）: プロンプトを渡し、AI が書いた台本を、保存した版を開くのと同じ道（openFromScript）で開く -->
     <div id="composePane" class="card advise" hidden>
       <p class="muted" data-i18n="composeHint"></p>
       <textarea id="composePrompt" class="paste" rows="6" readonly spellcheck="false"></textarea>

@@ -112,7 +112,7 @@ export function mustStopFor(next, playingId) {
 }
 
 /** その場で作品フォルダを選ばせてよいか。showDirectoryPicker があれば選べる。無ければ <input webkitdirectory> だが、
- *  iPad・iPhone・Android ではフォルダを選べない（作品を zip にして「台本・zip のファイルを開く」で開く） */
+ *  iPad・iPhone・Android ではフォルダを選べない（作品を zip にして「保存した版・作品の zip を開く」で開く） */
 export function canPickFolder({ picker, kind }) {
   return !!picker || !/iPhone|iPad|Android/.test(String(kind || ''));
 }

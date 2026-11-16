@@ -38,9 +38,12 @@ test('リンクの動画の言葉: 流せない理由はどれも英日がそろ
 
 test('見本を元にしていない台本の案内: どのボタンで開けるか・自分の作品はどのボタンかを、英日とも名指しする', () => {
   const [en, ja] = pair('scriptNotVariant');
-  assert.match(en, /Open a script or a zip/);
-  assert.match(ja, /「台本・zip のファイルを開く」と「台本を貼る」/);
-  assert.equal(pair('openScript')[1], '台本・zip のファイルを開く');   // 案内の名指しとボタンの名前がずれない
+  assert.ok(en.includes(`“${pair('openScript')[0]}”`) && ja.includes(`「${pair('openScript')[1]}」`));   // 案内の名指しとボタンの名前がずれない
+  assert.equal(pair('openScript')[1], '保存した版・作品の zip を開く');
+  assert.doesNotMatch(ja, /台本を貼る/);   // 準備の画面の「台本を貼る」は外した
+  const saved = pair('varySaved', 'x.md');
+  assert.ok(saved[0].includes(`“${pair('openScript')[0]}”`) && saved[1].includes(`「${pair('openScript')[1]}」`));
+  assert.ok(pair('openSavedHead')[0] && pair('openSavedHead')[1] && /zip/.test(pair('openScriptHint')[1]));
   const folder = pair('scriptOwnFolder');
   assert.ok(folder[0].includes(`“${pair('pickWork')[0]}”`) && folder[1].includes(`「${pair('pickWork')[1]}」`));
   const zip = pair('scriptOwnZip');

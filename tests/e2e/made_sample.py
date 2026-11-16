@@ -94,8 +94,9 @@ def open_prep(b):
 
 
 def paste(b, text):
-    b.evaluate(f"document.getElementById('pasteScriptBtn').click(); document.getElementById('pasteText').value = {json.dumps(text)}; "
-               "document.getElementById('pasteOpen').click(); true")
+    """台本を準備の画面の「保存した版・作品の zip を開く」で開く（AI と書く箱の「開く」と同じ道）"""
+    b.evaluate(f"const dt = new DataTransfer(); dt.items.add(new File([{json.dumps(text)}], 'script.md', {{ type: 'text/markdown' }})); "
+               "const i = document.getElementById('openScript'); i.files = dt.files; i.dispatchEvent(new Event('change')); true")
 
 
 def opened(b):

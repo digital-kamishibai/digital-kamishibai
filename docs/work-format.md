@@ -78,6 +78,9 @@ The player also opens a `.zip` (a single file is all that some devices can open 
   when both are there, `work.json` is read.
 - Paths in `work.json` are resolved inside the zip first, then in the media folder the narrator picks.
 - Files may be stored or compressed (deflate). The player writes zips with stored files only.
+- File names: UTF-8 when the zip marks them so (general purpose flag bit 11). Unmarked names are read as UTF-8 if they
+  are valid UTF-8 (macOS writes them so), otherwise as Shift_JIS (Windows' "Compressed folder" on a Japanese system
+  writes them so).
 - **Do not give a family's media to a chat AI to pack into a zip.** A chat AI writes `script.md` only (above).
   The player cannot tell where a zip was made and does not try.
 

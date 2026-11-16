@@ -162,6 +162,10 @@ p.roll { white-space: pre-line; margin: 8px 0 0; }
 /* 語りを変える欄（段2） */
 textarea.paste { width: 100%; box-sizing: border-box; font: inherit; }
 .advise .label { margin-top: 8px; }
+/* 前に保存したものを開く（準備の画面）: 作品フォルダを選ぶより控えめに */
+.open-saved { margin-top: 20px; }
+.open-saved .label { margin-bottom: 6px; color: var(--muted); font-size: .9rem; }
+.open-saved label.file { font-size: .9rem; padding: 6px 12px; }
 .vary-field { margin: 0 0 12px; }
 .vary-field .row { justify-content: space-between; margin-bottom: 4px; }
 .vary-field textarea { width: 100%; box-sizing: border-box; font: inherit; font-size: 1.2rem; line-height: 1.6; padding: 8px 10px; background: var(--hole-bg); color: var(--fg); resize: vertical; }

@@ -3,7 +3,7 @@
  見本を ?sample= で開く → 1枚目で「語りを変えてみる」→ 欄を書き換えて閉じる → 画面の語りが替わり、黄色のまま・印は出ない →
  知らせが出る → ファイルに保存（保存の窓は差し替え）した中身が Based on・Changed 付きの script.md → 開き直しても残っている →
  2枚目には欄が無い（黄色い所の無い枚）→ 玄関のカードに「変えた版で開く」→ variant=1 が無ければ見本のまま →
- このブラウザから消しても、保存した台本を貼る・ファイルで開くと変えた版で開く → 合図を変えた台本は開かない →
+ このブラウザから消しても、保存した台本を「保存した版・作品の zip を開く」で開くと変えた版で開く（「台本を貼る」は無い） → 合図を変えた台本は開かない →
  見本から作っていない台本は、案内の中の「作品フォルダを選ぶ」で作品を開ける（iPad では zip の案内）→
  全部を見本に戻すと元の語り → zip を開く（作品の zip は作品として・台本だけの zip は変えた版として）→
  AI に相談（段3）: 穴1のプロンプト（かかる枚・問いを先に）→ 答えを貼ると、開いていない枚の語りまで替わる。ページに例外が無いこと。
@@ -33,6 +33,12 @@ import burn  # noqa: E402
 
 failures = []
 MINE = 'A WORD OF MY OWN'
+
+
+def open_script(b, text, name='script.md', pre=''):
+    """準備の画面の「保存した版・作品の zip を開く」で台本のファイルを開く"""
+    b.evaluate(pre + f"const dt = new DataTransfer(); dt.items.add(new File([{json.dumps(text)}], {json.dumps(name)}, {{ type: 'text/markdown' }})); "
+               "const i = document.getElementById('openScript'); i.files = dt.files; i.dispatchEvent(new Event('change')); true")
 
 
 def ok(name, cond, detail=''):
@@ -152,28 +158,25 @@ try:
        nar.evaluate("Object.keys(localStorage).includes('dk-variant:six-friends-smoothie:ja')"))
     nar.evaluate("localStorage.clear(); true")
     open_prep(nar)
-    nar.evaluate(f"document.getElementById('pasteScriptBtn').click(); document.getElementById('pasteText').value = {json.dumps(saved['text'])}; "
-                 "document.getElementById('pasteOpen').click(); true")
-    ok('貼った台本で、変えた版が開く', wait(nar, "window.__dk && __dk.site() && __dk.screen() === 'show'", 'pasted') and has_mine(nar))
-    ok('貼った台本もこのブラウザに置いた', nar.evaluate("Object.keys(localStorage).some((k) => k === 'dk-variant:six-friends-smoothie:ja')"))
-    nar.evaluate("localStorage.clear(); true")
-    open_prep(nar)
-    nar.evaluate(f"const dt = new DataTransfer(); dt.items.add(new File([{json.dumps(saved['text'])}], 'six-friends-smoothie-ja-script.md', {{ type: 'text/markdown' }})); "
-                 "const i = document.getElementById('openScript'); i.files = dt.files; i.dispatchEvent(new Event('change')); true")
-    ok('ファイルの台本で、変えた版が開く', wait(nar, "window.__dk && __dk.site() && __dk.screen() === 'show'", 'file') and has_mine(nar))
+    ok('準備の画面に「台本を貼る」は無い・「前に保存したものを開く」の下に新しい名前のボタン',
+       nar.evaluate("!document.getElementById('pasteScriptBtn') && !document.getElementById('pasteText') "
+                    "&& document.getElementById('openSaved').textContent.includes('前に保存したものを開く') "
+                    "&& document.getElementById('openScript').closest('label').textContent.includes('保存した版・作品の zip を開く') "
+                    "&& document.getElementById('openSaved').textContent.includes('zip にしたものも開けます')"))
+    open_script(nar, saved['text'], 'six-friends-smoothie-ja-script.md')
+    ok('保存したファイルの台本で、変えた版が開く', wait(nar, "window.__dk && __dk.site() && __dk.screen() === 'show'", 'file') and has_mine(nar))
+    ok('開いた台本もこのブラウザに置いた', nar.evaluate("Object.keys(localStorage).some((k) => k === 'dk-variant:six-friends-smoothie:ja')"))
     open_prep(nar)
     # 黄色い所のほかを変えた台本は段4a の道（tests/e2e/made_sample.py）。骨組み（合図）まで変えたものは開かない
     # 枚の終わりの "---" より後は読まれないので、見出しのすぐ後に入れる
     other = saved['text']
     at = other.index('\n', other.index('## [Slide 2]'))
     other = other[:at + 1] + '\n> [Sound] sounds/other.mp3\n' + other[at + 1:]
-    nar.evaluate(f"document.getElementById('pasteScriptBtn').click(); document.getElementById('pasteText').value = {json.dumps(other)}; "
-                 "document.getElementById('pasteOpen').click(); true")
+    open_script(nar, other)
     ok('合図を変えた台本は、理由を出して開かない', wait(nar, "!document.getElementById('loadError').hidden && document.getElementById('loadError').textContent.includes('見本の絵と音では開けません')", 'other')
        and nar.evaluate("__dk.site() === null"))
     open_prep(nar)
-    nar.evaluate("document.getElementById('pasteScriptBtn').click(); document.getElementById('pasteText').value = "
-                 + json.dumps('# Mine\n\n## [Slide 1] A\n\nhello\n') + "; document.getElementById('pasteOpen').click(); true")
+    open_script(nar, '# Mine\n\n## [Slide 1] A\n\nhello\n')
     ok('見本から作っていない台本は、理由を出す', wait(nar, "!document.getElementById('loadError').hidden && document.getElementById('loadError').textContent.includes('Based on')", 'not variant'))
     # 自分の作品の台本を選んで止まり、案内を読んでも「作品フォルダを選ぶ」へたどり着けなかった（実機で）: 案内の中に同じボタンを置く
     ok('案内の中に「作品フォルダを選ぶ」ボタン（上のボタンと同じと名指し）',
@@ -203,9 +206,9 @@ try:
            nar.evaluate("document.getElementById('loadError').textContent"))
     open_prep(nar)
     # フォルダを選べない端末（iPad）: ボタンは出さず、作品フォルダを zip にして開くよう言う
-    nar.evaluate("Object.defineProperty(navigator, 'userAgent', { get: () => 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15' }); "
-                 "window.showDirectoryPicker = undefined; document.getElementById('pasteScriptBtn').click(); document.getElementById('pasteText').value = "
-                 + json.dumps('# Mine\n\n## [Slide 1] A\n\nhello\n') + "; document.getElementById('pasteOpen').click(); true")
+    open_script(nar, '# Mine\n\n## [Slide 1] A\n\nhello\n',
+                pre="Object.defineProperty(navigator, 'userAgent', { get: () => 'Mozilla/5.0 (iPad; CPU OS 17_0 like Mac OS X) AppleWebKit/605.1.15' }); "
+                    "window.showDirectoryPicker = undefined; ")
     ok('iPad では、ボタンの代わりに zip で開く案内', wait(nar, "!document.getElementById('loadError').hidden && document.getElementById('loadError').textContent.includes('丸ごと zip にして')", 'ipad')
        and nar.evaluate("!document.getElementById('loadError').contains(document.getElementById('pickWorkHereLabel'))"))
 

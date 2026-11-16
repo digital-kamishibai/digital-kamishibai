@@ -3,6 +3,9 @@
 //       iPad はフォルダを選べないので、作品を zip にすれば開ける。
 // 書く: 圧縮なし（CRC32 だけ）。写真・動画はもう圧縮されているので、縮めても小さくならない。画面で使うのは段4（写真を添えるとき）。
 // zip64（4GB を超える zip）は読まない（理由を出して止める）。
+// ファイル名: UTF-8 の印（汎用ビットフラグの 0x0800）があれば UTF-8。無ければ、正しい UTF-8 として読めればそのまま
+//   （Mac の「圧縮」は印を付けずに UTF-8 で書く）、読めなければ Shift_JIS（日本語の Windows の道具の古い書き方）。
+//   化けると work.json が指す素材が「見つからない」になる。
 
 const EOCD = 0x06054b50;
 const CENTRAL = 0x02014b50;
@@ -25,6 +28,21 @@ function dosTime(date, time) {
   return Number.isFinite(t) && t > 0 ? t : 0;
 }
 
+const utf8 = new TextDecoder('utf-8');
+const utf8Strict = new TextDecoder('utf-8', { fatal: true });
+let sjis = null;
+
+/** zip の中のファイル名のバイト列 → 文字（上の「ファイル名」） */
+export function zipName(bytes, flags) {
+  if (flags & UTF8) return utf8.decode(bytes);
+  try {
+    return utf8Strict.decode(bytes);
+  } catch {
+    sjis ||= new TextDecoder('shift_jis');
+    return sjis.decode(bytes);
+  }
+}
+
 /** zip の目次を読む → [{ path, size, packed, method, file() }]。file() はその中身の File（要るときにほどく）。
  *  フォルダの行は入れない。読めない zip は ZipError */
 export async function readZip(blob) {
@@ -39,11 +57,11 @@ export async function readZip(blob) {
   if (count === 0xffff || cdSize === 0xffffffff || cdOffset === 0xffffffff) throw new ZipError('zip64 is not read here (a zip over 4 GB)');
   if (cdOffset + cdSize > blob.size) throw new ZipError('the zip is cut short');
   const cd = await bytesOf(blob, cdOffset, cdOffset + cdSize);
-  const dec = new TextDecoder('utf-8');
   const out = [];
   let p = 0;
   for (let k = 0; k < count; k++) {
     if (p + 46 > cd.byteLength || u32(cd, p) !== CENTRAL) throw new ZipError('the table of contents is broken');
+    const flags = u16(cd, p + 8);
     const method = u16(cd, p + 10);
     const time = u16(cd, p + 12);
     const date = u16(cd, p + 14);
@@ -53,7 +71,7 @@ export async function readZip(blob) {
     const extraLen = u16(cd, p + 30);
     const commentLen = u16(cd, p + 32);
     const local = u32(cd, p + 42);
-    const name = dec.decode(new Uint8Array(cd.buffer, cd.byteOffset + p + 46, nameLen)).replace(/\\/g, '/');
+    const name = zipName(new Uint8Array(cd.buffer, cd.byteOffset + p + 46, nameLen), flags).replace(/\\/g, '/');
     p += 46 + nameLen + extraLen + commentLen;
     if (name.endsWith('/')) continue;
     if (packed === 0xffffffff || size === 0xffffffff || local === 0xffffffff) throw new ZipError('zip64 is not read here (a zip over 4 GB)');

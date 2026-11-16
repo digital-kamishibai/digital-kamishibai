@@ -68,3 +68,54 @@ test('readZip: zip でないもの・切れた zip は ZipError', async () => {
 test('makeZip: zip の外を指すパスは書かない', async () => {
   for (const bad of ['../x', '/abs', 'a//b', '']) await assert.rejects(makeZip([{ path: bad, data: 'x' }]), ZipError, bad);
 });
+
+/** テスト用: 名前のバイト列と汎用ビットフラグを指定した、圧縮なしの zip（ほかの道具が書く名前の形） */
+function namedZip(items) {
+  const parts = [];
+  const central = [];
+  let offset = 0;
+  for (const { name, flags, text } of items) {
+    const data = enc.encode(text);
+    const local = new DataView(new ArrayBuffer(30));
+    local.setUint32(0, 0x04034b50, true); local.setUint16(6, flags, true);
+    local.setUint32(14, crc32(data), true); local.setUint32(18, data.length, true); local.setUint32(22, data.length, true);
+    local.setUint16(26, name.length, true);
+    const c = new DataView(new ArrayBuffer(46));
+    c.setUint32(0, 0x02014b50, true); c.setUint16(8, flags, true); c.setUint32(16, crc32(data), true);
+    c.setUint32(20, data.length, true); c.setUint32(24, data.length, true); c.setUint16(28, name.length, true); c.setUint32(42, offset, true);
+    parts.push(local, name, data);
+    central.push(c, name);
+    offset += 30 + name.length + data.length;
+  }
+  const cdSize = central.reduce((a, b) => a + b.byteLength, 0);
+  const e = new DataView(new ArrayBuffer(22));
+  e.setUint32(0, 0x06054b50, true); e.setUint16(8, items.length, true); e.setUint16(10, items.length, true);
+  e.setUint32(12, cdSize, true); e.setUint32(16, offset, true);
+  return new Blob([...parts, ...central, e]);
+}
+
+// 「わたしの話/絵/はじまり.jpg」「わたしの話/表紙.jpg」を Shift_JIS で（「表」の2バイト目は '\' と同じ 0x5C）
+const SJIS_PIC = new Uint8Array([130, 237, 130, 189, 130, 181, 130, 204, 152, 98, 47, 138, 71, 47, 130, 205, 130, 182, 130, 220, 130, 232, 46, 106, 112, 103]);
+const SJIS_COVER = new Uint8Array([130, 237, 130, 189, 130, 181, 130, 204, 152, 98, 47, 0x95, 0x5c, 0x8e, 0x86, 46, 106, 112, 103]);
+
+test('readZip: UTF-8 の印付きの日本語のファイル名は UTF-8 で読む', async () => {
+  const entries = await readZip(namedZip([{ name: enc.encode('わたしの話/絵/はじまり.jpg'), flags: 0x0800, text: 'a' }]));
+  assert.deepEqual(entries.map((x) => x.path), ['わたしの話/絵/はじまり.jpg']);
+  assert.equal((await entries[0].file()).name, 'はじまり.jpg');
+});
+
+test('readZip: 印の無い日本語のファイル名は Shift_JIS で読む（2バイト目の 0x5C をフォルダの区切りにしない）', async () => {
+  const entries = await readZip(namedZip([
+    { name: SJIS_PIC, flags: 0, text: 'a' },
+    { name: SJIS_COVER, flags: 0, text: 'b' },
+    { name: enc.encode('わたしの話/work.json'), flags: 0, text: '{}' },
+  ]));
+  assert.deepEqual(entries.map((x) => x.path), ['わたしの話/絵/はじまり.jpg', 'わたしの話/表紙.jpg', 'わたしの話/work.json']);
+  assert.equal((await entries[1].file()).name, '表紙.jpg');
+  assert.equal(await (await entries[1].file()).text(), 'b');
+});
+
+test('readZip: 印が無くても、正しい UTF-8 の名前はそのまま（Mac の「圧縮」の書き方）', async () => {
+  const entries = await readZip(namedZip([{ name: enc.encode('わたしの話/絵/はじまり.jpg'), flags: 0, text: 'a' }]));
+  assert.deepEqual(entries.map((x) => x.path), ['わたしの話/絵/はじまり.jpg']);
+});
