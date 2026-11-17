@@ -2574,8 +2574,8 @@ async function openBoard() {
       if (me.chosen != null) me.drafts.set(me.chosen, $('seatComment').value);
       me.chosen = s.n;
       $('seatComment').value = draftOf(s.n);
-      if (!vEl.paused) vEl.pause();
-      vEl.currentTime = (s.from + s.to) / 2; // 見て確かめる用。カードの絵と同じ、席の真ん中（席の端はつなぎ目のフェードで前後の絵と重なる）
+      // カードの絵と同じ、席の真ん中へ移す（席の端はつなぎ目のフェードで前後の絵と重なる）。再生中なら止めずにそこから流れ続ける
+      vEl.currentTime = (s.from + s.to) / 2;
       renderSeatBar();
     });
     cards.set(s.n, b);
@@ -2587,7 +2587,16 @@ async function openBoard() {
   probe.src = URL.createObjectURL(v.file);
   // 開いた直後は、いま映っている席を選んだ席にする（席の外なら選んでいない）
   const here = seatAt(seats, vEl.currentTime || 0);
-  const me = { id: v.id, cards, probe, alive: true, chosen: here ? here.n : null, drafts: new Map() };
+  // 画面に見えている席（外側の箱で切られた所は見えていない）。いまのコマを見える所へ送るかを決める（markBoard）
+  const seen = new Set();
+  const io = new IntersectionObserver((list) => {
+    for (const e of list) {
+      const n = Number(e.target.dataset.n);
+      if (e.isIntersecting && e.intersectionRatio >= 0.9) seen.add(n); else seen.delete(n);
+    }
+  }, { threshold: [0, 0.9] });
+  for (const [n, el] of cards) { el.dataset.n = String(n); io.observe(el); }
+  const me = { id: v.id, cards, probe, alive: true, chosen: here ? here.n : null, drafts: new Map(), seen, io, nowN: here ? here.n : null };
   board = me;
   $('seatComment').value = me.chosen == null ? '' : draftOf(me.chosen);
   renderMediaBars();
@@ -2604,6 +2613,7 @@ async function openBoard() {
 function closeBoard() {
   if (board) {
     board.alive = false;
+    board.io.disconnect();
     URL.revokeObjectURL(board.probe.src);
     board.probe.removeAttribute('src');
     board.probe.load();
@@ -2617,6 +2627,15 @@ function closeBoard() {
 
 function markBoard(now) {
   if (!board || !vCurrent || board.id !== vCurrent.id) return;
+  $('board').classList.toggle('paused', vEl.paused); // いまのコマの札: 再生中は ▶、止めているあいだは ❚❚
+  // いまのコマが替わって画面の外へ出たら、絵コンテの中だけを送ってその段を上端に出す（動画のある外側の箱は動かさない）。
+  // 前のいまのコマが見えていたときだけ——自分で別の所を見ているあいだは引き戻さない。押したカードは見えているので動かない
+  const was = board.nowN;
+  board.nowN = now ? now.n : null;
+  if (now && was !== now.n && was != null && board.seen.has(was) && !board.seen.has(now.n)) {
+    const host = $('board');
+    host.scrollTop += board.cards.get(now.n).getBoundingClientRect().top - host.getBoundingClientRect().top - 6;
+  }
   for (const [n, el] of board.cards) {
     const x = seatItem(vCurrent, n);
     const seat = (seatsOf(vCurrent) || []).find((s) => s.n === n);

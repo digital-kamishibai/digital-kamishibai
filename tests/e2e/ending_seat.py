@@ -215,10 +215,19 @@ try:
     assert ev(f"{card(1)}.getAttribute('aria-current') === 'true' && !{card(3)}.hasAttribute('aria-current')")
     shot('rt_board_now.png')
     print('3. 再生・シークのあとも:', text('seatTarget'), '| 再生中:', not prop('nvideo', 'paused'), '| いまのコマ:', bg)
+    # 3b. 再生中にカードを押すと、そのコマへ飛んで止まらずに流れ続ける
+    click_card(2)
+    assert not prop('nvideo', 'paused'), 'カードを押しても止めない'
+    assert text('seatTarget') == '2 番：', text('seatTarget')
+    assert ev(f"{card(2)}.classList.contains('now') && {card(2)}.classList.contains('chosen')")
+    print('3b. 再生中にカード 2:', text('seatTarget'), '| 再生中:', not prop('nvideo', 'paused'))
+    click_card(3)  # 段 4 は 3 番を選んだまま
 
     # ---------- 4. 「3 番を外したい」→ 🗑。カード 4 は「直したい」（移すはひとことで）→ ✎ ----------
     click('seatRemove')
     ev("document.getElementById('nvideo').pause(); true")
+    # 止めているあいだ、いまのコマの札は ▶ でなく ❚❚
+    wait("getComputedStyle(document.querySelector('.board-card.now'), '::before').content === '\"❚❚\"'", 'paused mark')
     assert ev(f"{card(3)}.classList.contains('gone')") and '🗑' in ev(f"{card(3)}.textContent")
     assert '外すのをやめる' in text('seatRemove') and prop('seatCancel', 'hidden'), text('seatRemove')
     # 4b. 「3 番を外すのをやめる」→ 🗑 が消える・修正票からも消える → もう一度外す
@@ -253,6 +262,25 @@ try:
         click_card(n)
         assert prop('seatRemove', 'disabled') and not prop('seatPoint', 'disabled'), n
         print(f'5. 席 {n}: {text("seatTarget")}{text("seatRemove")} は押せない（{prop("seatRemove", "title")}）')
+
+    # ---------- 5b. いまのコマが絵コンテの見える範囲の外へ出たら送る。自分で別の所を見ているあいだは引き戻さない ----------
+    ev("(() => { const b = document.getElementById('board'); b.style.width = '280px'; b.style.maxHeight = '320px'; "
+       "b.style.scrollBehavior = 'auto'; b.scrollTop = 0; return true; })()")
+    inside = ("(() => { const b = document.getElementById('board').getBoundingClientRect(); "
+              "const c = %s.getBoundingClientRect(); return c.top >= b.top - 1 && c.bottom <= b.bottom + 1; })()")
+    seek(2.5)
+    wait(inside % card(1), 'card 1 visible')
+    assert not ev(inside % card(5)), '5 番は始めは見えない（3段に分かれていない）'
+    seek(22.5)
+    wait(inside % card(5), 'follow to card 5')
+    print('5b. 5 番へ移ると送る: scrollTop', prop('board', 'scrollTop'))
+    ev("document.getElementById('board').scrollTop = 0; true")
+    time.sleep(0.3)
+    seek(27.5)
+    time.sleep(0.5)
+    assert prop('board', 'scrollTop') == 0, '自分で上へ戻したあとは引き戻さない'
+    print('5b. 上へ戻したあと 6 番へ移っても動かない: ok')
+    ev("(() => { const b = document.getElementById('board'); b.removeAttribute('style'); return true; })()")
 
     # ---------- 6. 絵コンテを閉じたときの古い流れ: 止めて指す（再生中は押せない） ----------
     click('boardBtn')
