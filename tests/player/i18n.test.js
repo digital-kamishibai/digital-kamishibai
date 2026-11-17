@@ -50,3 +50,16 @@ test('見本を元にしていない台本の案内: どのボタンで開ける
   assert.ok(zip[0].includes(`“${pair('openScript')[0]}”`) && zip[1].includes(`「${pair('openScript')[1]}」`));
   assert.match(zip[1], /zip/);
 });
+
+test('絵コンテのコマのボタン: 番号を入れる・英日がそろう・入れ替え／移すはひとことで、と案内する', () => {
+  assert.deepEqual(pair('seatPoint', 3), ['Change seat 3', '3 番を直したい']);
+  assert.deepEqual(pair('seatRemove', 3), ['Remove seat 3', '3 番を外したい']);
+  assert.match(pair('seatPointAgain', 3)[1], /^3 番/);
+  assert.ok(pair('seatPoint', '')[1] && !/^ /.test(pair('seatPoint', '')[1]), '番号が無いときも文になる');
+  assert.match(pair('seatCommentPh')[1], /入れ替え・移すはひとことで/);
+  assert.match(pair('seatPinnedPh')[1], /入れ替え・移すはできません/);
+  assert.match(pair('seatRemovePinned')[1], /先に固定（pin）を外して/);
+  for (const key of ['seatPick', 'seatRemoveFinal', 'seatFinalPh', 'seatMarkFix', 'seatMarkRemove', 'boardHint']) {
+    assert.ok(pair(key)[0] && pair(key)[1], key);
+  }
+});

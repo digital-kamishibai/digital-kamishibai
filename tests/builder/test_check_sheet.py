@@ -240,7 +240,7 @@ def media_example():
 def test_reads_the_picture_and_video_example_of_the_format():
     title, items, errors = cs.read_sheet('# Correction sheet: T (2026-10-26 10:00)\n\n' + media_example())
     assert errors == []
-    picture, chosen, video, seat = items
+    picture, chosen, video, seat, removed = items
     assert picture == {'slide': 3, 'kind': 'picture', 'at': None,
                        'comment': 'the lamp should be dark — the storm has put it out'}
     assert chosen == {'slide': 4, 'kind': 'picture', 'at': None, 'media': {'use': 'pictures/_candidates/04-2.png'}}
@@ -248,6 +248,7 @@ def test_reads_the_picture_and_video_example_of_the_format():
     assert video['media'] == {'from': '0:12.5 (source 1:34.5)', 'to': '1:10.0 (source 4:58.0)'}
     assert seat['kind'] == 'ending seat' and seat['at'] == 2
     assert seat['media'] == {'at': '0:08.3', 'label': 'pictures/03.png'} and seat['comment'].startswith('too dark')
+    assert removed['remove'] is True and removed['at'] == 5 and 'remove' not in seat
 
 
 def test_a_picture_correction_needs_a_comment():
@@ -266,6 +267,32 @@ def test_picture_and_video_corrections_are_listed_not_judged(work, capsys):
     (work / 'sheet.md').write_text(sheet, encoding='utf-8')
     assert cs.main([str(work), str(work / 'sheet.md')]) == 0          # nothing pending: the maker chooses the new ones
     assert 'look      [Slide 4] ending seat 1' in capsys.readouterr().out
+
+
+def test_an_ending_seat_to_remove_is_in_the_heading(work, capsys):
+    sheet = ('# Correction sheet: The Lighthouse Keeper\'s Lamp (2026-11-17 10:00)\n\n'
+             '## [Slide 4] ending seat 1 remove\nAt 0:03.0\nLabel pictures/02.png\n\n'
+             '## [Slide 4] ending seat 2\nAt 0:08.3\nLabel pictures/03.png\nComment: 1 と入れ替え\n')
+    title, items, errors = cs.read_sheet(sheet)
+    assert errors == []
+    assert items[0]['remove'] is True and items[0]['at'] == 1 and items[0]['media']['label'] == 'pictures/02.png'
+    assert 'remove' not in items[1]
+    (work / 'sheet.md').write_text(sheet, encoding='utf-8')
+    assert cs.main([str(work), str(work / 'sheet.md')]) == 0
+    out = capsys.readouterr().out
+    assert 'look      [Slide 4] ending seat 1  - remove\n' in out
+    assert 'look      [Slide 4] ending seat 2  - 1 と入れ替え\n' in out
+
+
+@pytest.mark.parametrize('body, message', [
+    ('## [Slide 4] overlay 1 remove\n', 'not a correction heading'),
+    ('## [Slide 4] ending seat 1 delete\n', 'not a correction heading'),
+    ('## [Slide 4] ending seat 1\nAt 0:03.0\nRemove\n', "not a line of an ending seat (At, Label, Pin, Comment:): 'Remove'"),
+    ('## [Slide 4] ending seat 1\nUse pictures/x.png\n', 'not a line of an ending seat'),
+])
+def test_unknown_ending_seat_lines_are_errors(body, message):
+    _, _, errors = cs.read_sheet('# Correction sheet: T (2026-11-17 10:00)\n\n' + body)
+    assert any(message in e for e in errors), errors
 
 
 def test_an_ending_seat_with_another_picture_is_changed(work):

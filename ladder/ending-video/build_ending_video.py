@@ -7,9 +7,10 @@
     python build_ending_video.py <work folder> --storyboard          # storyboard: a JPEG and a page to point at seats
     python build_ending_video.py <work folder> --replace 17=2016/bike.jpg --replace 3=clips/run.mp4@1.2
     python build_ending_video.py <work folder> --move 14=2           # the content of seat 14 goes after seat 2
+    python build_ending_video.py <work folder> --swap 7=12           # seats 7 and 12 exchange their content
     python build_ending_video.py <work folder> --sort 1-30 [--pin 7] # by date taken (pinned seats stay)
     python build_ending_video.py <work folder> --pin-set 42="the line of the chorus" | --unpin 42 | --pins
-    python build_ending_video.py <work folder> --pick 1-10 | --confirm 1-22
+    python build_ending_video.py <work folder> --pick 1-10 | --confirm 1-22 | --placeholder 9
     python build_ending_video.py <work folder> --config second       # a second ending video for the same work
 
 This is a ladder: optional. It costs nothing, but needs Python 3.10+, Pillow and ffmpeg (with ffprobe) on the PATH.
@@ -395,8 +396,18 @@ def put_content(frame, content):
     return frame
 
 
+def fixed_seats(data):
+    """{i: why} of the seats whose content never moves: the pinned seats and the seat of the closing picture
+    (kind final). --move and --swap stop rather than change them, as --sort leaves them alone."""
+    out = {f['i']: 'the closing picture' for f in data.get('frames', [])
+           if isinstance(f, dict) and f.get('kind') == 'final'}
+    out.update({n: f'pinned: {why}' for n, why in pinned_seats(data).items()})
+    return dict(sorted(out.items()))
+
+
 def apply_move(data, i, after):
-    """Move the content of seat i to the seat after `after` (0 = to the front). Seats stay where they are."""
+    """Move the content of seat i to the seat after `after` (0 = to the front). Seats stay where they are.
+    Stops, changing nothing, when a seat that does not move (fixed_seats) would get other content."""
     frames = data['frames']
     pairs = [(f['i'], content_of(f)) for f in frames]
     nums = [n for n, _ in pairs]
@@ -406,12 +417,45 @@ def apply_move(data, i, after):
         raise ConfigError([f'no seat i={after} to move after'])
     if i == after:
         raise ConfigError([f'seat {i} cannot move after itself'])
-    moving = pairs.pop(nums.index(i))
+    a = nums.index(i)
+    b = 0 if after == 0 else nums.index(after) + (0 if nums.index(after) > a else 1)
+    fixed = fixed_seats(data)
+    if i in fixed:
+        raise ConfigError([f'seat {i} does not move ({fixed[i]})',
+                           '  a pinned seat moves only after --unpin; a closing picture is only replaced'])
+    hit = [n for n in nums[min(a, b):max(a, b) + 1] if n in fixed]
+    if hit:
+        n = hit[0] if b > a else hit[-1]
+        near = (f'--move {i}={n - 1}' if n - 1 != i else None) if b > a else f'--move {i}={n}'
+        raise ConfigError([f'--move {i}={after} would change seat {n} ({fixed[n]}), and that seat does not move',
+                           '  move it only as far as that seat' + (f' ({near})' if near else '')
+                           + ', or exchange two seats with --swap A=B'])
+    moving = pairs.pop(a)
     pos = 0 if after == 0 else [n for n, _ in pairs].index(after) + 1
     pairs.insert(pos, moving)
     for f, (_, c) in zip(frames, pairs):
         put_content(f, c)
     return frames
+
+
+def apply_swap(data, a, b):
+    """Exchange the content of seats a and b as it is (rotate, clip_*, status go with it). Two --replace would
+    lose what was fitted to each picture. Stops at a seat that does not move (fixed_seats)."""
+    if a == b:
+        raise ConfigError([f'--swap {a}={b}: the same seat'])
+    by_i = {f['i']: f for f in data['frames']}
+    for n in (a, b):
+        if n not in by_i:
+            raise ConfigError([f'no seat i={n}'])
+    fixed = fixed_seats(data)
+    for n in (a, b):
+        if n in fixed:
+            raise ConfigError([f'seat {n} does not move ({fixed[n]})',
+                               '  a pinned seat moves only after --unpin; a closing picture is only replaced'])
+    ca, cb = content_of(by_i[a]), content_of(by_i[b])
+    put_content(by_i[a], cb)
+    put_content(by_i[b], ca)
+    return by_i[a], by_i[b]
 
 
 def pinned_seats(data):
@@ -1584,18 +1628,29 @@ def cmd_move(work_dir, specs, config=None):
             raise ConfigError([f'--move takes N=M: {spec}', '  e.g. --move 14=2 (seat 14\'s content after seat 2), '
                                '--move 14=0 (to the front)'])
         i, after = int(m.group(1)), int(m.group(2))
-        pins_before = pinned_seats(data)
-        apply_move(data, i, after)
+        apply_move(data, i, after)             # stops before a pinned seat or the closing picture changes
         print(f'  moved the content of {i} {"to the front" if after == 0 else f"after {after}"} '
               '(the seats\' at/dur do not move)')
-        lo, hi = min(i, after or 1), max(i, after or 1)
-        for n, why in pins_before.items():
-            if lo <= n <= hi:                  # a pinned seat's picture changed: say so
-                now = next(f for f in data['frames'] if f['i'] == n)
-                print(f'     pinned seat {n} now holds {os.path.basename(now["src"])} ({why})')
     errors = validate_config(data)
     if errors:
         raise ConfigError(['after moving:'] + errors)
+    save_config(work_dir, data, config)
+    return 0
+
+
+def cmd_swap(work_dir, specs, config=None):
+    data = load_config(work_dir, config)
+    for spec in specs:
+        m = RE_MOVE.match(spec.strip().strip('"'))
+        if not m:
+            raise ConfigError([f'--swap takes A=B: {spec}', '  e.g. --swap 7=12 (seats 7 and 12 exchange their content)'])
+        a, b = int(m.group(1)), int(m.group(2))
+        fa, fb = apply_swap(data, a, b)
+        print(f'  seat {a} <-> seat {b}: {a} now holds {os.path.basename(fa["src"])}, '
+              f'{b} holds {os.path.basename(fb["src"])} (the seats\' at/dur do not move)')
+    errors = validate_config(data)
+    if errors:
+        raise ConfigError(['after swapping:'] + errors)
     save_config(work_dir, data, config)
     return 0
 
@@ -1834,12 +1889,14 @@ def main(argv=None):
     act.add_argument('--storyboard', action='store_true', help='make the storyboard (JPEG and page)')
     act.add_argument('--replace', action='append', metavar='N=FILE[@SEC]', help='put another file in seat N')
     act.add_argument('--move', action='append', metavar='N=M', help='move the content of seat N after seat M')
+    act.add_argument('--swap', action='append', metavar='A=B', help='exchange the content of seats A and B')
     act.add_argument('--sort', metavar='RANGE', help='sort these seats by date taken')
     act.add_argument('--pin-set', action='append', metavar='N=REASON', help='pin a seat, with the reason')
     act.add_argument('--unpin', metavar='RANGE')
     act.add_argument('--pins', action='store_true', help='list the pinned seats')
     act.add_argument('--pick', metavar='RANGE', help='mark seats as picked')
     act.add_argument('--confirm', metavar='RANGE', help='mark seats as confirmed')
+    act.add_argument('--placeholder', metavar='RANGE', help='mark seats as placeholders again (the maker chooses)')
     parser.add_argument('--pin', metavar='RANGE', help='with --sort: also leave these seats alone this time')
     parser.add_argument('--mark', metavar='RANGE', help='with --storyboard: open the page with these seats already '
                                                         'pointed at (the seats of a correction sheet)')
@@ -1873,6 +1930,8 @@ def main(argv=None):
             return cmd_replace(work_dir, args.replace, cfg)
         if args.move:
             return cmd_move(work_dir, args.move, cfg)
+        if args.swap:
+            return cmd_swap(work_dir, args.swap, cfg)
         if args.sort:
             return cmd_sort(work_dir, args.sort, args.pin, root, cfg)
         if args.pin_set:
@@ -1885,6 +1944,8 @@ def main(argv=None):
             return cmd_status(work_dir, args.pick, 'picked', cfg)
         if args.confirm:
             return cmd_status(work_dir, args.confirm, 'confirmed', cfg)
+        if args.placeholder:
+            return cmd_status(work_dir, args.placeholder, 'placeholder', cfg)
         if args.check:
             return cmd_check(work_dir, root, cfg)
         if args.mark and not args.storyboard:

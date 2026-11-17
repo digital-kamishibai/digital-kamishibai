@@ -13,7 +13,7 @@ To change the format, change this file first, then the tools.
 All three are tested against the same example, [`examples/sample-story/`](../examples/sample-story/).
 The two readers of `script.md` (the builder in Python, the player in JavaScript) are held to one shared set of answers (§2.7).
 
-Status: **v1, first edition (2026-10-22)**; `[BGM once]` added 2026-10-24 (player stage 4). Several `[Video]` on one slide allowed 2026-10-24 (the narrator picks which one to play). `overlays`, `draft` and the correction sheet (§6) added 2026-10-25 (practising and correcting in the player). `slide_size`, `overlay_base`, `overlay_layout` and the `layout` correction added 2026-10-25 (moving the words on the picture). `[Text]` (words on the screen, written in `script.md`, §2.6) added 2026-10-25, and drawn into the picture by the builder the same day. `role`, `seats` and `source_segments` of a video (§3.3) and the `picture`, `video K` and `ending seat N` corrections (§6) added 2026-10-26 (pointing at pictures and videos while practising). `[BGM after video]` added 2026-10-29 (music that the old works start by a click once the video is over). `Use` of a `picture` correction (choosing a candidate in the player) added 2026-10-29. `color` and `fill` of a `layout` correction, the colour of a box and the light-against-dark guide (§3.2) added 2026-10-30 (correcting the colours of the words on the picture). `picture_source` of a slide (§3.2) added 2026-11-01 (a picture correction was taken as changed after a rebuild). `[Video]` with a YouTube link — a **linked video** (§2.4, §3.3) — added 2026-11-09, and its `captions` the same day (listeners cannot choose captions themselves), (a work handed out to other families shows published videos without packing them, and listeners on their own devices see them too). Music that is too loud is played quieter (§4) from 2026-11-09 (a song from a CD put in place of a sample's music drowned out the narration). `volume` of a linked video added 2026-11-10 (a talk on YouTube played about 6 dB louder than the video files beside it, and the player cannot measure it), and the `Volume` correction (§6) the same day (a maker who does not know dB sets it by ear while practising). Planned 2026-11-11 for opening the site's samples in one press (the tools follow stage by stage; none of these is in a tool yet): samples on the site (§1), a zip read and written by the player (§1), the player reading a pasted `script.md` (§2.7), numbered holes `~N ` (§2.3), a changed version of a handed-out sample kept as `script.md` (§6), SVG pictures (§4) and substitute fonts for drawing words (§3.2). Covers what stage 1 of the player needs (pictures, slide order, narrator notes)
+Status: **v1, first edition (2026-10-22)**; `[BGM once]` added 2026-10-24 (player stage 4). Several `[Video]` on one slide allowed 2026-10-24 (the narrator picks which one to play). `overlays`, `draft` and the correction sheet (§6) added 2026-10-25 (practising and correcting in the player). `slide_size`, `overlay_base`, `overlay_layout` and the `layout` correction added 2026-10-25 (moving the words on the picture). `[Text]` (words on the screen, written in `script.md`, §2.6) added 2026-10-25, and drawn into the picture by the builder the same day. `role`, `seats` and `source_segments` of a video (§3.3) and the `picture`, `video K` and `ending seat N` corrections (§6) added 2026-10-26 (pointing at pictures and videos while practising). `[BGM after video]` added 2026-10-29 (music that the old works start by a click once the video is over). `Use` of a `picture` correction (choosing a candidate in the player) added 2026-10-29. `color` and `fill` of a `layout` correction, the colour of a box and the light-against-dark guide (§3.2) added 2026-10-30 (correcting the colours of the words on the picture). `picture_source` of a slide (§3.2) added 2026-11-01 (a picture correction was taken as changed after a rebuild). `[Video]` with a YouTube link — a **linked video** (§2.4, §3.3) — added 2026-11-09, and its `captions` the same day (listeners cannot choose captions themselves), (a work handed out to other families shows published videos without packing them, and listeners on their own devices see them too). Music that is too loud is played quieter (§4) from 2026-11-09 (a song from a CD put in place of a sample's music drowned out the narration). `volume` of a linked video added 2026-11-10 (a talk on YouTube played about 6 dB louder than the video files beside it, and the player cannot measure it), and the `Volume` correction (§6) the same day (a maker who does not know dB sets it by ear while practising). Planned 2026-11-11 for opening the site's samples in one press (the tools follow stage by stage; none of these is in a tool yet): samples on the site (§1), a zip read and written by the player (§1), the player reading a pasted `script.md` (§2.7), numbered holes `~N ` (§2.3), a changed version of a handed-out sample kept as `script.md` (§6), SVG pictures (§4) and substitute fonts for drawing words (§3.2). `ending seat N remove` (§6) and `final` of a seat (§3.3) added 2026-11-17 (a seat of the ending video is chosen on a card of the storyboard; swapping and moving are said in the `Comment:`). Covers what stage 1 of the player needs (pictures, slide order, narrator notes)
 and fixes the shape of sound and video cues. Size limits for video are provisional until stage 2 measures them.
 
 **Not in v1** (decided, not forgotten): sound effects the narrator triggers by tapping, and music volume per slide.
@@ -486,7 +486,7 @@ own picture is the one mostly seen.
 | Field | Meaning |
 |---|---|
 | `role` | `"ending"`: the video was put together from pictures on a song (the ladder's ending video). Missing means a video shown during the story |
-| `seats` | only with `role: "ending"`, and may be missing even then (an ending made in an editing app has none). The places on the video's timeline, one per seat of the ending video's definition, in order: `{"n": 1, "from": 4.2, "to": 10.2}`. `n` counts from 1 by one; `from` and `to` are **seconds from the start of this video file** (an opening before the song is already added in), `from < to`, and a seat never starts before the previous one ends. Optional: `label` (what the maker put in the seat, as the maker named it — a file name), `pin` (why the seat must not move, for a seat the maker pinned) |
+| `seats` | only with `role: "ending"`, and may be missing even then (an ending made in an editing app has none). The places on the video's timeline, one per seat of the ending video's definition, in order: `{"n": 1, "from": 4.2, "to": 10.2}`. `n` counts from 1 by one; `from` and `to` are **seconds from the start of this video file** (an opening before the song is already added in), `from < to`, and a seat never starts before the previous one ends. Optional: `label` (what the maker put in the seat, as the maker named it — a file name), `pin` (why the seat must not move, for a seat the maker pinned), `final` (`true` only: the seat of the closing picture, `kind: "final"` in the definition — it can only be replaced, never removed or moved) |
 | `source_segments` | only without `role`: the video file is these stretches of a longer original, joined in order: `[{"start": 82, "dur": 74}, {"start": 278, "dur": 105}]` (seconds in the original). The narrator's corrections then also give the time in the original |
 
 ```json
@@ -518,7 +518,7 @@ as written (it can carry more, such as a playlist). Times in the playback messag
 
 A seat holds the times `from <= t < to` (so a time on the line between two seats belongs to the later one). A time
 between two seats or outside every seat (an opening or a closing) belongs to no seat.
-**Like `notes`, a player must never send `seats`, `label`, `pin` or `source_segments` to a listener's device** —
+**Like `notes`, a player must never send `seats`, `label`, `pin`, `final` or `source_segments` to a listener's device** —
 a label can carry a family's names and dates. Listeners get the video itself and nothing about it but its size.
 
 ### 3.4 Joining in the middle
@@ -684,7 +684,7 @@ Comment: the band in the picture is gone, and the words sank into the sky
   is a heading `## [Slide N] comment` followed by the `Comment:` line only.
 - **Before** is what lets the person or the chat AI find the place in the source: notes are not the source word for word
   (production notes, bold and cues are removed — §3.2).
-- The keywords (`Correction sheet`, `[Slide N]`, `notes`, `overlay`, `layout`, `left`, `top`, `width`, `height`, `size`, `color`, `fill`, `none`, `Before`, `After`, `Comment`, `picture`, `video`, `ending seat`, `At`, `Label`, `Pin`, `From`, `To`, `source`, `Use`, `Volume`, `was`) are fixed. Do not translate them.
+- The keywords (`Correction sheet`, `[Slide N]`, `notes`, `overlay`, `layout`, `left`, `top`, `width`, `height`, `size`, `color`, `fill`, `none`, `Before`, `After`, `Comment`, `picture`, `video`, `ending seat`, `remove`, `At`, `Label`, `Pin`, `From`, `To`, `source`, `Use`, `Volume`, `was`) are fixed. Do not translate them.
 
 **Pictures and videos** cannot be corrected in the player — a picture is made again, a video is cut again or put
 together again, and **the maker chooses** the new one. The sheet only says **what to change, and where**:
@@ -705,6 +705,10 @@ Comment: start after the interview
 At 0:08.3
 Label pictures/03.png
 Comment: too dark — another photo from that morning
+
+## [Slide 7] ending seat 5 remove
+At 0:28.0
+Label 2016/bike.jpg
 ````
 
 - `picture`: a request to make the picture again (or, for a photo, to change it). `Comment:` is **required**.
@@ -736,9 +740,18 @@ Comment: too dark — another photo from that morning
   Volume -6dB (was 0dB)
   Comment: louder than the other videos
   ````
-- `ending seat N`: seat N of the slide's ending video (`role: "ending"` with `seats`), pointed at while paused:
-  `At` is where it was paused; `Label` and `Pin` copy the seat's `label` and `pin` when it has them. It asks for
-  **another picture in that seat**; `Comment:` (optional) says why. The seat keeps its place on the song.
+- `ending seat N`: seat N of the slide's ending video (`role: "ending"` with `seats`), chosen on a card of the
+  storyboard (or, with the storyboard closed, where the video was paused). `At` is the middle of the seat (or where it
+  was paused); `Label` and `Pin` copy the seat's `label` and `pin` when it has them. It asks for **a change to that
+  seat**: another picture, or — said in the `Comment:` with **the storyboard's seat numbers** — a swap or a move
+  ("swap with 7", "after 2", "to the front"). `Comment:` is optional. The seat keeps its place on the song.
+  No other line may follow the heading (a reader stops at an unknown line instead of passing it in silence).
+- `ending seat N remove`: **remove** the picture of seat N. The pictures after it move forward by one seat, up to the
+  next seat that does not move (a seat with `pin`, or the closing picture, `final`) or to the last seat, and the seat
+  that is left empty is for the maker to fill. A seat with `pin` or `final` cannot be removed. The removal is in the
+  heading, not in a line, so a reader that does not know it stops (`not a correction heading`) instead of reading it
+  as a request for another picture. The lines are as for `ending seat N`.
+  A seat has at most one correction: a change and a removal replace each other.
 - One slide may have several of these, and any of them next to text corrections. A slide's `comment` stays as above.
 
 A `Volume` is judged by the `[Video]` line's `volume` when the work is opened again: **done** (removed by itself) when

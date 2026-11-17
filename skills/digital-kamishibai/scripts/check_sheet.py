@@ -26,10 +26,13 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 import build_work  # noqa: E402  (build_work.py, next to this file)
 
-HEADING = re.compile(r'^## \[Slide (\d+)\] (?:(notes) (\d+)(?:-(\d+))?|(overlay|layout|video|ending seat) (\d+)|(comment|picture))[ \t]*$')
+HEADING = re.compile(r'^## \[Slide (\d+)\] (?:(notes) (\d+)(?:-(\d+))?|(overlay|layout|video|ending seat) (\d+)( remove)?|(comment|picture))[ \t]*$')
 # Pictures and videos (work-format §6): the sheet says what to change and where; the maker chooses the new one.
 MEDIA_KINDS = ('picture', 'video', 'ending seat')
 MEDIA_LINE = re.compile(r'^(From|To|At|Label|Pin|Use) (.+?)[ \t]*$')
+# The lines of an ending seat. Any other line is an error, so a line added later is never read past in silence
+# (that is why a removal is in the heading, `ending seat N remove`: an older check_sheet.py stops at it)
+SEAT_LINES = ('at', 'label', 'pin')
 VOLUME_LINE = re.compile(r'^Volume (-?\d+(?:\.\d+)?)dB \(was (-?\d+(?:\.\d+)?)dB\)[ \t]*$')
 FENCE = re.compile(r'^(`{3,})[ \t]*$')
 LAYOUT_LINE = re.compile(r'^(left|top|width|height) (-?\d+(?:\.\d+)?)in$|^size (\d+)pt$'
@@ -102,14 +105,18 @@ def read_sheet(text: str) -> tuple[str | None, list[dict], list[str]]:
     while i < len(lines):
         line = lines[i]
         h = HEADING.match(line)
+        if h and h.group(7) and h.group(5) != 'ending seat':
+            h = None                                             # only an ending seat is removed
         if h:
             slide = int(h.group(1))
             if h.group(2):
                 item = {'slide': slide, 'kind': 'notes', 'at': (int(h.group(3)), int(h.group(4) or h.group(3)))}
             elif h.group(5):
                 item = {'slide': slide, 'kind': h.group(5), 'at': int(h.group(6))}
+                if h.group(7):
+                    item['remove'] = True
             else:
-                item = {'slide': slide, 'kind': h.group(7), 'at': None}
+                item = {'slide': slide, 'kind': h.group(8), 'at': None}
             items.append(item)
             i += 1
             continue
@@ -133,6 +140,12 @@ def read_sheet(text: str) -> tuple[str | None, list[dict], list[str]]:
             item['comment'] = line[len('Comment:'):].strip()
         elif item is not None and item['kind'] == 'video' and (vm := VOLUME_LINE.match(line)):
             item['volume'] = (float(vm.group(1)), float(vm.group(2)))
+        elif item is not None and item['kind'] == 'ending seat':
+            mm = MEDIA_LINE.match(line)
+            if mm and mm.group(1).lower() in SEAT_LINES:
+                item.setdefault('media', {})[mm.group(1).lower()] = mm.group(2)
+            elif line.strip():
+                errors.append(f'line {i + 1}: not a line of an ending seat (At, Label, Pin, Comment:): {line!r}')
         elif item is not None and item['kind'] in MEDIA_KINDS and (mm := MEDIA_LINE.match(line)):
             item.setdefault('media', {})[mm.group(1).lower()] = mm.group(2)   # not 'at': that is the heading's number
         i += 1
@@ -303,6 +316,8 @@ def main(argv: list[str] | None = None) -> int:
         at = item['at'] if item['kind'] != 'notes' else (
             f'{item["at"][0]}' if item['at'][0] == item['at'][1] else f'{item["at"][0]}-{item["at"][1]}')
         where = f'[Slide {item["slide"]}] {item["kind"]}' + (f' {at}' if at is not None else '')
+        if item.get('remove'):
+            where += '  - remove'
         use = item.get('media', {}).get('use') if item['kind'] == 'picture' else None
         vol = item.get('volume')
         note = (f'  - use {use}' if use else '') + (f'  - volume {vol[0]:g}dB (was {vol[1]:g}dB)' if vol else '') + (f'  - {item["comment"]}' if item.get('comment') else '')

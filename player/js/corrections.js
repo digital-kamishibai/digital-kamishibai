@@ -6,7 +6,7 @@
 //   - 読み直した作品と比べた反映の判定（反映済み／手を入れて反映／未反映）
 //   - 修正票の Markdown・ブラウザの中への保存の形
 //   - 画面の文字の置き場所（layout。絵の上で動かした枠の位置・大きさ・文字の大きさ・文字色・下地の色。計算は layout.js）
-//   - エンディング動画のコマ（seat。止めた位置のコマを「差し替えたい」と指す。§6 ending seat N）——
+//   - エンディング動画のコマ（seat。絵コンテで選んだ席を「直したい」「外したい」と指す。§6 ending seat N・ending seat N remove）——
 //     文ではないので Before/After で判定せず、指したときの写真の名前・動画のファイルが変わったら「変わった（見て消す）」。自分では消さない
 //   - 上演中の動画の区間（video。止めた位置を「開始に／終わりに」。§6 video K）——コマと同じく判定せず、動画のファイルか元の区間が変わったら「変わった」
 //   - 絵の作り直し（picture。何をどう直したいかの文が必須。§6 picture）——1枚に1件。絵のパスかファイルが変わったら「変わった」。
@@ -244,15 +244,21 @@ export const pictureLines = (x) => [...(x.use ? [`Use ${x.use}`] : []), ...(x.co
 
 // ---------- エンディング動画のコマ（seat） ----------
 
+const tenth = (t) => Math.round(t * 10) / 10;
+
 /** その枚の k 本目の動画の合図（cues の動画だけを数える。1から） */
 export const videoCueOf = (slideData, k) => (slideData.cues || []).filter((c) => c && c.type === 'video')[k - 1] || null;
 
-/** コマを指す: 止めた位置 time（動画の中の秒）のコマを、修正票に入れる。同じ動画の同じコマは1件にまとめる（ひとことを書き替える）。
- *  file＝指したときの動画のファイルの見分け（{ size, modified }）。コマが無い位置なら sheet をそのまま返す */
-export function pointSeat(sheet, slideData, k, seats, time, file, comment = '') {
-  const seat = (seats || []).find((t) => t.from <= time && time < t.to);
-  if (!seat) return sheet;
-  const item = { slide: slideData.number, kind: 'seat', at: seat.n, video: k, time: Math.round(time * 10) / 10 };
+/** コマを指す: 絵コンテで選んだ席 seat（作品の seats の1つ）を、修正票に入れる。同じ動画の同じ席は1件にまとめる
+ *  （ひとことを書き替える。差し替えと外すも置き換え合う）。time＝席の真ん中（§6 の At 行）。
+ *  action: 無し＝直したい（差し替え・入れ替え・移す。どれかはひとことで）| 'remove'＝外したい（後ろを詰める）。
+ *  動かない席（pin の席・閉じの絵の席 final）は外せない——sheet をそのまま返す。
+ *  file＝指したときの動画のファイルの見分け（{ size, modified }）。止めた位置から指すときは、呼ぶ側で seatAt してから呼ぶ */
+export function markSeat(sheet, slideData, k, seat, file, comment = '', action) {
+  if (!seat || !Number.isInteger(seat.n) || (action !== undefined && action !== 'remove')) return sheet;
+  if (action === 'remove' && (seat.pin || seat.final === true)) return sheet;
+  const item = { slide: slideData.number, kind: 'seat', at: seat.n, video: k, time: tenth((seat.from + seat.to) / 2) };
+  if (action) item.action = action;
   if (seat.label !== undefined) item.label = seat.label;
   if (seat.pin) item.pin = seat.pin;
   if (file) item.file = { size: file.size, modified: file.modified };
@@ -263,8 +269,6 @@ export function pointSeat(sheet, slideData, k, seats, time, file, comment = '') 
 }
 
 // ---------- 上演中の動画の区間（video K） ----------
-
-const tenth = (t) => Math.round(t * 10) / 10;
 
 /** 区間の端を入れる: side＝'from'（いまの位置を開始に）| 'to'（終わりに）、time＝動画の中の秒。同じ動画は1件にまとめる。
  *  元の動画の区間（source_segments）があれば、元の動画での秒も持つ（Markdown の (source m:ss.s)。M3）。
@@ -482,7 +486,7 @@ const pad = (n) => String(n).padStart(2, '0');
 const stamp = (d) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 
 export const place = (x) => (x.kind === 'notes' ? `notes ${x.at[0] === x.at[1] ? x.at[0] : `${x.at[0]}-${x.at[1]}`}`
-  : x.kind === 'seat' ? `ending seat ${x.at}` : x.kind === 'picture' ? 'picture' : x.kind === 'volume' ? `video ${x.at}` : `${x.kind} ${x.at}`);
+  : x.kind === 'seat' ? `ending seat ${x.at}${x.action === 'remove' ? ' remove' : ''}` : x.kind === 'picture' ? 'picture' : x.kind === 'volume' ? `video ${x.at}` : `${x.kind} ${x.at}`);
 /** 動画の中の秒 → m:ss.s（§6） */
 export function clock(sec) {
   const tenths = Math.round(Math.max(0, Number(sec) || 0) * 10);
@@ -548,6 +552,7 @@ export function readSheet(raw, title) {
     || (x.kind === 'overlay' && isBoxShape(x.before) && isBoxShape(x.after) && Number.isInteger(x.at))
     || (x.kind === 'layout' && isLayoutValues(x.before) && isLayoutValues(x.after) && Number.isInteger(x.at))
     || (x.kind === 'seat' && Number.isInteger(x.at) && Number.isInteger(x.video) && typeof x.time === 'number'
+      && (x.action === undefined || x.action === 'remove')
       && (x.label === undefined || typeof x.label === 'string') && (x.pin === undefined || typeof x.pin === 'string')
       && (x.comment === undefined || typeof x.comment === 'string')
       && isFile(x.file))

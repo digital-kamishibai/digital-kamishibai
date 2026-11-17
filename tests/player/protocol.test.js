@@ -9,7 +9,7 @@ import {
 const work = {
   format: 'digital-kamishibai/work', version: 1, title: 'T', language: 'en', draft: true,
   // overlays も notes と同じく語り手専用（work-format §3.2。練習しながら直す修正票のために足した）
-  slides: [1, 2, 3].map((n) => ({ number: n, title: `S${n}`, picture: `pictures/0${n}.jpg`, notes: `SECRET NOTES ${n}`, overlays: [[[`SECRET OVERLAY ${n}`]]], overlay_base: `overlay_base/SECRET_BASE_${n}.jpg`, overlay_layout: [{ x: 1, y: 1, width: 1, height: 1, inset: [0, 0, 0, 0], anchor: 'top', wrap: true, paragraphs: [{ align: 'left', space_before: 0, size: 30, bold: true, color: '#123456', font: 'SECRETFONT' }] }], cues: [{ type: 'sound', file: 'sounds/x.mp3' }, { type: 'video', file: 'videos/SECRET_VIDEO.mp4', role: 'ending', seats: [{ n: 1, from: 0, to: 5, label: 'SECRET_LABEL.jpg', pin: 'SECRET PIN' }] }, { type: 'video', file: 'videos/clip.mp4', source_segments: [{ start: 4242, dur: 10 }] }] })),
+  slides: [1, 2, 3].map((n) => ({ number: n, title: `S${n}`, picture: `pictures/0${n}.jpg`, notes: `SECRET NOTES ${n}`, overlays: [[[`SECRET OVERLAY ${n}`]]], overlay_base: `overlay_base/SECRET_BASE_${n}.jpg`, overlay_layout: [{ x: 1, y: 1, width: 1, height: 1, inset: [0, 0, 0, 0], anchor: 'top', wrap: true, paragraphs: [{ align: 'left', space_before: 0, size: 30, bold: true, color: '#123456', font: 'SECRETFONT' }] }], cues: [{ type: 'sound', file: 'sounds/x.mp3' }, { type: 'video', file: 'videos/SECRET_VIDEO.mp4', role: 'ending', seats: [{ n: 1, from: 0, to: 5, label: 'SECRET_LABEL.jpg', pin: 'SECRET PIN', final: true }] }, { type: 'video', file: 'videos/clip.mp4', source_segments: [{ start: 4242, dur: 10 }] }] })),
 };
 const pictures = new Map([1, 2, 3].map((n) => [n, { mime: 'image/jpeg', size: 100 * n, key: `pictures/0${n}.jpg` }]));
 
@@ -73,7 +73,7 @@ test('R1: エンディング動画の席・写真の名前・元の動画の区�
   const videos = work.slides[0].cues.filter((c) => c.type === 'video').map((c, k) => ({ ...c, id: `v${k}`, n: 1, size: 10, mime: 'video/mp4', kind: 'video' }));
   const out = [...onHello(s, 'a', {}), ...approve(s, 'a', work, pictures, videos), ...goTo(s, 2, 3)];
   const text = everything(out);
-  for (const secret of ['seats', 'SECRET_LABEL', 'label', 'SECRET PIN', 'pin"', 'source_segments', '4242', 'role', 'ending', 'SECRET_VIDEO', 'videos/']) {
+  for (const secret of ['seats', 'SECRET_LABEL', 'label', 'SECRET PIN', 'pin"', 'final', 'source_segments', '4242', 'role', 'ending', 'SECRET_VIDEO', 'videos/']) {
     assert.ok(!text.includes(secret), secret);
   }
 });

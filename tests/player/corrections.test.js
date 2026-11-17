@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   editable, sheetEnabled, mayReload, keepSlide, editorStep, paragraphs, boxFromFields, fieldsFromBox,
   diffNotes, diffOverlays, emptySheet, setSlideEdits, removeItem, judge, reconcile, applySheet,
-  fence, sheetMarkdown, sheetName, readSheet, storageKey, isEmpty, pointSeat, clock, seatLines,
+  fence, sheetMarkdown, sheetName, readSheet, storageKey, isEmpty, markSeat, clock, seatLines,
   markCut, cutLines, mediaLines, place, videoOf, askPicture, choosePicture, pictureLines, sheetCounts, workSig, commentStatus, removeComment, isOldComment, sheetGroups,
   setLinkVolume, linkVolumeNow, volumeLines, dbText,
 } from '../../player/js/corrections.js';
@@ -231,45 +231,61 @@ const endingSlide = (labels = ['photos/a.jpg', 'photos/b.jpg']) => ({
 });
 const FILE = { size: 1000, modified: 111 };
 
-test('止めた位置のコマを指すと、その枚の何本目の動画の何番のコマかが入る・同じコマは1件にまとめる', () => {
-  let sh = pointSeat(emptySheet('T'), endingSlide(), 2, seats, 9.04, FILE, '  too   dark ');
-  assert.deepEqual(sh.items, [{ slide: 4, kind: 'seat', at: 2, video: 2, time: 9, label: 'photos/b.jpg', pin: 'the chorus', file: FILE, comment: 'too dark' }]);
-  sh = pointSeat(sh, endingSlide(), 2, seats, 10, FILE, 'another morning');
+test('選んだ席を指すと、その枚の何本目の動画の何番の席かが入る（At は席の真ん中）・同じ席は1件にまとめる', () => {
+  let sh = markSeat(emptySheet('T'), endingSlide(), 2, seats[1], FILE, '  too   dark ');
+  assert.deepEqual(sh.items, [{ slide: 4, kind: 'seat', at: 2, video: 2, time: 11, label: 'photos/b.jpg', pin: 'the chorus', file: FILE, comment: 'too dark' }]);
+  sh = markSeat(sh, endingSlide(), 2, seats[1], FILE, 'another morning');
   assert.equal(sh.items.length, 1);
   assert.equal(sh.items[0].comment, 'another morning');
-  assert.equal(pointSeat(sh, endingSlide(), 2, seats, 1.5, FILE), sh, 'コマの外（前の映像）では何も入らない');
+  assert.equal(markSeat(sh, endingSlide(), 2, null, FILE), sh, '席の外（前の映像）では何も入らない');
+});
+
+test('外す件: 見出しに remove・差し替えと外すは同じ席で置き換え合う・動かない席は外せない・知らない action は入らない', () => {
+  let sh = markSeat(emptySheet('T'), endingSlide(), 2, seats[0], FILE, '7 と入れ替え');
+  sh = markSeat(sh, endingSlide(), 2, seats[0], FILE, '', 'remove');
+  assert.deepEqual(sh.items, [{ slide: 4, kind: 'seat', at: 1, video: 2, time: 5, action: 'remove', label: 'photos/a.jpg', file: FILE }]);
+  assert.equal(place(sh.items[0]), 'ending seat 1 remove');
+  const md = sheetMarkdown(sh, new Date(2026, 9, 26, 10, 0));
+  assert.match(md, /## \[Slide 4\] ending seat 1 remove\nAt 0:05\.0\nLabel photos\/a\.jpg\n/);
+  sh = markSeat(sh, endingSlide(), 2, seats[0], FILE, 'darker one');
+  assert.equal(sh.items.length, 1);
+  assert.equal(sh.items[0].action, undefined, '直したいに戻せる');
+  assert.equal(place(sh.items[0]), 'ending seat 1');
+  assert.equal(markSeat(sh, endingSlide(), 2, seats[1], FILE, '', 'remove'), sh, 'pin の席は外せない');
+  assert.equal(markSeat(sh, endingSlide(), 2, { ...seats[0], final: true }, FILE, '', 'remove'), sh, '閉じの絵の席は外せない');
+  assert.equal(markSeat(sh, endingSlide(), 2, seats[0], FILE, '', 'swap'), sh);
 });
 
 test('コマの件は Markdown に At・Label・Pin・Comment で書く（文の件・その枚のひとことと並ぶ）', () => {
   let sh = setSlideEdits(emptySheet('T'), endingSlide(), { notes: 'Play it now.', comment: 'slower' });
-  sh = pointSeat(sh, endingSlide(), 2, seats, 3.25, FILE);
+  sh = markSeat(sh, endingSlide(), 2, seats[0], FILE);
   assert.equal(clock(83.25), '1:23.3');
   assert.equal(clock(3), '0:03.0');
   const md = sheetMarkdown(sh, new Date(2026, 9, 26, 10, 0));
   assert.equal(md, [
     '# Correction sheet: T (2026-10-26 10:00)', '',
     '## [Slide 4] notes 1', '### Before', '```', 'Play it.', '```', '### After', '```', 'Play it now.', '```', 'Comment: slower', '',
-    '## [Slide 4] ending seat 1', 'At 0:03.3', 'Label photos/a.jpg', '',
+    '## [Slide 4] ending seat 1', 'At 0:05.0', 'Label photos/a.jpg', '',
   ].join('\n'));
   assert.deepEqual(seatLines({ time: 9, label: 'b', pin: 'p', comment: 'c' }), ['At 0:09.0', 'Label b', 'Pin p', 'Comment: c']);
 });
 
 test('ひとことだけの枚にコマの件があっても、ひとことは comment の見出しで残る', () => {
   let sh = setSlideEdits(emptySheet('T'), endingSlide(), { notes: 'Play it.', comment: 'music too loud' });
-  sh = pointSeat(sh, endingSlide(), 2, seats, 3, FILE);
+  sh = markSeat(sh, endingSlide(), 2, seats[0], FILE);
   const md = sheetMarkdown(sh, new Date(2026, 9, 26, 10, 0));
   assert.match(md, /## \[Slide 4\] comment\nComment: music too loud\n\n## \[Slide 4\] ending seat 1/);
 });
 
 test('直す欄を閉じても、指したコマは消えない', () => {
-  let sh = pointSeat(emptySheet('T'), endingSlide(), 2, seats, 3, FILE);
+  let sh = markSeat(emptySheet('T'), endingSlide(), 2, seats[0], FILE);
   sh = setSlideEdits(sh, endingSlide(), { notes: 'Play it.' });
   assert.equal(sh.items.length, 1);
   assert.equal(applySheet(sh, endingSlide()).notes, 'Play it.', 'コマの件は台本に当てない');
 });
 
 test('読み直し: 写真の名前か動画のファイルが変わったら「変わった」・自分では消さない・変わっていなければ未反映', () => {
-  const sh = pointSeat(emptySheet('T'), endingSlide(), 2, seats, 3, FILE);
+  const sh = markSeat(emptySheet('T'), endingSlide(), 2, seats[0], FILE);
   const x = sh.items[0];
   assert.equal(judge(x, endingSlide(), () => FILE), 'pending');
   assert.equal(judge(x, endingSlide(), () => null), 'pending', '動画が手元に無ければ写真の名前だけで見る');
@@ -285,9 +301,11 @@ test('読み直し: 写真の名前か動画のファイルが変わったら「
 });
 
 test('保存したコマの件を読み戻す・形の違う件は捨てる', () => {
-  const sh = pointSeat(emptySheet('T'), endingSlide(), 2, seats, 9, FILE, 'x');
-  assert.deepEqual(readSheet(JSON.stringify(sh), 'T'), sh);
-  const bad = { ...sh, items: [{ ...sh.items[0], video: 'two' }, { ...sh.items[0], file: { size: 1 } }] };
+  const sh = markSeat(emptySheet('T'), endingSlide(), 2, seats[1], FILE, 'x');
+  assert.deepEqual(readSheet(JSON.stringify(sh), 'T'), sh, 'action の無い件（古い件も）はそのまま読める');
+  const rm = markSeat(emptySheet('T'), endingSlide(), 2, seats[0], FILE, '', 'remove');
+  assert.deepEqual(readSheet(JSON.stringify(rm), 'T'), rm);
+  const bad = { ...sh, items: [{ ...sh.items[0], video: 'two' }, { ...sh.items[0], file: { size: 1 } }, { ...sh.items[0], action: 'swap' }] };
   assert.deepEqual(readSheet(JSON.stringify(bad), 'T').items, []);
 });
 

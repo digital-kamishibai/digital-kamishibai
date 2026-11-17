@@ -633,6 +633,8 @@ def ending_seats(folder: Path | None, result: Result) -> dict[str, list[dict]]:
                     seat['label'] = str(f['src'])
                 if f.get('pin'):
                     seat['pin'] = str(f['pin'])
+                if f.get('kind') == 'final':     # the closing picture: the player does not offer to remove it
+                    seat['final'] = True
                 seats.append(seat)
             output = data['output']
         except (OSError, ValueError, KeyError, TypeError) as e:

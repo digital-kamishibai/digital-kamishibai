@@ -22,7 +22,7 @@ import { createEngine } from './engine.js';
 import {
   editable, sheetEnabled, mayReload, keepSlide, editorStep, boxFromFields, fieldsFromBox, boxText, paragraphs,
   emptySheet, setSlideEdits, removeItem, removeComment, isOldComment, judge, reconcile, applySheet, sheetMarkdown, sheetName,
-  readSheet, storageKey, isEmpty, place, textOf, videoCueOf, pointSeat, clock as seatClock, mediaLines, isMedia, videoOf, markCut, setLinkVolume, linkVolumeNow, dbText,
+  readSheet, storageKey, isEmpty, place, textOf, videoCueOf, markSeat, clock as seatClock, mediaLines, isMedia, videoOf, markCut, setLinkVolume, linkVolumeNow, dbText,
   askPicture, choosePicture, sheetCounts, sheetGroups, workSig,
 } from './corrections.js';
 import {
@@ -2359,15 +2359,28 @@ function renderLinkNote() {
 }
 
 // ---------- エンディング動画のコマを指す（M1）・絵コンテ（M2） ----------
-// 止めた位置のコマを「差し替えたい」と修正票に入れる。新しい写真を選ぶのは作り手（絵コンテのページで）。
-// ⚠️ 席・写真の名前・カードの絵は語り手の画面だけ。聞き手へは送らない（R1。席は videos の一覧にも入れていない）
+// コマを「直したい」（差し替え・入れ替え・移す。どれかはひとことで）「外したい」（後ろを詰める）と修正票に入れる。
+// 番号は絵コンテのカードで決める（選んだ席）。閉じているときは今までどおり、止めた位置の席。新しい写真を選ぶのは作り手。
+// 2026-11-17: ひとことの欄が1つで、席を「押した瞬間に映っている席」で決めていたので、ひとことを書いてから次のカードを押すと
+// 次の番号に入った（練習した人が）。いまは選んだ席で決め、書きかけは席ごとに覚え、ボタンに番号を出す
+// ⚠️ 席・写真の名前・カードの絵・ひとことは語り手の画面だけ。聞き手へは送らない（R1。席は videos の一覧にも入れていない）
 
 /** いまの動画がエンディング動画で席を持つなら、その席 */
 function seatsOf(v) {
   const cue = v && work && work.slides[v.n - 1] ? videoCueOf(work.slides[v.n - 1], v.k) : null;
   return cue && cue.role === 'ending' && Array.isArray(cue.seats) && cue.seats.length ? cue.seats : null;
 }
-const pointedSeat = (v, n) => !!sheet && sheet.items.some((x) => x.kind === 'seat' && x.slide === v.n && x.video === v.k && x.at === n);
+/** その席の修正票の件（1つの席に1件） */
+const seatItem = (v, n) => (sheet ? sheet.items.find((x) => x.kind === 'seat' && x.slide === v.n && x.video === v.k && x.at === n) : null);
+/** 絵コンテがいまの動画で開いているか */
+const boardOpen = () => !!board && !!vCurrent && board.id === vCurrent.id;
+/** 記録する席: 絵コンテを開いていれば選んだ席（再生中でもよい）。閉じていれば止めた位置の席（再生中は null） */
+function targetSeat(seats) {
+  if (boardOpen()) return board.chosen == null ? null : seats.find((s) => s.n === board.chosen) || null;
+  return vEl.paused ? seatAt(seats, vEl.currentTime || 0) : null;
+}
+/** 選んだ席のひとことの欄: その席の書きかけ、無ければ記録したひとこと */
+const draftOf = (n) => (board.drafts.has(n) ? board.drafts.get(n) : (seatItem(vCurrent, n) || {}).comment || '');
 
 function renderSeatBar() {
   const seats = seatsOf(vCurrent);
@@ -2375,27 +2388,47 @@ function renderSeatBar() {
   $('seatBar').hidden = !can;
   if (!can) { closeBoard(); return; }
   const at = vEl.currentTime || 0;
-  const seat = seatAt(seats, at);
-  $('seatNow').textContent = seat
-    ? [t('seatNow', seat.n, seats.length, seatClock(at)), seat.label, seat.pin ? t('seatPinned', seat.pin) : ''].filter(Boolean).join(' · ')
-    : t('seatNone', seatClock(at));
+  const here = seatAt(seats, at);
+  const open = boardOpen();
+  const seat = open ? targetSeat(seats) : here;
+  const info = (s, clock) => [t('seatNow', s.n, seats.length, clock), s.label, s.pin ? t('seatPinned', s.pin) : ''].filter(Boolean).join(' · ');
+  $('seatNow').textContent = seat ? info(seat, seatClock(open ? seat.from : at)) : open ? t('seatPick') : t('seatNone', seatClock(at));
+  const target = targetSeat(seats);
+  const item = target ? seatItem(vCurrent, target.n) : null;
   const point = $('seatPoint');
-  point.disabled = !seat || !vEl.paused;
-  point.textContent = t(seat && pointedSeat(vCurrent, seat.n) ? 'seatPointAgain' : 'seatPoint');
-  point.title = seat && !vEl.paused ? t('seatPaused') : '';
-  $('seatComment').placeholder = t(seat && seat.pin ? 'seatPinnedPh' : 'seatCommentPh');
-  markBoard(seat);
+  point.disabled = !target;
+  point.textContent = t(item && !item.action ? 'seatPointAgain' : 'seatPoint', target ? target.n : seat ? seat.n : '');
+  point.title = !open && seat && !vEl.paused ? t('seatPaused') : '';
+  const fixed = !!target && (!!target.pin || target.final === true);
+  const remove = $('seatRemove');
+  remove.disabled = !target || fixed;
+  remove.textContent = t('seatRemove', target ? target.n : seat ? seat.n : '');
+  remove.title = target && target.final === true ? t('seatRemoveFinal') : target && target.pin ? t('seatRemovePinned')
+    : !open && seat && !vEl.paused ? t('seatPaused') : '';
+  $('seatComment').placeholder = t(seat && seat.final === true ? 'seatFinalPh' : seat && seat.pin ? 'seatPinnedPh' : 'seatCommentPh');
+  markBoard(here);
 }
 
-$('seatPoint').addEventListener('click', () => {
+/** 席を記録する（action: 無し＝直したい・'remove'＝外したい） */
+function recordSeat(action) {
   const seats = seatsOf(vCurrent);
   if (!seats || !sheet || !editable(editCtx())) return;
-  sheet = pointSeat(sheet, work.slides[vCurrent.n - 1], vCurrent.k, seats, vEl.currentTime,
-    { size: vCurrent.file.size, modified: vCurrent.file.lastModified }, $('seatComment').value);
-  $('seatComment').value = '';
+  const seat = targetSeat(seats);
+  if (!seat) return;
+  sheet = markSeat(sheet, work.slides[vCurrent.n - 1], vCurrent.k, seat,
+    { size: vCurrent.file.size, modified: vCurrent.file.lastModified }, $('seatComment').value, action);
+  if (boardOpen()) {
+    board.drafts.delete(seat.n);
+    $('seatComment').value = draftOf(seat.n);
+  } else $('seatComment').value = '';
   saveSheet();
   renderSheet();
   renderSeatBar();
+}
+$('seatPoint').addEventListener('click', () => recordSeat());
+$('seatRemove').addEventListener('click', () => recordSeat('remove'));
+$('seatComment').addEventListener('input', () => {
+  if (boardOpen() && board.chosen != null) board.drafts.set(board.chosen, $('seatComment').value);
 });
 for (const ev of ['timeupdate', 'pause', 'play', 'seeked', 'loadedmetadata']) vEl.addEventListener(ev, () => renderMediaBars());
 
@@ -2479,7 +2512,7 @@ function stepVolume(dir) {
 $('volDown').addEventListener('click', () => stepVolume(-1));
 $('volUp').addEventListener('click', () => stepVolume(1));
 
-let board = null; // 開いている絵コンテ { id, cards: Map(n → 要素), probe, alive }
+let board = null; // 開いている絵コンテ { id, cards: Map(n → 要素), probe, alive, chosen: 選んだ席の番号 | null, drafts: Map(n → 書きかけ) }
 
 /** 要素のできごとを1回待つ（動画が読めなかったら false） */
 function once(el, ev) {
@@ -2505,10 +2538,17 @@ async function openBoard() {
     const c = Object.assign(document.createElement('canvas'), { width: 192, height: 108 });
     const cap = document.createElement('span');
     cap.textContent = `${s.n} · ${seatClock(s.from)}${s.pin ? ' · 📌' : ''}`;
-    b.append(c, cap);
+    const mark = Object.assign(document.createElement('span'), { className: 'board-mark' });
+    b.append(c, cap, mark);
     b.addEventListener('click', () => {
+      // そのカードを選んだ席にする。欄はその席の書きかけに替える（前の席の書きかけを次の席へ持ち越さない）
+      if (board !== me) return;
+      if (me.chosen != null) me.drafts.set(me.chosen, $('seatComment').value);
+      me.chosen = s.n;
+      $('seatComment').value = draftOf(s.n);
       if (!vEl.paused) vEl.pause();
-      vEl.currentTime = (s.from + s.to) / 2; // カードの絵と同じ、席の真ん中（席の端はつなぎ目のフェードで前後の絵と重なる）
+      vEl.currentTime = (s.from + s.to) / 2; // 見て確かめる用。カードの絵と同じ、席の真ん中（席の端はつなぎ目のフェードで前後の絵と重なる）
+      renderSeatBar();
     });
     cards.set(s.n, b);
     return b;
@@ -2517,8 +2557,11 @@ async function openBoard() {
   $('boardBtn').setAttribute('aria-expanded', 'true');
   const probe = Object.assign(document.createElement('video'), { muted: true, preload: 'auto', playsInline: true });
   probe.src = URL.createObjectURL(v.file);
-  const me = { id: v.id, cards, probe, alive: true };
+  // 開いた直後は、いま映っている席を選んだ席にする（席の外なら選んでいない）
+  const here = seatAt(seats, vEl.currentTime || 0);
+  const me = { id: v.id, cards, probe, alive: true, chosen: here ? here.n : null, drafts: new Map() };
   board = me;
+  $('seatComment').value = me.chosen == null ? '' : draftOf(me.chosen);
   renderMediaBars();
   if (!(await once(probe, 'loadeddata'))) return;
   for (const s of seats) {
@@ -2537,6 +2580,7 @@ function closeBoard() {
     board.probe.removeAttribute('src');
     board.probe.load();
     board = null;
+    $('seatComment').value = ''; // 書きかけは絵コンテを開いているあいだだけ
   }
   $('board').hidden = true;
   $('board').replaceChildren();
@@ -2546,8 +2590,16 @@ function closeBoard() {
 function markBoard(now) {
   if (!board || !vCurrent || board.id !== vCurrent.id) return;
   for (const [n, el] of board.cards) {
-    el.classList.toggle('on', pointedSeat(vCurrent, n));
+    const x = seatItem(vCurrent, n);
+    const seat = (seatsOf(vCurrent) || []).find((s) => s.n === n);
+    el.classList.toggle('fix', !!x && !x.action);
+    el.classList.toggle('gone', !!x && x.action === 'remove');
+    el.classList.toggle('chosen', board.chosen === n);
+    el.setAttribute('aria-pressed', String(board.chosen === n));
     el.classList.toggle('now', !!now && now.n === n);
+    el.querySelector('.board-mark').textContent = !x ? '' : x.action === 'remove' ? `🗑 ${t('seatMarkRemove')}` : `✎ ${t('seatMarkFix')}`;
+    const head = x && x.comment ? (x.comment.length > 40 ? `${x.comment.slice(0, 40)}…` : x.comment) : '';
+    el.title = [seat && seat.label, head].filter(Boolean).join(' — ');
   }
 }
 

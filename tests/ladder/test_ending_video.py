@@ -170,7 +170,8 @@ def test_replace_an_unknown_seat():
 
 def test_move_moves_only_the_content():
     data = definition()
-    seats = [(f['i'], f['at'], f['dur'], f.get('beat'), f.get('pin')) for f in data['frames']]
+    data['frames'][1].pop('pin')
+    seats =[(f['i'], f['at'], f['dur'], f.get('beat'), f.get('pin')) for f in data['frames']]
     bev.apply_move(data, 3, 0)
     assert [f['src'] for f in data['frames']] == ['2019/c.mp4', '2019/a.jpg', '2019/b.jpg']
     assert data['frames'][0]['kind'] == 'clip' and data['frames'][0]['clip_start_sec'] == 1.0
@@ -184,6 +185,95 @@ def test_move_moves_only_the_content():
 def test_move_errors(i, after):
     with pytest.raises(bev.ConfigError):
         bev.apply_move(definition(), i, after)
+
+
+def five(final=False):
+    """Five seats: 3 is pinned; 5 is the closing picture when final."""
+    data = definition(duration_sec=20.0)
+    data['frames'] = [{'i': n, 'at': 4.0 * (n - 1), 'dur': 4.0, 'src': f'2019/{n}.jpg', 'status': 'picked'}
+                      for n in range(1, 6)]
+    data['frames'][2]['pin'] = 'the chorus'
+    if final:
+        data['frames'][4].update(kind='final', root='work', src='pictures/end.png')
+    return data
+
+
+def srcs(data):
+    return [os.path.basename(f['src']) for f in data['frames']]
+
+
+def test_move_that_does_not_cross_a_fixed_seat_moves_as_before():
+    data = five(final=True)
+    bev.apply_move(data, 4, 3)                                    # already after 3: nothing changes
+    assert srcs(data) == ['1.jpg', '2.jpg', '3.jpg', '4.jpg', 'end.png']
+    bev.apply_move(data, 1, 2)
+    assert srcs(data) == ['2.jpg', '1.jpg', '3.jpg', '4.jpg', 'end.png']
+    bev.apply_move(data, 2, 0)
+    assert srcs(data) == ['1.jpg', '2.jpg', '3.jpg', '4.jpg', 'end.png']
+
+
+@pytest.mark.parametrize('i, after, seat, hint', [
+    (1, 4, 3, '--move 1=2'),          # over the pinned seat, towards the end
+    (2, 3, 3, None),                  # the seat before the pin cannot go any further
+    (4, 0, 3, '--move 4=3'),          # over the pinned seat, towards the front
+    (4, 5, 5, None),                  # onto the closing picture
+    (3, 0, 3, None),                  # the pinned seat itself
+    (5, 3, 5, None),                  # the closing picture itself
+])
+def test_move_stops_before_a_pinned_seat_or_the_closing_picture_changes(i, after, seat, hint):
+    data = five(final=True)
+    before = copy.deepcopy(data)
+    with pytest.raises(bev.ConfigError) as ex:
+        bev.apply_move(data, i, after)
+    text = ' '.join(ex.value.messages)
+    assert f'seat {seat}' in text and 'does not move' in text
+    if hint:
+        assert hint in text and '--swap' in text
+    assert data == before, 'the definition is not changed'
+
+
+def test_move_stops_on_the_command_line_and_keeps_the_file(tmp_path):
+    w = tmp_path / 'work'
+    w.mkdir()
+    (w / 'ending_video.json').write_text(json.dumps(five()), encoding='utf-8')
+    before = (w / 'ending_video.json').read_text(encoding='utf-8')
+    assert bev.main([str(w), '--move', '1=4']) == 1
+    assert (w / 'ending_video.json').read_text(encoding='utf-8') == before
+
+
+def test_swap_exchanges_the_content_as_it_is():
+    data = five(final=True)
+    data['frames'][0].update(rotate='cw', status='confirmed')
+    data['frames'][3].update(kind='clip', src='2019/v.mp4', clip_start_sec=1.5, clip_hold_sec=2.0, status='placeholder')
+    seats = [(f['i'], f['at'], f['dur'], f.get('pin')) for f in data['frames']]
+    bev.apply_swap(data, 1, 4)
+    one, four = data['frames'][0], data['frames'][3]
+    assert (one['src'], one['kind'], one['clip_start_sec'], one['clip_hold_sec'], one['status']) == \
+        ('2019/v.mp4', 'clip', 1.5, 2.0, 'placeholder')
+    assert (four['src'], four['rotate'], four['status'], 'kind' in four) == ('2019/1.jpg', 'cw', 'confirmed', False)
+    assert [(f['i'], f['at'], f['dur'], f.get('pin')) for f in data['frames']] == seats
+    assert bev.validate_config(data) == []
+
+
+@pytest.mark.parametrize('a, b', [(1, 3), (3, 1), (1, 5), (2, 2), (1, 9)])
+def test_swap_stops(a, b):
+    data = five(final=True)
+    before = copy.deepcopy(data)
+    with pytest.raises(bev.ConfigError):
+        bev.apply_swap(data, a, b)
+    assert data == before
+
+
+def test_swap_and_placeholder_on_the_command_line(tmp_path):
+    w = tmp_path / 'work'
+    w.mkdir()
+    (w / 'ending_video.json').write_text(json.dumps(five()), encoding='utf-8')
+    assert bev.main([str(w), '--swap', '1=4', '--swap', '2=5']) == 0
+    assert bev.main([str(w), '--placeholder', '4-5']) == 0
+    data = json.loads((w / 'ending_video.json').read_text(encoding='utf-8'))
+    assert srcs(data) == ['4.jpg', '5.jpg', '3.jpg', '1.jpg', '2.jpg']
+    assert [f['status'] for f in data['frames']] == ['picked', 'picked', 'picked', 'placeholder', 'placeholder']
+    assert bev.main([str(w), '--swap', '1-4']) == 1
 
 
 def test_sort_by_date_leaves_pinned_seats_even_if_not_passed():

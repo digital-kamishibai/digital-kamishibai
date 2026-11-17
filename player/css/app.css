@@ -214,7 +214,10 @@ p.rec-note { margin: 6px 0 0; }
 .board .hint { grid-column: 1 / -1; margin: 0; }
 .board-card { display: flex; flex-direction: column; gap: 2px; padding: 3px; font-size: .8rem; text-align: left; }
 .board-card canvas { width: 100%; height: auto; aspect-ratio: 16 / 9; background: #000; display: block; }
-.board-card.on { outline: 3px solid var(--ng); }
+.board-card.fix, .board-card.gone { outline: 3px solid var(--ng); }
+.board-card.gone canvas { opacity: .35; }
+.board-card.chosen { box-shadow: 0 0 0 3px var(--accent); }
+.board-mark { min-height: 1.2em; }
 .board-card.now { border-color: var(--accent); background: var(--accent); color: #fff; }
 
 /* 絵の上で直す（overlay_layout）。⚠️ 枠の中の値は段階0で PowerPoint に合わせたもの——外すとずれる */

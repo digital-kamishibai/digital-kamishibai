@@ -22,9 +22,11 @@ python build_ending_video.py <work> --storyboard        # ending/storyboard.html
 python build_ending_video.py <work> --storyboard --mark 17,20   # the same, with the seats of a correction sheet already pointed at
 python build_ending_video.py <work> --replace 17=2016/bike.jpg --replace 3=2019/run.mp4@1.2   # @ = start second
 python build_ending_video.py <work> --move 14=2         # the content of seat 14 goes after seat 2
+python build_ending_video.py <work> --swap 7=12         # seats 7 and 12 exchange their content (as it is)
 python build_ending_video.py <work> --sort 1-30         # by date taken; pinned seats stay
 python build_ending_video.py <work> --pin-set 42="the first line of the chorus"
 python build_ending_video.py <work> --confirm 1-22      # mark what the maker has decided
+python build_ending_video.py <work> --placeholder 9     # a seat left for the maker to fill (after removing a picture)
 python build_ending_video.py <work>                     # build videos/<output>
 python build_ending_video.py <work> --check             # files, song, video, storyboard up to date
 python check_smoothness.py <work>                       # judder check of the finished video
@@ -32,6 +34,13 @@ python check_smoothness.py <work>                       # judder check of the fi
 
 - `--init` cuts the song into equal seats (`--seat 5` seconds) and fills them with photos from `--photos`, by date
   taken. Everything starts as a placeholder: **the maker chooses**. It never overwrites a definition.
+- **Seats that do not move**: a pinned seat (`pin`) and the closing picture (`kind: final`). `--sort` leaves them
+  alone; `--move` and `--swap` stop, changing nothing, when one of them would get another picture, and say what would
+  work instead (move only as far as the seat before it, or `--swap`). To move a pinned seat's picture, `--unpin` first.
+- `--swap A=B` takes everything of the content with it (`rotate`, `clip_start_sec`, `clip_hold_sec`, `clip_parts`,
+  `status`). Two `--replace` would lose what was fitted to each picture.
+- To remove a picture: `--move N=K` (K is the seat before the next seat that does not move, or the last seat), then
+  `--placeholder K` — the pictures after it move forward and the empty seat waits for the maker.
 - After any change, run `--storyboard` again before pointing at more seats (`--check` says when it is old).
 - On another computer, where the photos are in another folder: `--photo-root <folder>`.
 - One work, two ending videos: `--config NAME` (its own definition, storyboard and cache).

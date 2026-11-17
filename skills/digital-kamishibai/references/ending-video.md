@@ -56,12 +56,38 @@ elsewhere the maker runs it on their own computer. Its README has the details. T
    maker points at the seats to change. Show the maker this page — it holds the family's photos, so it stays on their
    computer. When the maker pointed at seats while practising in the room player (`ending seat N` in a correction
    sheet), add `--mark N,M`: the page opens with those seats already pointed at.
-3. **Changes are made seat by seat**: `--replace N=FILE` (a video with `@second`), `--move N=M`, `--sort RANGE`
-   (by date), `--pin-set N="why"` for a seat that must not move (a lyric). None of these moves a seat in time.
+3. **Changes are made seat by seat**: `--replace N=FILE` (a video with `@second`), `--move N=M`, `--swap A=B`,
+   `--sort RANGE` (by date), `--pin-set N="why"` for a seat that must not move (a lyric), `--placeholder RANGE` for a
+   seat left for the maker to fill. None of these moves a seat in time. Pinned seats and the closing picture do not
+   move: `--move` and `--swap` stop rather than change them, and say what would work instead.
+   From a correction sheet, follow the steps below.
 4. **After every change, `--storyboard` again** before the next round of pointing; `--check` says when it is old.
    The maker points at the new page, not the old one.
 5. **Build**, then `check_smoothness.py` (the stutter check), then watch it with the maker. `--confirm RANGE` records
    what the maker has decided.
+
+### From a correction sheet
+
+The maker chose seats on the storyboard cards in the room player: `ending seat N` (change it — another picture, or a
+swap or a move said in the `Comment:`) and `ending seat N remove`. **The numbers are the storyboard's numbers when they
+recorded them**; every change you make shifts what sits where, so never add or subtract numbers.
+
+1. `check_sheet.py`: every ending seat should be `look`. A `changed` one means the seats have moved since — ask the
+   maker to choose those seats on the storyboard again.
+2. **Before changing anything**, turn every number in the headings and in the comments into **the picture's name**,
+   from the definition (`ending_video*.json`, the `src` of `frames`).
+3. Say it back to the maker and ask ("I take out the photo in 3, move 4 to 9 forward, and you choose a new photo for
+   9. I swap 7 and 12. Is that right?").
+4. Apply them one by one. **Each time, find the seat now by the picture's name** in the definition.
+   - Remove: `--move N=K`, where K is the seat before the next seat that does not move (pinned, or the closing
+     picture), or the last seat. K is the seat left empty; if N and K are the same, do not move. Then
+     `--placeholder K` (it keeps the removed picture for now, as a placeholder; the storyboard shows it as not chosen).
+     After several removals the empty seats are at the back; find them by name too.
+   - Swap: `--swap A=B`. If the tool stops (a pinned seat or the closing picture), ask the maker.
+   - Move: `--move N=M`. If the tool stops (it would cross a pinned seat or the closing picture), ask the maker.
+5. `--storyboard --mark <the empty seats and the seats that want another picture, by their numbers now>`; the maker
+   chooses; `--replace`. A change whose comment only swaps or moves is not marked. Never build with an empty seat
+   that nobody has chosen.
 
 Rules while helping:
 

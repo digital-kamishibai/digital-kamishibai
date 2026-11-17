@@ -572,7 +572,8 @@ def test_the_ending_video_gets_its_seats_only_in_a_draft():
     assert cue['seats'] == [
         {'n': 1, 'from': 0.0, 'to': 6.4, 'label': 'pictures/02.png'},          # the 0.8 s cross-fades split at the middle
         {'n': 2, 'from': 6.4, 'to': 12.4, 'label': 'pictures/03.png'},
-        {'n': 3, 'from': 12.4, 'to': 18.0, 'label': 'pictures/01.jpg', 'pin': 'the title at the end of the song'},
+        {'n': 3, 'from': 12.4, 'to': 18.0, 'label': 'pictures/01.jpg', 'pin': 'the title at the end of the song',
+         'final': True},                                                       # the closing picture (kind final)
     ]
 
 

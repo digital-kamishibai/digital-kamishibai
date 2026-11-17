@@ -1,12 +1,15 @@
-"""エンディング動画のコマを指す1往復をまるごと通す（手で動かす確認。Edge・ffmpeg が要る）:
+"""エンディング動画のコマを絵コンテのカードで直す1往復をまるごと通す（手で動かす確認。Edge・ffmpeg が要る）:
     python tests/e2e/ending_seat.py [作業フォルダ]
- 練習で止めて指す → 修正票 → 印つきの絵コンテ → 作り手が選ぶ（ここでは代わりに1つ選ぶ）→
-エンディング動画と練習用の版を作り直す → 書き戻しの確認 → プレイヤーで読み直して「変わった」。
-作業用リポジトリの見本は変えない（写しで行う）。"""
+ 絵コンテのカードで席を選ぶ（書きかけは席ごと・再生やシークで番号が変わらない）→「直したい」「外したい」→
+動かない席（固定・閉じの絵）は外せない → 閉じたときの古い流れ（止めて指す）→ 修正票（見出しの remove）→
+書き戻し（Skill の手順: 外す＝--move で詰めて --placeholder・移しすぎは道具が止める）→ 作り手が選ぶ（ここでは代わりに1つ選ぶ）→
+エンディング動画と練習用の版を作り直す → プレイヤーで読み直して「変わった」。
+作業用リポジトリの見本は変えない（写しで行う。写しの定義は6席に広げる: 5 は固定、6 は閉じの絵）。"""
 import base64
 import functools
 import http.server
 import json
+import os
 import shutil
 import subprocess
 import sys
@@ -33,18 +36,28 @@ CHECK = REPO / 'skills' / 'digital-kamishibai' / 'scripts' / 'check_sheet.py'
 
 
 def run(*args):
-    r = subprocess.run([PY, *map(str, args)], capture_output=True, text=True, encoding='utf-8', errors='replace')
+    r = subprocess.run([PY, *map(str, args)], capture_output=True, text=True, encoding='utf-8', errors='replace',
+                       env={**os.environ, 'PYTHONIOENCODING': 'utf-8'})
     print(f'$ {" ".join(Path(str(a)).name if i == 0 else str(a) for i, a in enumerate(args))}  -> {r.returncode}')
     for line in (r.stdout + r.stderr).strip().splitlines()[-4:]:
         print('    ' + line)
     return r
 
 
-# ---------- 準備: 見本の写し・曲・エンディング動画・練習用の版 ----------
+# ---------- 準備: 見本の写し（6席に広げる）・曲・エンディング動画・練習用の版 ----------
 shutil.rmtree(HERE / 'rt', ignore_errors=True)
 shutil.copytree(REPO / 'examples' / 'sample-story', WORK)
+DEFINITION = WORK / 'ending_video.json'
+data = json.loads(DEFINITION.read_text(encoding='utf-8'))
+pics = ['pictures/02.png', 'pictures/03.png', 'pictures/01.jpg']
+data['duration_sec'] = 30.0
+data['frames'] = [{'i': n, 'at': 5.0 * (n - 1), 'dur': 5.0, 'xfade': 0.8 if n < 6 else 0.0, 'root': 'work',
+                   'src': pics[(n - 1) % 3], 'status': 'picked'} for n in range(1, 7)]
+data['frames'][4]['pin'] = 'the first line of the chorus'
+data['frames'][5].update(kind='final', src='pictures/01.jpg', zoom=1.0, status='confirmed')
+DEFINITION.write_text(json.dumps(data, ensure_ascii=False, indent=1), encoding='utf-8')
 (WORK / 'sounds').mkdir()
-subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=330:duration=18',
+subprocess.run(['ffmpeg', '-loglevel', 'error', '-y', '-f', 'lavfi', '-i', 'sine=frequency=330:duration=30',
                 '-af', 'volume=0.3', str(WORK / 'sounds' / 'ending.mp3')], check=True)
 assert run(LADDER, WORK).returncode == 0
 assert run(BUILD, WORK, '--draft', '--skip-text').returncode == 0
@@ -105,6 +118,54 @@ def shot(name):
     (HERE / name).write_bytes(base64.b64decode(b.call('Page.captureScreenshot', {'format': 'png'}, session=True)['data']))
 
 
+def card(n):
+    return f"document.querySelectorAll('.board-card')[{n - 1}]"
+
+
+def click_card(n):
+    ev(f"{card(n)}.click(); true")
+    time.sleep(0.3)
+
+
+def text(el):
+    return ev(f"document.getElementById('{el}').textContent")
+
+
+def prop(el, name):
+    return ev(f"document.getElementById('{el}').{name}")
+
+
+def click(el):
+    ev(f"document.getElementById('{el}').click(); true")
+    time.sleep(0.2)
+
+
+def seek(sec):
+    ev("(async () => { const v = document.getElementById('nvideo'); v.currentTime = %s; "
+       "await new Promise(r => v.addEventListener('seeked', r, { once: true })); return true; })()" % sec)
+    time.sleep(0.3)
+
+
+def play():
+    """ヘッドレスでは音のある再生が止められるので、音を消して流す（席の判定には音は要らない）"""
+    assert ev("(async () => { const v = document.getElementById('nvideo'); v.muted = true; "
+              "try { await v.play(); } catch (e) { return String(e); } return !v.paused; })()") is True
+    time.sleep(0.5)
+
+
+def note(s):
+    ev("(() => { const c = document.getElementById('seatComment'); c.value = %s; "
+       "c.dispatchEvent(new Event('input')); return true; })()" % json.dumps(s))
+
+
+def sheet_markdown():
+    return ev("""(async () => {
+      const m = await import('/site/player/js/corrections.js');
+      const key = Object.keys(localStorage).find(k => k.startsWith('dk-corrections:'));
+      return m.sheetMarkdown(JSON.parse(localStorage.getItem(key)), new Date(2026, 10, 17, 16, 0));
+    })()""")
+
+
 try:
     b.call('Emulation.setDeviceMetricsOverride', {'width': 1600, 'height': 1300, 'deviceScaleFactor': 1, 'mobile': False}, session=True)
     b.call('Page.navigate', {'url': base + '/site/player/narrator.html'}, session=True)
@@ -113,7 +174,7 @@ try:
     ev("localStorage.clear(); window.__errs = []; addEventListener('error', (e) => __errs.push(e.message)); "
        "addEventListener('unhandledrejection', (e) => __errs.push(String(e.reason))); true")
 
-    # ---------- 1. 練習: 最後の枚でエンディング動画を止めて、コマ2を指す ----------
+    # ---------- 1. 練習: 最後の枚でエンディング動画の絵コンテを開く ----------
     ev(f"{PICK}('pickWork', {json.dumps(listing())})")
     wait("document.getElementById('workTitle').textContent.length > 0", 'work loaded')
     ev("document.querySelector('[data-goto=show]').click(); true")
@@ -121,61 +182,109 @@ try:
         ev("document.getElementById('nextBtn').click(); true")
         time.sleep(0.2)
     wait("document.getElementById('nvideo').readyState >= 1", 'video')
-    ev("(async () => { const v = document.getElementById('nvideo'); v.currentTime = 9; "
-       "await new Promise(r => v.addEventListener('seeked', r, { once: true })); return true; })()")
-    time.sleep(0.3)
-    print('1. 止めた位置:', ev("document.getElementById('seatNow').textContent"))
-    ev("document.getElementById('seatComment').value = 'too dark'; document.getElementById('seatPoint').click(); true")
-    time.sleep(0.2)
-    md = ev("""(async () => {
-      const m = await import('/site/player/js/corrections.js');
-      const key = Object.keys(localStorage).find(k => k.startsWith('dk-corrections:'));
-      return m.sheetMarkdown(JSON.parse(localStorage.getItem(key)), new Date(2026, 9, 26, 16, 0));
-    })()""")
+    click('boardBtn')
+    wait("document.querySelectorAll('.board-card').length === 6", 'storyboard')
+    print('1. 開いた直後:', text('seatNow'), '|', text('seatPoint'), '|', text('seatRemove'))
+    assert ev(f"{card(1)}.classList.contains('chosen')"), '開いた直後は映っている席（1）'
+
+    # ---------- 2. カード 3 でひとことを書く → カード 4 では欄が空・ボタンは 4 → カード 3 に戻ると書きかけが戻る ----------
+    click_card(3)
+    note('too dark')
+    click_card(4)
+    assert prop('seatComment', 'value') == '', '前の席の書きかけを持ち越さない'
+    assert '4' in text('seatPoint') and '3' not in text('seatPoint'), text('seatPoint')
+    click_card(3)
+    assert prop('seatComment', 'value') == 'too dark'
+    print('2. 席ごとの書きかけ: ok |', text('seatPoint'), '|', text('seatRemove'))
+
+    # ---------- 3. 再生・シークしてもボタンの番号は選んだ席のまま（再生中でも押せる） ----------
+    play()
+    seek(1.5)
+    assert not prop('nvideo', 'paused'), '再生したまま'
+    assert '3' in text('seatPoint') and '3' in text('seatRemove') and not prop('seatRemove', 'disabled'), text('seatPoint')
+    assert ev(f"{card(1)}.classList.contains('now') && {card(3)}.classList.contains('chosen')")
+    print('3. 再生・シークのあとも:', text('seatPoint'), '| 再生中:', not prop('nvideo', 'paused'))
+
+    # ---------- 4. 「3 番を外したい」→ 🗑。カード 4 は「直したい」（移すはひとことで）→ ✎ ----------
+    click('seatRemove')
+    ev("document.getElementById('nvideo').pause(); true")
+    assert ev(f"{card(3)}.classList.contains('gone')") and '🗑' in ev(f"{card(3)}.textContent")
+    click_card(4)
+    note('2 の後ろへ')
+    click('seatPoint')
+    assert ev(f"{card(4)}.classList.contains('fix')") and '✎' in ev(f"{card(4)}.textContent")
+    assert '2 の後ろへ' in ev(f"{card(4)}.title")
+    print('4. 印:', ev("[...document.querySelectorAll('.board-card')].map(c => c.textContent).join(' / ')"))
+    shot('rt_board_marks.png')
+
+    # ---------- 5. 固定の席・閉じの絵の席では「外したい」が押せない（直したいは押せる） ----------
+    for n in (5, 6):
+        click_card(n)
+        assert prop('seatRemove', 'disabled') and not prop('seatPoint', 'disabled'), n
+        print(f'5. 席 {n}: {text("seatRemove")} は押せない（{prop("seatRemove", "title")}）')
+
+    # ---------- 6. 絵コンテを閉じたときの古い流れ: 止めて指す（再生中は押せない） ----------
+    click('boardBtn')
+    assert prop('seatComment', 'value') == '', '閉じると書きかけは消える'
+    seek(2)
+    assert '1' in text('seatPoint') and not prop('seatPoint', 'disabled'), text('seatPoint')
+    note('brighter')
+    click('seatPoint')
+    play()
+    assert prop('seatPoint', 'disabled'), '閉じているときは止めて指す'
+    ev("document.getElementById('nvideo').pause(); true")
+    md = sheet_markdown()
     sheet = HERE / 'rt' / 'sheet.md'
     sheet.write_text(md, encoding='utf-8')
-    print('   修正票:\n' + '\n'.join('     ' + l for l in md.strip().splitlines()))
+    print('6. 修正票:\n' + '\n'.join('     ' + l for l in md.strip().splitlines()))
+    assert '## [Slide 4] ending seat 3 remove\nAt 0:12.9\n' in md   # 席の真ん中（席の端はフェードで割る）
+    assert '## [Slide 4] ending seat 4\n' in md and 'Comment: 2 の後ろへ' in md
+    assert '## [Slide 4] ending seat 1\n' in md and 'Comment: brighter' in md
+    click('sheetBtn')
+    assert 'ending seat 3 remove' in ev("document.getElementById('sheetList').innerText")
+    click('sheetBtn')
 
-    # ---------- 2. 書き戻し（Skill の手順どおり）: まだ選んでいない ----------
+    # ---------- 7. 書き戻し（Skill の手順どおり）: 番号を写真の名前に直してから当てる ----------
     r = run(CHECK, WORK, sheet)
-    assert 'look' in r.stdout and r.returncode == 0
-    assert run(LADDER, WORK, '--storyboard', '--mark', '2').returncode == 0
+    assert r.returncode == 0 and 'ending seat 3  - remove' in r.stdout and 'changed' not in r.stdout
+    names = [f['src'] for f in json.loads(DEFINITION.read_text(encoding='utf-8'))['frames']]
+    gone, after = names[2], names[3]                  # 3 を外す（名前で引き直す）
+    assert run(LADDER, WORK, '--move', '1=5').returncode == 1, '固定の席をまたぐ移し方は止まる'
+    assert run(LADDER, WORK, '--move', '3=4').returncode == 0   # 外す: 次の動かない席（5）の手前まで詰める
+    assert run(LADDER, WORK, '--placeholder', '4').returncode == 0
+    frames = json.loads(DEFINITION.read_text(encoding='utf-8'))['frames']
+    assert frames[3]['src'] == gone and frames[3]['status'] == 'placeholder' and frames[2]['src'] == after
+    assert run(LADDER, WORK, '--storyboard', '--mark', '1,4').returncode == 0
     page = (WORK / 'ending' / 'storyboard.html').read_text(encoding='utf-8')
-    assert 'const MARK = [2];' in page
+    assert 'const MARK = [1, 4];' in page
 
-    # ---------- 3. 作り手が選ぶ（印つきの絵コンテを開いて確かめ、コピーされるコマンドを見る） ----------
+    # ---------- 8. 作り手が選ぶ（印つきの絵コンテを開いて確かめる） ----------
     b2 = burn.Browser(burn.find_browser())
     try:
         b2.call('Page.navigate', {'url': (WORK / 'ending' / 'storyboard.html').as_uri()}, session=True)
         time.sleep(1.5)
-        print('3. 絵コンテの印:', b2.evaluate("[...document.querySelectorAll('.card')].map(c => c.dataset.id + ':' + c.getAttribute('aria-pressed')).join(' ')"))
-        print('   コピーされる行:', b2.evaluate("replaceLines()"))
+        print('8. 絵コンテの印:', b2.evaluate("[...document.querySelectorAll('.card')].map(c => c.dataset.id + ':' + c.getAttribute('aria-pressed')).join(' ')"))
     finally:
         b2.close()
     time.sleep(1.1)  # 動画の更新日時が確実に変わるように
-    assert run(LADDER, WORK, '--replace', '2=pictures/01.jpg').returncode == 0
+    assert run(LADDER, WORK, '--replace', '4=pictures/03.png').returncode == 0
     assert run(LADDER, WORK).returncode == 0
     assert run(BUILD, WORK, '--draft', '--skip-text').returncode == 0
     r = run(CHECK, WORK, sheet)
     assert 'changed' in r.stdout and r.returncode == 0
 
-    # ---------- 4. プレイヤーで作品を読み直す ----------
+    # ---------- 9. プレイヤーで作品を読み直す ----------
     ev(f"{PICK}('reloadWork', {json.dumps(listing())})")
     wait("document.getElementById('reloadNote').textContent.length > 0", 'reloaded')
-    print('4. 読み直し:', ev("document.getElementById('reloadNote').textContent"))
+    print('9. 読み直し:', ev("document.getElementById('reloadNote').textContent"))
     ev("document.getElementById('sheetBtn').click(); true")
     time.sleep(0.3)
-    print('   修正票の一覧:', ev("document.getElementById('sheetList').innerText").replace('\n', ' | '))
-    md2 = ev("""(async () => {
-      const m = await import('/site/player/js/corrections.js');
-      const key = Object.keys(localStorage).find(k => k.startsWith('dk-corrections:'));
-      return JSON.parse(localStorage.getItem(key)).items.length;
-    })()""")
-    print('   保存された件数:', md2)
+    listed = ev("document.getElementById('sheetList').innerText")
+    print('   修正票の一覧:', listed.replace('\n', ' | '))
     shot('rt_after_reload.png')
     errs = ev("window.__errs")
     print('ページの例外:', errs)
-    assert '変わった' in ev("document.getElementById('sheetList').innerText") or 'changed' in ev("document.getElementById('sheetList').innerText")
+    assert '変わった' in listed or 'changed' in listed
     assert not errs
     print('ALL OK')
 finally:

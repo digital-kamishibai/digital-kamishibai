@@ -78,6 +78,7 @@ function videoCueErrors(c) {
         if (t.from < prevTo) errors.push(`${seat}: starts before seat ${k} ends`);
         if (t.label !== undefined && typeof t.label !== 'string') errors.push(`${seat}: label must be text`);
         if (t.pin !== undefined && (typeof t.pin !== 'string' || !t.pin)) errors.push(`${seat}: pin must be the reason, as text`);
+        if (t.final !== undefined && t.final !== true) errors.push(`${seat}: final must be true when present`);
         prevTo = t.to;
       });
     }

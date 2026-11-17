@@ -319,6 +319,12 @@ test('席は 1, 2, 3 … の順・from < to・前の席が終わる前に始ま�
   assert.match(validateWork(withCue(overlap)).errors.join(), /seat 2: starts before seat 1 ends/);
   const pin = ending(); pin.seats[0].pin = '';
   assert.match(validateWork(withCue(pin)).errors.join(), /pin must be the reason/);
+  const fin = ending(); fin.seats[2].final = true;
+  assert.deepEqual(validateWork(withCue(fin)).errors, [], '閉じの絵の席は final: true');
+  for (const v of [false, 'yes', 1]) {
+    const bad = ending(); bad.seats[2].final = v;
+    assert.match(validateWork(withCue(bad)).errors.join(), /seat 3: final must be true/);
+  }
   const gap = ending(); gap.seats[1].from = 9;
   assert.deepEqual(validateWork(withCue(gap)).errors, [], '席の間のすき間はよい');
 });
