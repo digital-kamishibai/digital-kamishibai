@@ -2625,6 +2625,7 @@ function markBoard(now) {
     el.classList.toggle('chosen', board.chosen === n);
     el.setAttribute('aria-pressed', String(board.chosen === n));
     el.classList.toggle('now', !!now && now.n === n);
+    if (now && now.n === n) el.setAttribute('aria-current', 'true'); else el.removeAttribute('aria-current');
     el.querySelector('.board-mark').textContent = !x ? '' : x.action === 'remove' ? `🗑 ${t('seatMarkRemove')}` : `✎ ${t('seatMarkFix')}`;
     const head = x && x.comment ? (x.comment.length > 40 ? `${x.comment.slice(0, 40)}…` : x.comment) : '';
     el.title = [seat && seat.label, head].filter(Boolean).join(' — ');

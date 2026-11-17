@@ -204,7 +204,17 @@ try:
     assert not prop('nvideo', 'paused'), '再生したまま'
     assert text('seatTarget') == '3 番：' and not prop('seatRemove', 'disabled'), text('seatTarget')
     assert ev(f"{card(1)}.classList.contains('now') && {card(3)}.classList.contains('chosen')")
-    print('3. 再生・シークのあとも:', text('seatTarget'), '| 再生中:', not prop('nvideo', 'paused'))
+    # いま映っているコマ（青と ▶）は、選んだコマ（赤茶の輪）と別の色・別の印
+    cue = ev("getComputedStyle(document.documentElement).getPropertyValue('--cue').trim()")
+    bg = ev(f"getComputedStyle({card(1)}).backgroundColor")
+    assert bg == ev("(() => { const d = document.createElement('div'); d.style.color = %s; document.body.append(d); "
+                    "const c = getComputedStyle(d).color; d.remove(); return c; })()" % json.dumps(cue)), (bg, cue)
+    assert bg != ev(f"getComputedStyle({card(3)}).backgroundColor")
+    assert ev(f"getComputedStyle({card(1)}, '::before').content") == '"▶"'
+    assert ev(f"getComputedStyle({card(3)}, '::before').content") == 'none'
+    assert ev(f"{card(1)}.getAttribute('aria-current') === 'true' && !{card(3)}.hasAttribute('aria-current')")
+    shot('rt_board_now.png')
+    print('3. 再生・シークのあとも:', text('seatTarget'), '| 再生中:', not prop('nvideo', 'paused'), '| いまのコマ:', bg)
 
     # ---------- 4. 「3 番を外したい」→ 🗑。カード 4 は「直したい」（移すはひとことで）→ ✎ ----------
     click('seatRemove')
