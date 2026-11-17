@@ -268,6 +268,13 @@ export function markSeat(sheet, slideData, k, seat, file, comment = '', action) 
   return { ...sheet, items: [...sheet.items.filter((x) => !same(x)), item].sort(order) };
 }
 
+/** 席の件を取り消す（絵コンテのカードで「外すのをやめる」「直したいを取り消す」）。件が無ければ sheet をそのまま返す。
+ *  その枚の件がほかに無くなれば、その枚のひとことの扱いも修正票の一覧の「取り下げる」と同じ */
+export function unmarkSeat(sheet, slideNo, k, n) {
+  const i = sheet.items.findIndex((x) => x.kind === 'seat' && x.slide === slideNo && x.video === k && x.at === n);
+  return i < 0 ? sheet : removeItem(sheet, i);
+}
+
 // ---------- 上演中の動画の区間（video K） ----------
 
 /** 区間の端を入れる: side＝'from'（いまの位置を開始に）| 'to'（終わりに）、time＝動画の中の秒。同じ動画は1件にまとめる。

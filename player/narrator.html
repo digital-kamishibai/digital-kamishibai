@@ -233,7 +233,11 @@
           <span id="seatNow" class="seat-now"></span>
           <span class="seat-act">
             <input id="seatComment" type="text">
+            <!-- 記録するコマの番号。ボタンの文字には番号を入れず、ここに1回だけ出す -->
+            <span id="seatTarget" class="seat-target"></span>
             <button id="seatPoint" class="mini" type="button"></button>
+            <!-- 直したいの取り消しは、直したいのすぐ右（取り消す相手の隣） -->
+            <button id="seatCancel" class="mini" type="button" hidden></button>
             <button id="seatRemove" class="mini" type="button"></button>
             <button id="boardBtn" class="mini" type="button" aria-expanded="false" aria-controls="board" data-i18n="boardBtn">Storyboard</button>
           </span>

@@ -1,6 +1,6 @@
 """エンディング動画のコマを絵コンテのカードで直す1往復をまるごと通す（手で動かす確認。Edge・ffmpeg が要る）:
     python tests/e2e/ending_seat.py [作業フォルダ]
- 絵コンテのカードで席を選ぶ（書きかけは席ごと・再生やシークで番号が変わらない）→「直したい」「外したい」→
+ 絵コンテのカードで席を選ぶ（書きかけは席ごと・再生やシークで番号が変わらない）→「直したい」「外したい」（その場で取り消せる）→
 動かない席（固定・閉じの絵）は外せない → 閉じたときの古い流れ（止めて指す）→ 修正票（見出しの remove）→
 書き戻し（Skill の手順: 外す＝--move で詰めて --placeholder・移しすぎは道具が止める）→ 作り手が選ぶ（ここでは代わりに1つ選ぶ）→
 エンディング動画と練習用の版を作り直す → プレイヤーで読み直して「変わった」。
@@ -162,6 +162,7 @@ def sheet_markdown():
     return ev("""(async () => {
       const m = await import('/site/player/js/corrections.js');
       const key = Object.keys(localStorage).find(k => k.startsWith('dk-corrections:'));
+      if (!key) return '';  // 件が無くなると保存ごと消える
       return m.sheetMarkdown(JSON.parse(localStorage.getItem(key)), new Date(2026, 10, 17, 16, 0));
     })()""")
 
@@ -184,7 +185,7 @@ try:
     wait("document.getElementById('nvideo').readyState >= 1", 'video')
     click('boardBtn')
     wait("document.querySelectorAll('.board-card').length === 6", 'storyboard')
-    print('1. 開いた直後:', text('seatNow'), '|', text('seatPoint'), '|', text('seatRemove'))
+    print('1. 開いた直後:', text('seatNow'), '|', text('seatTarget'), text('seatPoint'), '|', text('seatRemove'))
     assert ev(f"{card(1)}.classList.contains('chosen')"), '開いた直後は映っている席（1）'
 
     # ---------- 2. カード 3 でひとことを書く → カード 4 では欄が空・ボタンは 4 → カード 3 に戻ると書きかけが戻る ----------
@@ -192,42 +193,62 @@ try:
     note('too dark')
     click_card(4)
     assert prop('seatComment', 'value') == '', '前の席の書きかけを持ち越さない'
-    assert '4' in text('seatPoint') and '3' not in text('seatPoint'), text('seatPoint')
+    assert text('seatTarget') == '4 番：', text('seatTarget')
     click_card(3)
     assert prop('seatComment', 'value') == 'too dark'
-    print('2. 席ごとの書きかけ: ok |', text('seatPoint'), '|', text('seatRemove'))
+    print('2. 席ごとの書きかけ: ok |', text('seatTarget'), text('seatPoint'), '|', text('seatRemove'))
 
     # ---------- 3. 再生・シークしてもボタンの番号は選んだ席のまま（再生中でも押せる） ----------
     play()
     seek(1.5)
     assert not prop('nvideo', 'paused'), '再生したまま'
-    assert '3' in text('seatPoint') and '3' in text('seatRemove') and not prop('seatRemove', 'disabled'), text('seatPoint')
+    assert text('seatTarget') == '3 番：' and not prop('seatRemove', 'disabled'), text('seatTarget')
     assert ev(f"{card(1)}.classList.contains('now') && {card(3)}.classList.contains('chosen')")
-    print('3. 再生・シークのあとも:', text('seatPoint'), '| 再生中:', not prop('nvideo', 'paused'))
+    print('3. 再生・シークのあとも:', text('seatTarget'), '| 再生中:', not prop('nvideo', 'paused'))
 
     # ---------- 4. 「3 番を外したい」→ 🗑。カード 4 は「直したい」（移すはひとことで）→ ✎ ----------
     click('seatRemove')
     ev("document.getElementById('nvideo').pause(); true")
     assert ev(f"{card(3)}.classList.contains('gone')") and '🗑' in ev(f"{card(3)}.textContent")
+    assert '外すのをやめる' in text('seatRemove') and prop('seatCancel', 'hidden'), text('seatRemove')
+    # 4b. 「3 番を外すのをやめる」→ 🗑 が消える・修正票からも消える → もう一度外す
+    click('seatRemove')
+    assert not ev(f"{card(3)}.classList.contains('gone')") and '🗑' not in ev(f"{card(3)}.textContent")
+    assert 'ending seat 3' not in sheet_markdown()
+    assert text('seatRemove') == '外したい'
+    click('seatRemove')
+    assert ev(f"{card(3)}.classList.contains('gone')")
+    print('4b. 外す → やめる → 外す: ok')
     click_card(4)
     note('2 の後ろへ')
     click('seatPoint')
     assert ev(f"{card(4)}.classList.contains('fix')") and '✎' in ev(f"{card(4)}.textContent")
     assert '2 の後ろへ' in ev(f"{card(4)}.title")
+    # 4c. 「4 番の直したいを取り消す」→ ✎ が消え、ひとことが欄に戻る → 押し直して記録する
+    assert not prop('seatCancel', 'hidden') and text('seatCancel') == '直したいを取り消す', text('seatCancel')
+    assert ev("document.getElementById('seatPoint').nextElementSibling.id") == 'seatCancel', '取り消しは直したいのすぐ右'
+    click('seatCancel')
+    assert not ev(f"{card(4)}.classList.contains('fix')") and 'ending seat 4' not in sheet_markdown()
+    assert prop('seatComment', 'value') == '2 の後ろへ' and prop('seatCancel', 'hidden')
+    click('seatPoint')
+    assert ev(f"{card(4)}.classList.contains('fix')")
+    print('4c. 直したい → 取り消す（ひとことは欄に戻る）→ 記録し直す: ok')
     print('4. 印:', ev("[...document.querySelectorAll('.board-card')].map(c => c.textContent).join(' / ')"))
     shot('rt_board_marks.png')
+    # ボタンの文字に番号を繰り返さない（番号は札に1回だけ）
+    assert not any(ch.isdigit() for ch in text('seatPoint') + text('seatRemove') + text('seatCancel'))
 
     # ---------- 5. 固定の席・閉じの絵の席では「外したい」が押せない（直したいは押せる） ----------
     for n in (5, 6):
         click_card(n)
         assert prop('seatRemove', 'disabled') and not prop('seatPoint', 'disabled'), n
-        print(f'5. 席 {n}: {text("seatRemove")} は押せない（{prop("seatRemove", "title")}）')
+        print(f'5. 席 {n}: {text("seatTarget")}{text("seatRemove")} は押せない（{prop("seatRemove", "title")}）')
 
     # ---------- 6. 絵コンテを閉じたときの古い流れ: 止めて指す（再生中は押せない） ----------
     click('boardBtn')
     assert prop('seatComment', 'value') == '', '閉じると書きかけは消える'
     seek(2)
-    assert '1' in text('seatPoint') and not prop('seatPoint', 'disabled'), text('seatPoint')
+    assert text('seatTarget') == '1 番：' and not prop('seatPoint', 'disabled'), text('seatTarget')
     note('brighter')
     click('seatPoint')
     play()

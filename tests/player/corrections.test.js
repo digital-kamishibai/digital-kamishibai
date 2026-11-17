@@ -3,7 +3,7 @@ import assert from 'node:assert/strict';
 import {
   editable, sheetEnabled, mayReload, keepSlide, editorStep, paragraphs, boxFromFields, fieldsFromBox,
   diffNotes, diffOverlays, emptySheet, setSlideEdits, removeItem, judge, reconcile, applySheet,
-  fence, sheetMarkdown, sheetName, readSheet, storageKey, isEmpty, markSeat, clock, seatLines,
+  fence, sheetMarkdown, sheetName, readSheet, storageKey, isEmpty, markSeat, unmarkSeat, clock, seatLines,
   markCut, cutLines, mediaLines, place, videoOf, askPicture, choosePicture, pictureLines, sheetCounts, workSig, commentStatus, removeComment, isOldComment, sheetGroups,
   setLinkVolume, linkVolumeNow, volumeLines, dbText,
 } from '../../player/js/corrections.js';
@@ -254,6 +254,19 @@ test('外す件: 見出しに remove・差し替えと外すは同じ席で置�
   assert.equal(markSeat(sh, endingSlide(), 2, seats[1], FILE, '', 'remove'), sh, 'pin の席は外せない');
   assert.equal(markSeat(sh, endingSlide(), 2, { ...seats[0], final: true }, FILE, '', 'remove'), sh, '閉じの絵の席は外せない');
   assert.equal(markSeat(sh, endingSlide(), 2, seats[0], FILE, '', 'swap'), sh);
+});
+
+test('席の件を取り消す: その席の件だけ消える・件が無ければそのまま・その枚の件が無くなればひとことも取り下げと同じに', () => {
+  let sh = markSeat(emptySheet('T'), endingSlide(), 2, seats[0], FILE, '', 'remove');
+  sh = markSeat(sh, endingSlide(), 2, seats[1], FILE, 'too dark');
+  const once = unmarkSeat(sh, 4, 2, 1);
+  assert.deepEqual(once.items.map((x) => x.at), [2], '外したいを取り消すと、直したいの件は残る');
+  assert.equal(unmarkSeat(once, 4, 2, 1), once, '件が無ければそのまま');
+  assert.equal(unmarkSeat(once, 4, 1, 2), once, '別の動画の同じ番号は消さない');
+  let withComment = setSlideEdits(emptySheet('T'), endingSlide(), { notes: 'Play it.', comment: 'slower' });
+  withComment = markSeat(withComment, endingSlide(), 2, seats[0], FILE);
+  const removeOne = removeItem(withComment, withComment.items.findIndex((x) => x.kind === 'seat'));
+  assert.deepEqual(unmarkSeat(withComment, 4, 2, 1), removeOne, '修正票の一覧の「取り下げる」と同じ');
 });
 
 test('コマの件は Markdown に At・Label・Pin・Comment で書く（文の件・その枚のひとことと並ぶ）', () => {

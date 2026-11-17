@@ -51,11 +51,14 @@ test('見本を元にしていない台本の案内: どのボタンで開ける
   assert.match(zip[1], /zip/);
 });
 
-test('絵コンテのコマのボタン: 番号を入れる・英日がそろう・入れ替え／移すはひとことで、と案内する', () => {
-  assert.deepEqual(pair('seatPoint', 3), ['Change seat 3', '3 番を直したい']);
-  assert.deepEqual(pair('seatRemove', 3), ['Remove seat 3', '3 番を外したい']);
-  assert.match(pair('seatPointAgain', 3)[1], /^3 番/);
-  assert.ok(pair('seatPoint', '')[1] && !/^ /.test(pair('seatPoint', '')[1]), '番号が無いときも文になる');
+test('絵コンテのコマのボタン: 番号は札に1回だけ出す・英日がそろう・入れ替え／移すはひとことで、と案内する', () => {
+  assert.deepEqual(pair('seatTarget', 3), ['Seat 3:', '3 番：']);
+  assert.ok(pair('seatTarget', '')[1] && !/^ /.test(pair('seatTarget', '')[1]), '番号が無いときも札になる');
+  assert.deepEqual(pair('seatPoint'), ['Change', '直したい']);
+  assert.deepEqual(pair('seatRemove'), ['Remove', '外したい']);
+  for (const key of ['seatPointAgain', 'seatUnremove', 'seatCancel']) {
+    assert.ok(pair(key)[0] && pair(key)[1] && !/\d/.test(pair(key)[1]), `${key}: ボタンの文字に番号を入れない`);
+  }
   assert.match(pair('seatCommentPh')[1], /入れ替え・移すはひとことで/);
   assert.match(pair('seatPinnedPh')[1], /入れ替え・移すはできません/);
   assert.match(pair('seatRemovePinned')[1], /先に固定（pin）を外して/);

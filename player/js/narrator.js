@@ -22,7 +22,7 @@ import { createEngine } from './engine.js';
 import {
   editable, sheetEnabled, mayReload, keepSlide, editorStep, boxFromFields, fieldsFromBox, boxText, paragraphs,
   emptySheet, setSlideEdits, removeItem, removeComment, isOldComment, judge, reconcile, applySheet, sheetMarkdown, sheetName,
-  readSheet, storageKey, isEmpty, place, textOf, videoCueOf, markSeat, clock as seatClock, mediaLines, isMedia, videoOf, markCut, setLinkVolume, linkVolumeNow, dbText,
+  readSheet, storageKey, isEmpty, place, textOf, videoCueOf, markSeat, unmarkSeat, clock as seatClock, mediaLines, isMedia, videoOf, markCut, setLinkVolume, linkVolumeNow, dbText,
   askPicture, choosePicture, sheetCounts, sheetGroups, workSig,
 } from './corrections.js';
 import {
@@ -2395,16 +2395,23 @@ function renderSeatBar() {
   $('seatNow').textContent = seat ? info(seat, seatClock(open ? seat.from : at)) : open ? t('seatPick') : t('seatNone', seatClock(at));
   const target = targetSeat(seats);
   const item = target ? seatItem(vCurrent, target.n) : null;
+  $('seatTarget').textContent = t('seatTarget', target ? target.n : seat ? seat.n : '');
   const point = $('seatPoint');
   point.disabled = !target;
-  point.textContent = t(item && !item.action ? 'seatPointAgain' : 'seatPoint', target ? target.n : seat ? seat.n : '');
+  point.textContent = t(item && !item.action ? 'seatPointAgain' : 'seatPoint');
   point.title = !open && seat && !vEl.paused ? t('seatPaused') : '';
   const fixed = !!target && (!!target.pin || target.final === true);
+  const removed = !!item && item.action === 'remove';
+  // 外したいの記録がある席では、同じボタンで「外すのをやめる」
   const remove = $('seatRemove');
-  remove.disabled = !target || fixed;
-  remove.textContent = t('seatRemove', target ? target.n : seat ? seat.n : '');
-  remove.title = target && target.final === true ? t('seatRemoveFinal') : target && target.pin ? t('seatRemovePinned')
+  remove.disabled = !target || (fixed && !removed);
+  remove.textContent = t(removed ? 'seatUnremove' : 'seatRemove');
+  remove.title = removed ? '' : target && target.final === true ? t('seatRemoveFinal') : target && target.pin ? t('seatRemovePinned')
     : !open && seat && !vEl.paused ? t('seatPaused') : '';
+  // 直したいの記録がある席だけ、取り消すボタンを出す
+  const cancel = $('seatCancel');
+  cancel.hidden = !item || removed;
+  cancel.textContent = t('seatCancel');
   $('seatComment').placeholder = t(seat && seat.final === true ? 'seatFinalPh' : seat && seat.pin ? 'seatPinnedPh' : 'seatCommentPh');
   markBoard(here);
 }
@@ -2425,8 +2432,29 @@ function recordSeat(action) {
   renderSheet();
   renderSeatBar();
 }
+/** 選んだ席の件を取り消す。記録したひとことは書きかけとして欄に戻す（欄に書きかけがあればそちらを残す） */
+function cancelSeat() {
+  const seats = seatsOf(vCurrent);
+  if (!seats || !sheet || !editable(editCtx())) return;
+  const seat = targetSeat(seats);
+  const item = seat ? seatItem(vCurrent, seat.n) : null;
+  if (!item) return;
+  sheet = unmarkSeat(sheet, vCurrent.n, vCurrent.k, seat.n);
+  const back = $('seatComment').value || item.comment || '';
+  if (boardOpen()) board.drafts.set(seat.n, back);
+  $('seatComment').value = back;
+  saveSheet();
+  renderSheet();
+  renderSeatBar();
+}
 $('seatPoint').addEventListener('click', () => recordSeat());
-$('seatRemove').addEventListener('click', () => recordSeat('remove'));
+$('seatRemove').addEventListener('click', () => {
+  const seats = seatsOf(vCurrent);
+  const seat = seats ? targetSeat(seats) : null;
+  const item = seat ? seatItem(vCurrent, seat.n) : null;
+  if (item && item.action === 'remove') cancelSeat(); else recordSeat('remove');
+});
+$('seatCancel').addEventListener('click', () => cancelSeat());
 $('seatComment').addEventListener('input', () => {
   if (boardOpen() && board.chosen != null) board.drafts.set(board.chosen, $('seatComment').value);
 });
