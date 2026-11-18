@@ -18,6 +18,8 @@ on:
 
 jobs:
   record:
+    # Only in the public repository: the public site's Workers KV is written from there alone.
+    if: github.repository == 'digital-kamishibai/digital-kamishibai'
     runs-on: ubuntu-latest
     concurrency:
       group: donation

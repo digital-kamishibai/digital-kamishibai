@@ -35,9 +35,10 @@ jobs:
 
   # Publishes the room player to the public site (wrangler.jsonc env "public") after the tests pass on main.
   # Skips quietly until the repository secret CLOUDFLARE_API_TOKEN is set.
+  # Runs only in the public repository, so a copy of this workflow elsewhere never deploys the public site.
   deploy:
     needs: [builder, player]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.repository == 'digital-kamishibai/digital-kamishibai' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-latest
     concurrency:
       group: deploy-public
