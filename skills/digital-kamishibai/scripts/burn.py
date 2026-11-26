@@ -205,6 +205,9 @@ class Browser:
             self.call(method, session=True)
         self.call('Emulation.setDeviceMetricsOverride',
                   {'width': WIDTH, 'height': HEIGHT, 'deviceScaleFactor': 1, 'mobile': False}, session=True)
+        # Edge 158 hides a headless tab about 10 seconds after the start; a hidden page paints no frames, so
+        # burn.html's requestAnimationFrame never comes back. A page that thinks it has the focus stays visible.
+        self.call('Emulation.setFocusEmulationEnabled', {'enabled': True}, session=True)
 
     def call(self, method: str, params: dict | None = None, session: bool = False) -> dict:
         self.seq += 1

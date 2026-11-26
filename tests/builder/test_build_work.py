@@ -520,6 +520,15 @@ def test_a_cut_connection_points_at_the_sandbox(media):
     assert 'run this command outside it' not in errors(TEXT_SLIDES, media, renderer=FakeRenderer(fail='no browser'))
 
 
+def test_a_browser_that_does_not_answer_is_not_blamed_on_the_sandbox(media):
+    class Silent(FakeRenderer):
+        def __call__(self, *args, **kwargs):
+            raise TimeoutError('timed out')        # an OSError too, but it happens outside a sandbox as well
+    said = errors(TEXT_SLIDES, media, renderer=Silent())
+    assert 'the browser did not answer within 60 seconds' in said
+    assert 'sandbox' not in said
+
+
 def test_words_on_a_video_only_slide_are_an_error(media):
     assert 'needs a picture to draw on' in errors(
         script('## [Slide 1] A\n\na\n', '## [Slide 2] B\n\n> [Video] videos/v.mp4\n\n> [Text] place top\n> x\n'),
@@ -558,6 +567,21 @@ def test_burning_the_sample_story(tmp_path):
     assert {p.name: p.read_bytes() for p in (work / 'pictures').iterdir() if p.is_file()} == before  # originals untouched
     w = json.loads((work / 'work.json').read_text(encoding='utf-8'))
     assert w['slides'][1]['picture'] == 'pictures/_built/02.jpg' and w['draft'] is True
+
+
+@pytest.mark.skipif(bw.burn.find_browser() is None, reason='no Microsoft Edge or Google Chrome')
+def test_the_drawing_page_keeps_painting_after_a_while():
+    # Edge 158 hid a headless tab about 10 seconds after the start, and requestAnimationFrame never came back.
+    import time
+    browser = bw.burn.Browser(bw.burn.find_browser())
+    try:
+        browser.call('Page.navigate', {'url': 'about:blank'}, session=True)
+        time.sleep(15)
+        assert browser.evaluate('document.visibilityState') == 'visible'
+        assert browser.evaluate('Promise.race([new Promise((r) => requestAnimationFrame(() => r("painted"))),'
+                                ' new Promise((r) => setTimeout(() => r("stuck"), 3000))])') == 'painted'
+    finally:
+        browser.close()
 
 
 # ---------- ending video seats (§3.3, only with --draft) ----------

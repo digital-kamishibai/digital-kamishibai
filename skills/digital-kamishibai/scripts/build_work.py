@@ -712,7 +712,12 @@ def add_text(work: dict, media: Path | None, draft: bool, renderer, result: Resu
                   for j in jobs], media)
     except Exception as e:                       # the browser, the page or the disk
         # a connection the system cut (an AI's sandbox can stop the browser): not the work's fault
-        hint = ' (inside a sandbox the browser may be stopped: run this command outside it)' if isinstance(e, OSError) else ''
+        # A timeout is the browser not answering (it can happen outside a sandbox too), so it gets no sandbox hint.
+        if isinstance(e, TimeoutError):
+            e = 'the browser did not answer within 60 seconds'
+            hint = ''
+        else:
+            hint = ' (inside a sandbox the browser may be stopped: run this command outside it)' if isinstance(e, OSError) else ''
         result.errors.append(f'could not draw the words on the screen: {e}{hint}')
         return
     for j, fit in zip(jobs, fits or [[] for _ in jobs]):
