@@ -325,6 +325,8 @@ const S = {
   volDown: ['Quieter (this video)', 'この動画の音を小さく'],
   volUp: ['Louder (this video)', 'この動画の音を大きく'],
   picHint: ['To have this picture made again, write what should change', 'この絵を作り直してほしいなら、何をどう直したいかを書いてください'],
+  picHintWords: ['To have this picture made again, write what should change. The words on the picture (colour, size, place) are changed in "Move the words on the picture" under "Correct" — the picture is not made again',
+    'この絵を作り直してほしいなら、何をどう直したいかを書いてください。絵の上の文字（色・大きさ・場所）は、「直す」の「絵の上で直す」で変えられます（絵は作り直しません）'],
   picSheet: (c) => [`On the sheet (picture): ${c}`, `修正票（絵）: ${c}`],
   picPh: ['What should change in this picture (required)', '絵の何をどう直したいか（必須）'],
   picAsk: ['Make this picture again', 'この絵を作り直したい'],

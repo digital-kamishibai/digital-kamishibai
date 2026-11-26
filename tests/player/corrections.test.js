@@ -4,7 +4,7 @@ import {
   editable, sheetEnabled, mayReload, keepSlide, editorStep, paragraphs, boxFromFields, fieldsFromBox,
   diffNotes, diffOverlays, emptySheet, setSlideEdits, removeItem, judge, reconcile, applySheet,
   fence, sheetMarkdown, sheetName, readSheet, storageKey, isEmpty, markSeat, unmarkSeat, clock, seatLines,
-  markCut, cutLines, mediaLines, place, videoOf, askPicture, choosePicture, pictureLines, sheetCounts, workSig, commentStatus, removeComment, isOldComment, sheetGroups,
+  markCut, cutLines, mediaLines, place, videoOf, askPicture, choosePicture, pictureLines, wordsOf, sheetCounts, workSig, commentStatus, removeComment, isOldComment, sheetGroups,
   setLinkVolume, linkVolumeNow, volumeLines, dbText,
 } from '../../player/js/corrections.js';
 
@@ -443,6 +443,23 @@ test('絵の件は Markdown に Comment だけで書く（パス・ファイル�
   assert.equal(place(sh.items[1]), 'picture');
   assert.deepEqual(pictureLines({ comment: 'c' }), ['Comment: c']);
   assert.deepEqual(mediaLines({ kind: 'picture', comment: 'c' }), ['Comment: c']);
+});
+
+test('読み直し: 絵の上の文字が変わったら、絵のファイルが同じでも「変わった」（§6。文字の直しが絵の件で頼まれる）', () => {
+  const box = { x: 457200, y: 274320, width: 11247120, height: 914400, fill: null, paragraphs: [{ size: 44, color: '#2A2A3A' }] };
+  const dark = { ...picSlide(), overlays: [[['The keeper island']]], overlay_layout: [box] };
+  const light = { ...dark, overlay_layout: [{ ...box, paragraphs: [{ size: 44, color: '#FFFFFF' }] }] };
+  const x = askPicture(emptySheet('T'), dark, FILE, '文字を明るく').items[0];
+  assert.equal(x.words, wordsOf(dark));
+  assert.equal(judge(x, dark, () => FILE), 'pending', '組み立て直しただけ（文字も同じ）');
+  assert.equal(judge(x, light, () => FILE), 'changed', '[Text] に色を書き戻した');
+  assert.equal(judge(x, { ...dark, overlays: [[['The island']]] }, () => FILE), 'changed', '文字そのものを直した');
+  assert.equal(askPicture(emptySheet('T'), picSlide(), FILE, 'darker').items[0].words, undefined, '文字の枠の無い枚は覚えない');
+  const old = { ...x }; delete old.words;
+  assert.equal(judge(old, light, () => FILE), 'pending', '前からある件（words なし）は今までどおり');
+  const use = choosePicture(emptySheet('T'), dark, FILE, 'pictures/_candidates/03-1.png').items[0];
+  assert.equal(judge({ ...use, words: x.words }, light, () => ({ ...FILE, useLeft: true })), 'pending', 'Use の件は候補を待つ');
+  assert.doesNotMatch(sheetMarkdown({ ...emptySheet('T'), items: [x] }, new Date(2026, 10, 26, 10, 0)), /keeper|2A2A3A/, 'Markdown には書かない');
 });
 
 test('ひとことだけの枚に絵の件があっても、ひとことは comment の見出しで残る・直す欄を閉じても絵の件は残る', () => {

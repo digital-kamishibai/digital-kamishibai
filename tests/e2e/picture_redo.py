@@ -214,6 +214,13 @@ try:
     })()""")
     assert 'picture' not in copied, copied
     shot('picture_after_use.png')
+    # 「確かめた（消す）」で件を消すと、欄の頼みの文も消える（2026-11-26: 前の文が欄に残り、押せばまた入った——実機で）
+    assert ev("document.getElementById('picComment').value") != '', '消す前は頼みの文が欄にある'
+    ev("[...document.querySelectorAll('#sheetList button')].find(b => /確かめた|Checked/.test(b.textContent)).click(); true")
+    time.sleep(0.3)
+    left = ev("document.getElementById('picComment').value")
+    print('   消したあとの欄:', repr(left))
+    assert left == '', left
     errs = ev("window.__errs")
     print('ページの例外:', errs)
     assert not errs

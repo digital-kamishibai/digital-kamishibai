@@ -199,14 +199,23 @@ function order(a, b) {
  *  書き直されるので、それで見分けると、絵が同じでも「変わった」になる（2026-11-01 Issue #5） */
 export const picturePath = (slideData) => slideData.picture_source || slideData.picture;
 
+/** その枚の絵の上の文字の見分け（文字・位置・大きさ・色。§6）。文字の枠が無ければ null。
+ *  聞き手には絵の一部に見えるので、文字の直しが絵の件で頼まれる（2026-11-14: 「文字を明るく」が絵の件に入り、
+ *  [Text] に色を書き戻しても未反映のまま残った——実際の作品で） */
+export const wordsOf = (slideData) => (slideData.overlay_layout && slideData.overlay_layout.length
+  ? JSON.stringify([slideData.overlays || [], slideData.overlay_layout]) : null);
+
 /** その枚の絵を作り直したい: 何をどう直したいかの文（必須。空なら sheet をそのまま返す）を修正票に入れる。1枚に1件（書き直せば置き換える）。
- *  指したときの絵のパス（picturePath: 組み立ての元の絵があればそれ）と file＝その絵のファイルの見分け（{ size, modified }）を持つ（M6。Markdown には書かない）。
+ *  指したときの絵のパス（picturePath: 組み立ての元の絵があればそれ）と file＝その絵のファイルの見分け（{ size, modified }）、
+ *  words＝絵の上の文字の見分け（wordsOf。文字の枠のある枚だけ）を持つ（M6。Markdown には書かない）。
  *  絵の無い枚（picture: null）でも sheet をそのまま返す */
 export function askPicture(sheet, slideData, file, comment) {
   const c = String(comment || '').replace(/\s+/g, ' ').trim();
   if (!c || typeof slideData.picture !== 'string' || !slideData.picture) return sheet;
   const item = { slide: slideData.number, kind: 'picture', path: picturePath(slideData), comment: c };
   if (file) item.file = { size: file.size, modified: file.modified };
+  const words = wordsOf(slideData);
+  if (words) item.words = words;
   const same = (x) => x.kind === 'picture' && x.slide === item.slide;
   return { ...sheet, items: [...sheet.items.filter((x) => !same(x)), item].sort(order) };
 }
@@ -234,7 +243,8 @@ function judgePicture(item, slideData, file) {
     return item.use && file && file.useLeft === false ? 'done' : 'pending';
   }
   const changed = picturePath(slideData) !== item.path
-    || !!(file && item.file && (file.size !== item.file.size || file.modified !== item.file.modified));
+    || !!(file && item.file && (file.size !== item.file.size || file.modified !== item.file.modified))
+    || (!item.use && item.words !== undefined && wordsOf(slideData) !== item.words); // 文字だけ直した（Use の件は候補を待つ）
   if (!changed) return 'pending';
   return item.use && file && file.useLeft === false ? 'done' : 'changed';
 }

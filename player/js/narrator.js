@@ -23,7 +23,7 @@ import {
   editable, sheetEnabled, mayReload, keepSlide, editorStep, boxFromFields, fieldsFromBox, boxText, paragraphs,
   emptySheet, setSlideEdits, removeItem, removeComment, isOldComment, judge, reconcile, applySheet, sheetMarkdown, sheetName,
   readSheet, storageKey, isEmpty, place, textOf, videoCueOf, markSeat, unmarkSeat, clock as seatClock, mediaLines, isMedia, videoOf, markCut, setLinkVolume, linkVolumeNow, dbText,
-  askPicture, choosePicture, sheetCounts, sheetGroups, workSig,
+  askPicture, choosePicture, sheetCounts, sheetGroups, workSig, wordsOf,
 } from './corrections.js';
 import {
   editOf, applyEdit, moveBy, resizeBy, nudge, resize, toIn, fromIn, sheetValues, KEYS as LAYOUT_KEYS, workPalette, meanLuma, contrast,
@@ -1487,6 +1487,7 @@ function renderEditTools() {
 
 const pictureItem = (n) => (sheet ? sheet.items.find((x) => x.kind === 'picture' && x.slide === n) : null);
 let picBarSlide = null; // 欄に入れた文がどの枚のものか（枚を動かしたら、その枚の頼みを入れ直す）
+let picBarFrom = '';    // 欄に入れたときの頼みの文（件が消えた・書き替わったら入れ直す。2026-11-26: 件を消しても前の文が欄に残った——実機で）
 
 function renderPicBar() {
   const n = session.slide;
@@ -1494,8 +1495,10 @@ function renderPicBar() {
   $('picBar').hidden = !can;
   if (!can) { picBarSlide = null; renderCandBar(n); return; }
   const x = pictureItem(n);
-  if (picBarSlide !== n) { $('picComment').value = (x && x.comment) || ''; picBarSlide = n; }
-  $('picSheet').textContent = !x ? t('picHint') : x.use ? t('picChosen', candName(x.use)) : t('picSheet', x.comment);
+  const from = (x && x.comment) || '';
+  if (picBarSlide !== n || from !== picBarFrom) { $('picComment').value = from; picBarSlide = n; picBarFrom = from; }
+  const hint = wordsOf(work.slides[n - 1]) ? 'picHintWords' : 'picHint'; // 文字の枠のある枚は、文字の直し方も添える（§6）
+  $('picSheet').textContent = !x ? t(hint) : x.use ? t('picChosen', candName(x.use)) : t('picSheet', x.comment);
   const ask = $('picAsk');
   ask.textContent = t(x && x.comment ? 'picAskAgain' : 'picAsk');
   ask.disabled = !$('picComment').value.trim();

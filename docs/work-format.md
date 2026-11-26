@@ -764,6 +764,11 @@ picture's path — for a slide with `picture_source`, that file, not the built p
 changed (or the video is gone), the player shows the correction as
 **changed — look, and remove it**. It never removes one by itself: something changed, but not necessarily as wished.
 A new candidate for a picture that the maker has not chosen yet changes nothing: the slide still shows the old picture.
+For a `picture` without `Use`, the player also remembers the slide's overlay words and their place, size and colours
+(`overlays` and `overlay_layout`): the listeners see them as part of the picture, so a maker may ask for them here.
+When they have changed, the correction is **changed — look, and remove it** too, even if the picture file is the same
+(2026-11-14: "make the words brighter" was asked as a picture, the colour was written back on `[Text]`, and the
+correction stayed not done, in a real work). A `picture` with `Use` waits for its candidate whatever the words do.
 A `picture` with `Use` is **done** (removed by itself) when the picture has changed **and** the chosen candidate is no
 longer among the candidates (it was moved into the slide's place); when the picture changed but the candidate is still
 there, it is **changed — look, and remove it**.
