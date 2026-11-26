@@ -2012,7 +2012,7 @@ function identOf(list, x, pics) {
   return v ? { size: v.file.size, modified: v.file.lastModified } : null;
 }
 const statusOf = (x) => (work.slides[x.slide - 1]
-  ? judge(x, work.slides[x.slide - 1], (y) => identOf(videos, y, pictures))
+  ? judge(x, work.slides[x.slide - 1], (y) => identOf(videos, y, pictures), sheet.items.filter((y) => y.slide === x.slide))
   : isMedia(x) ? 'changed' : 'reworded');
 /** Markdown に書かない件（手を入れて反映した件・指したコマや動画が変わった件。Claude にもう一度当てさせない） */
 const skipped = () => new Set(sheet.items.map((x, i) => (['reworded', 'changed'].includes(statusOf(x)) ? i : -1)).filter((i) => i >= 0));

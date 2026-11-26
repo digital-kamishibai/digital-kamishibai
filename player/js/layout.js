@@ -61,14 +61,17 @@ export function snapCenter(pos, len, slideLen, tol) {
   return Math.abs(pos - c) <= tol ? { pos: c, snapped: true } : { pos, snapped: false };
 }
 
-/** ドラッグで動かす（dx, dy は EMU）。0.01インチの格子へ・中央へ吸い付く → { edit, guides: { v, h } } */
+/** ドラッグで動かす（dx, dy は EMU）。0.01インチの格子へ・中央へ吸い付く → { edit, guides: { v, h } }
+ *  その向きに tol より動かしていなければ、元の値のまま（縦にだけ動かしたのに、横の吸い付き・格子で left が変わり修正票に入った——実機で） */
 export function moveBy(start, dx, dy, slide, tol) {
-  const sx = snapCenter(start.x + dx, start.width, slide.width, tol);
-  const sy = snapCenter(start.y + dy, start.height, slide.height, tol);
-  return {
-    edit: { ...start, x: sx.snapped ? sx.pos : snapGrid(sx.pos), y: sy.snapped ? sy.pos : snapGrid(sy.pos) },
-    guides: { v: sx.snapped, h: sy.snapped },
+  const axis = (pos, d, len, slideLen) => {
+    if (Math.abs(d) <= tol) return { pos, snapped: false };
+    const s = snapCenter(pos + d, len, slideLen, tol);
+    return s.snapped ? s : { pos: snapGrid(s.pos), snapped: false };
   };
+  const sx = axis(start.x, dx, start.width, slide.width);
+  const sy = axis(start.y, dy, start.height, slide.height);
+  return { edit: { ...start, x: sx.pos, y: sy.pos }, guides: { v: sx.snapped, h: sy.snapped } };
 }
 
 /** 四隅のつまみで大きさを変える。corner: 'nw' | 'ne' | 'sw' | 'se'（つかんだ角が動き、向かいの角は動かない） */

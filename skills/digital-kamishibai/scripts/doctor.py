@@ -117,7 +117,10 @@ def main(argv=None):
     args = parser.parse_args(argv)
     for stream in (sys.stdout, sys.stderr):
         if hasattr(stream, 'reconfigure'):
-            stream.reconfigure(errors='backslashreplace')
+            if stream.isatty():
+                stream.reconfigure(errors='backslashreplace')
+            else:  # into a pipe or a file: UTF-8 (not cp932 on a Japanese Windows)
+                stream.reconfigure(encoding='utf-8', errors='backslashreplace')
     needs = args.needs or ['basic']
     rows = run(needs)
     missing = [r for r in rows if not r[2]]

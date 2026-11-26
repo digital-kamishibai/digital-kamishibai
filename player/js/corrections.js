@@ -158,7 +158,7 @@ const itemsOf = (sheet, slide) => sheet.items.filter((x) => x.slide === slide);
 export function setSlideEdits(sheet, slideData, edits, sig) {
   const n = slideData.number;
   // 指したコマ・動画の区間は直す欄の外で足したもの。欄を閉じても残す
-  const keep = itemsOf(sheet, n).filter((x) => isMedia(x) || judge(x, slideData) === 'reworded');
+  const keep = itemsOf(sheet, n).filter((x) => isMedia(x) || judge(x, slideData, null, itemsOf(sheet, n)) === 'reworded');
   const fresh = [];
   if (edits.notes !== undefined) fresh.push(...diffNotes(n, slideData.notes, edits.notes));
   if (edits.overlays !== undefined) fresh.push(...diffOverlays(n, slideData.overlays, edits.overlays));
@@ -404,19 +404,38 @@ function findRun(paras, seq) {
   return -1;
 }
 
+/** seq が続けて現れる回数（重ならないように数える） */
+function countRuns(paras, seq) {
+  let n = 0;
+  for (let i = 0; seq.length && i + seq.length <= paras.length;) {
+    if (seq.every((p, k) => paras[i + k] === p)) { n++; i += seq.length; } else i++;
+  }
+  return n;
+}
+
 /** 修正票の1件を、読み直した作品の同じ枚と比べる → 'done'（反映済み）| 'reworded'（手を入れて反映）| 'pending'（未反映）。
- *  絵（picture）・コマ（seat）・動画の区間（video）は 'changed'（変わった・見て消す）| 'pending'。fileOf(item)＝その件の動画のいまのファイルの見分け（任意） */
-export function judge(item, slideData, fileOf) {
+ *  絵（picture）・コマ（seat）・動画の区間（video）は 'changed'（変わった・見て消す）| 'pending'。fileOf(item)＝その件の動画のいまのファイルの見分け（任意）。
+ *  others＝同じ枚のほかの件（段落を移すと、足す件と消す件の2つになる。§6） */
+export function judge(item, slideData, fileOf, others = []) {
   if (item.kind === 'picture') return judgePicture(item, slideData, fileOf ? fileOf(item) : null);
   if (item.kind === 'seat') return judgeSeat(item, slideData, fileOf ? fileOf(item) : null);
   if (item.kind === 'video') return judgeCut(item, slideData, fileOf ? fileOf(item) : null);
   if (item.kind === 'volume') return judgeVolume(item, slideData);
   if (item.kind === 'layout') return judgeLayout(item, slideData);
+  const count = (x, within) => (item.kind === 'notes'
+    ? countRuns((within || paragraphs(slideData.notes)).map(trimEnds), x.map(trimEnds))
+    : (within ? [within] : slideData.overlays || []).filter((b) => sameBox(b, x)).length);
   const found = (x) => (item.kind === 'notes'
     ? findRun(paragraphs(slideData.notes).map(trimEnds), x.map(trimEnds)) >= 0
     : (slideData.overlays || []).some((b) => sameBox(b, x)));
-  // 消した件は「元の文が残っているか」だけで決める（空の新しい文で探すと、どこにでも見つかって必ず反映済みになる）
-  if (!item.after.length) return item.before.length && found(item.before) ? 'pending' : 'done';
+  // 消した件は「元の文が残っているか」で決める（空の新しい文で探すと、どこにでも見つかって必ず反映済みになる）。
+  // ただし、同じ枚の反映済みの件が After に置いた分は数えない＝移した先（2026-11-14: 移した段落がいつまでも未反映——実際の作品で）
+  if (!item.after.length) {
+    if (!item.before.length) return 'done';
+    const moved = others.filter((o) => o !== item && o.kind === item.kind && o.after.length && found(o.after))
+      .reduce((n, o) => n + count(item.before, o.after), 0);
+    return count(item.before) > moved ? 'pending' : 'done';
+  }
   if (found(item.after)) return 'done';
   return found(item.before) ? 'pending' : 'reworded';
 }
@@ -429,7 +448,7 @@ export function judge(item, slideData, fileOf) {
 export function reconcile(sheet, work, fileOf) {
   const slide = (n) => work.slides[n - 1];
   const gone = (x) => (isMedia(x) ? 'changed' : 'reworded');
-  const judged = sheet.items.map((x) => ({ x, st: slide(x.slide) ? judge(x, slide(x.slide), fileOf) : gone(x) }));
+  const judged = sheet.items.map((x) => ({ x, st: slide(x.slide) ? judge(x, slide(x.slide), fileOf, itemsOf(sheet, x.slide)) : gone(x) }));
   const items = judged.filter((j) => j.st !== 'done').map((j) => j.x);
   const comments = { ...sheet.comments };
   const commentAt = { ...(sheet.commentAt || {}) };

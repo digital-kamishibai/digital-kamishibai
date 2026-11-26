@@ -777,6 +777,12 @@ paragraphs must appear as the same paragraphs one after another):
 | After is not empty | a paragraph/box equal to After | neither After nor Before is there | a paragraph/box equal to Before |
 | After is empty (removed) | no paragraph/box equal to Before | — | a paragraph/box equal to Before |
 
+A paragraph that was **moved** within the slide comes as two corrections: one whose After puts it in its new place, and
+one with an empty After where it was. So for an empty After, a paragraph/box equal to Before that sits inside the After
+of another correction of the same slide **that is done** is not counted: it is the moved one. It is **not done** while
+there are more of them than those Afters hold (2026-11-14: a moved paragraph stayed not done after it was written back,
+in a real work).
+
 "Reworded" happens when the source was edited while writing the correction back (for example to follow its own rules).
 It also happens when Before changed for another reason, so the player never removes it by itself.
 A comment with no change of text is never judged; the narrator removes it.

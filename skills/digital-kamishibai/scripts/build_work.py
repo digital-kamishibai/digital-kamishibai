@@ -775,6 +775,17 @@ def dump(work: dict) -> str:
     return json.dumps(work, ensure_ascii=False, indent=2) + '\n'
 
 
+
+def set_up_streams(errors: str = 'backslashreplace') -> None:
+    """A console that cannot show a character must not stop the tool. Into a pipe or a file, write UTF-8:
+    on a Japanese Windows the default is cp932, and the reader (an agent through Git Bash) reads it as UTF-8."""
+    for stream in (sys.stdout, sys.stderr):
+        if hasattr(stream, 'reconfigure'):
+            if stream.isatty():
+                stream.reconfigure(errors=errors)
+            else:
+                stream.reconfigure(encoding='utf-8', errors=errors)
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description='Build work.json from script.md (Digital Kamishibai).')
     parser.add_argument('folder', type=Path, help='the work folder that holds script.md')
@@ -784,9 +795,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('--draft', action='store_true', help='a version for practising and correcting in the player')
     parser.add_argument('--skip-text', action='store_true', help='leave the words on the screen ([Text]) out')
     args = parser.parse_args(argv)
-    for stream in (sys.stdout, sys.stderr):        # a Japanese Windows console cannot show every character
-        if hasattr(stream, 'reconfigure'):
-            stream.reconfigure(errors='backslashreplace')
+    set_up_streams()
 
     script = args.folder / 'script.md'
     if not script.is_file():

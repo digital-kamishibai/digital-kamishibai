@@ -106,6 +106,17 @@ test('E10 消した: 元の文が無い→反映済み／ある→未反映（�
   assert.equal(judge(boxItem([['消す枠']], []), slide(1, '', [[['消す枠']]])), 'pending');
 });
 
+test('E10 移した段落: 足す件が反映済みなら、その After に置いた分は数えない（§6）', () => {
+  const add = { ...notesItem(['あ'], ['あ', 'う']), at: [1, 1] };
+  const del = { ...notesItem(['う'], []), at: [3, 3] };
+  const both = [add, del];
+  assert.equal(judge(del, slide(1, 'あ\n\nい\n\nう'), null, both), 'pending', '書き戻す前');
+  assert.equal(judge(add, slide(1, 'あ\n\nう\n\nい'), null, both), 'done');
+  assert.equal(judge(del, slide(1, 'あ\n\nう\n\nい'), null, both), 'done', '書き戻したあと');
+  assert.equal(judge(del, slide(1, 'あ\n\nう\n\nい\n\nう'), null, both), 'pending', '足しただけで、元の段落が残っている');
+  assert.equal(judge(del, slide(1, 'あ\n\nう\n\nい'), null, [del]), 'pending', 'ほかの件が無ければ今までどおり');
+});
+
 test('E10 一致は段落・枠まるごと（短い文が別の段落に含まれても反映済みにしない）・行末の空白はそろえる', () => {
   const x = notesItem(['元の文'], ['はい']);
   assert.equal(judge(x, slide(1, 'はいと言った\n\n元の文')), 'pending');

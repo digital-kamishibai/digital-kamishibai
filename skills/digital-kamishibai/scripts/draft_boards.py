@@ -77,9 +77,7 @@ def board_png() -> bytes:
 
 
 def main(argv: list[str] | None = None) -> int:
-    for stream in (sys.stdout, sys.stderr):   # a console that cannot show a character must not stop the tool
-        if hasattr(stream, 'reconfigure'):
-            stream.reconfigure(errors='replace')
+    build_work.set_up_streams('replace')
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument('work', type=Path, help='the work folder (where script.md is)')
     ap.add_argument('--check', action='store_true', help='only list what would be placed')

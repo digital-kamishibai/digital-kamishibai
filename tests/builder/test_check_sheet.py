@@ -346,3 +346,62 @@ def test_a_linked_video_volume_is_judged_from_the_video_line(work, capsys):
     (work / 'videos').mkdir(exist_ok=True)
     (work / 'videos' / 'x.mp4').write_bytes(b'mp4')
     assert [state for _, state in cs.check(work, sheet)[0]] == ['changed']
+
+
+def test_through_a_pipe_the_comments_are_utf8(work):
+    # a Japanese Windows writes cp932 into a pipe by default, and the reader (an agent through Git Bash) reads UTF-8
+    import os
+    import subprocess
+    sheet = SHEET.replace('Comment: sounds more like me', 'Comment: もっと自分の声に近い')
+    (work / 'sheet.md').write_text(sheet, encoding='utf-8')
+    env = {k: v for k, v in os.environ.items() if k not in ('PYTHONIOENCODING', 'PYTHONUTF8')}
+    run = subprocess.run([sys.executable, str(SCRIPTS / 'check_sheet.py'), str(work), str(work / 'sheet.md')],
+                         stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
+    assert 'もっと自分の声に近い' in run.stdout.decode('utf-8')
+
+
+MOVED = '''# Correction sheet: The Lighthouse Keeper's Lamp (2026-11-14 10:00)
+
+## [Slide 2] notes 1
+### Before
+```
+One winter night, the wind was so strong
+that the windows sang.
+```
+### After
+```
+And the lamp went out.
+
+One winter night, the wind was so strong
+that the windows sang.
+```
+
+## [Slide 2] notes 2
+### Before
+```
+And the lamp went out.
+```
+### After
+```
+```
+'''
+WIND = 'One winter night, the wind was so strong\nthat the windows sang.\n'
+LAMP = 'And the lamp went out.\n'
+
+
+def test_a_moved_paragraph_is_done_once_it_is_written_back(work):
+    # a move is an addition and a removal (§6): the removed paragraph is still there, in its new place
+    script = work / 'script.md'
+    s = script.read_text(encoding='utf-8')
+    assert WIND in s and LAMP in s
+
+    def now():
+        judged, errors = cs.check(work, MOVED)
+        assert errors == []
+        return [state for _, state in judged]
+    assert now() == ['pending', 'pending']
+    script.write_text(s.replace(LAMP, '').replace(WIND, LAMP + '\n' + WIND), encoding='utf-8')
+    assert script.read_text(encoding='utf-8').count(LAMP) == 1
+    assert now() == ['done', 'done']
+    script.write_text(s.replace(WIND, LAMP + '\n' + WIND), encoding='utf-8')     # only the addition is written back
+    assert now() == ['done', 'pending']

@@ -33,16 +33,30 @@ test('直せる値は位置・大きさ・文字の大きさ。大きさは全�
 
 test('ドラッグ: 0.01インチの格子へ・中心がスライドの中心に近ければ吸い付く', () => {
   const e = editOf(head());                         // 横はもともと中央（0.5in + 12.3in = 12.8in の中心＝6.67in ≒ 13.333/2）
-  const r = moveBy(e, 3000, 20000, SLIDE, 20000);
+  const r = moveBy(e, 25000, 30000, SLIDE, 20000);
   assert.equal(r.guides.v, true);
   assert.equal(r.edit.x, SLIDE.width / 2 - e.width / 2);
   assert.equal(r.edit.y % STEP, 0);
   assert.equal(r.guides.h, false);
-  const far = moveBy(e, 300000, 0, SLIDE, 20000);
+  const far = moveBy(e, 300000, 30000, SLIDE, 20000);
   assert.equal(far.guides.v, false);
   assert.equal(far.edit.x % STEP, 0);
   assert.deepEqual(snapCenter(100, 50, 300, 10), { pos: 100, snapped: false });
   assert.deepEqual(snapCenter(120, 50, 300, 10), { pos: 125, snapped: true });
+});
+
+test('ドラッグ: 縦にだけ動かしたら、横は元の値のまま（中央の近くでも吸い付かない）', () => {
+  const e = { x: fromIn(0.5), y: fromIn(0.25), width: fromIn(12.3), height: fromIn(1), size: 30 };
+  const wide = { width: fromIn(13.333), height: fromIn(7.5) };   // 中央は (13.333 − 12.3) / 2 ≈ 0.5167in
+  const r = moveBy(e, 0, fromIn(1), wide, 20000);
+  assert.equal(r.edit.x, e.x);
+  assert.equal(r.guides.v, false);
+  assert.equal(r.edit.y, fromIn(1.25));
+  const shaky = moveBy({ ...e, x: e.x + 1234 }, 15000, fromIn(1), wide, 20000);   // 格子に乗っていない値も、手のぶれでは変えない
+  assert.equal(shaky.edit.x, e.x + 1234);
+  const moved = moveBy(e, 25000, fromIn(1), wide, 20000);         // 横にも動かせば吸い付く
+  assert.equal(moved.guides.v, true);
+  assert.equal(moved.edit.x, wide.width / 2 - e.width / 2);
 });
 
 test('つまみ: つかんだ角が動き、向かいの角は動かない。0.1インチより小さくしない', () => {

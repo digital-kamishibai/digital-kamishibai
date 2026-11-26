@@ -182,6 +182,17 @@ def find_run(paras: list[str], seq: list[str]) -> int:
     return -1
 
 
+def count_runs(paras: list[str], seq: list[str]) -> int:
+    """How many times seq appears, one after another, in paras (non-overlapping)."""
+    n, i = 0, 0
+    while seq and i + len(seq) <= len(paras):
+        if all(paras[i + k] == p for k, p in enumerate(seq)):
+            n, i = n + 1, i + len(seq)
+        else:
+            i += 1
+    return n
+
+
 def norm_box(box):
     return [[re.sub(SPACES, '', line) for line in para] for para in box or []]
 
@@ -210,7 +221,8 @@ def sheet_values(box: dict, words: list | None = None) -> dict:
     return values
 
 
-def judge(item: dict, slide: dict | None) -> str:
+def judge(item: dict, slide: dict | None, others: list | tuple = ()) -> str:
+    """others: the other corrections of the same slide (a moved paragraph is a removal and an addition, §6)."""
     if slide is None:
         return 'reworded'
     if item['kind'] == 'layout':
@@ -226,13 +238,22 @@ def judge(item: dict, slide: dict | None) -> str:
             return 'pending'
         return 'reworded'
 
-    def found(x):
+    def count(x, within=None):
         if item['kind'] == 'notes':
-            return find_run([trim_ends(p) for p in paragraphs(slide['notes'])], [trim_ends(p) for p in x]) >= 0
-        return any(norm_box(b) == norm_box(x) for b in slide.get('overlays') or [])
+            paras = paragraphs(slide['notes']) if within is None else within
+            return count_runs([trim_ends(p) for p in paras], [trim_ends(p) for p in x])
+        boxes = (slide.get('overlays') or []) if within is None else [within]
+        return sum(norm_box(b) == norm_box(x) for b in boxes)
+
+    def found(x):
+        return count(x) > 0 if x else True
 
     if not item['after']:
-        return 'pending' if item['before'] and found(item['before']) else 'done'
+        if not item['before']:
+            return 'done'
+        moved = sum(count(item['before'], o['after']) for o in others
+                    if o is not item and o['kind'] == item['kind'] and o['after'] and found(o['after']))
+        return 'pending' if count(item['before']) > moved else 'done'
     if found(item['after']):
         return 'done'
     return 'pending' if found(item['before']) else 'reworded'
@@ -292,7 +313,7 @@ def check(folder: Path, sheet_text: str, media: Path | None = None) -> tuple[lis
             return 'pending' if left else 'done'
         if item['kind'] in MEDIA_KINDS:
             return 'look'
-        return judge(item, slides.get(item['slide']))
+        return judge(item, slides.get(item['slide']), [o for o in items if o['slide'] == item['slide']])
     return [(item, state(item)) for item in items], errors
 
 
@@ -302,9 +323,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('sheet', type=Path, help='the correction sheet (.md) saved or copied from the room player')
     parser.add_argument('--media', type=Path, help='folder of the pictures, if not the work folder')
     args = parser.parse_args(argv)
-    for stream in (sys.stdout, sys.stderr):        # a Japanese Windows console cannot show every character
-        if hasattr(stream, 'reconfigure'):
-            stream.reconfigure(errors='backslashreplace')
+    build_work.set_up_streams()
     if not args.sheet.is_file():
         print(f'error: {args.sheet} not found', file=sys.stderr)
         return 1
