@@ -30,9 +30,16 @@ Keep the prompts in the plan, one per slide, under the markers `### [Prompt styl
 - **Say "fills the frame from the left edge to the right edge"** for tall subjects (cliffs, towers, people standing):
   otherwise a tall picture can come back centred between plain bands.
 - **Keep one style**: paint the cover first, then ask for the others "in the style of the attached picture".
+- **Attach pictures by what they are for** (on the picture ladder: style `--anchor`, characters `--character`,
+  composition `--sketch`, or the lines `- Anchor:` `- Character:` `- Sketch:` under a slide's `[Prompt N]`;
+  `ladder/images/README.md`). A picture attached for its style is not copied; one attached for its characters gives
+  them the same look in a new scene; a slide's own rough sketch gives the composition.
 - **For a sequel, choose the attached picture with care.** A group picture from the earlier work tends to be copied
   almost as it is, and a new character drawn next to it may come out as someone else (an animal turns human).
-  Attach a picture where the **new** character came out right, and describe the old ones in words.
+  Attach a picture where the **new** character came out right, and describe the old ones in words. The earlier
+  work's pictures can be attached by their path; there is no need to copy them into this work.
+- **When the maker drew rough sketches** in the slides' places, they can be the composition (`--sketch`). Look at
+  each result: a sketch that is itself a picture in a frame may be copied with its notes; make that slide without it.
 - **If words on the screen seem to vanish**, measure the colour of the picture behind them before blaming an overlap:
   white words on a pale sky disappear. Move the box to the calm band, or give it a `fill`.
 

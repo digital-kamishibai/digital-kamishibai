@@ -171,13 +171,14 @@ def test_not_16_9_is_warned():
 def test_request_body_attaches_the_style_picture(tmp_path):
     anchor = tmp_path / '01.png'
     anchor.write_bytes(png(size=(16, 9)))
-    body = gi.request_body('A storm.', anchor)
+    body = gi.request_body('A storm.', [('style', anchor)])
     parts = body['contents'][0]['parts']
     assert parts[0]['inline_data']['mime_type'] == 'image/png'
     assert base64.b64decode(parts[0]['inline_data']['data']) == anchor.read_bytes()
+    assert parts[1] == {'text': gi.STYLE_NOTE}
     assert parts[-1] == {'text': 'A storm.'}
     assert body['generationConfig']['imageConfig'] == {'aspectRatio': '16:9', 'imageSize': '2K'}
-    assert gi.request_body('A storm.', None)['contents'][0]['parts'] == [{'text': 'A storm.'}]
+    assert gi.request_body('A storm.', [])['contents'][0]['parts'] == [{'text': 'A storm.'}]
 
 
 # ---------- runs ----------
@@ -314,3 +315,93 @@ def test_request_image_reads_the_answer_and_sends_the_key_in_a_header(monkeypatc
     monkeypatch.setattr(gi.urllib.request, 'urlopen', urlopen)
     assert gi.request_image(KEY, 'm', {'contents': []}) == b'PICTURE'
     assert seen['key'] == KEY and KEY not in seen['url'] and '/models/m:generateContent' in seen['url']
+
+
+# ---------- references with roles: style, characters, sketch ----------
+
+def attached(call):
+    """[(role note, picture bytes)] of one request, in order."""
+    parts = call['body']['contents'][0]['parts']
+    roles = {gi.STYLE_NOTE: 'style', gi.CHARACTER_NOTE: 'character', gi.SKETCH_NOTE: 'sketch'}
+    return [(roles[parts[i + 1]['text']], base64.b64decode(p['inline_data']['data']))
+            for i, p in enumerate(parts) if 'inline_data' in p]
+
+
+def test_each_role_has_its_note_in_the_order_style_characters_sketch(work, fake, tmp_path):
+    pictures = work / 'pictures'
+    one, two = png(size=(16, 9), color=(1, 2, 3)), png(size=(16, 9), color=(4, 5, 6))
+    (pictures / '01.png').write_bytes(one)
+    (pictures / '02.png').write_bytes(two)
+    earlier = tmp_path.parent / 'earlier.png'                 # a picture from outside the work (the previous work)
+    earlier.write_bytes(png(size=(16, 9), color=(7, 8, 9)))
+    assert gi.main([str(work), '2', '--character', str(earlier), '--sketch', '--anchor', '1']) == 0
+    assert attached(fake[0]) == [('style', one), ('character', earlier.read_bytes()), ('sketch', two)]
+    assert (pictures / '_candidates' / '02-1.png').is_file()   # a sketch is the slide's picture: a candidate
+
+
+def test_anchor_is_repeatable_and_takes_files(work, fake, tmp_path):
+    (work / 'pictures' / '01.png').write_bytes(png(size=(16, 9)))
+    other = tmp_path.parent / 'other-style.jpg'
+    other.write_bytes(png(size=(16, 9), color=(9, 9, 9)))
+    assert gi.main([str(work), '2', '--anchor', '1', '--anchor', str(other)]) == 0
+    assert [role for role, _ in attached(fake[0])] == ['style', 'style']
+    assert gi.main([str(work), '2', '--anchor', 'none', '--anchor', '1']) == 1
+
+
+def test_a_line_in_the_plan_replaces_that_role_for_its_slide(work, fake, tmp_path):
+    ref = work / 'ref'
+    ref.mkdir()
+    (ref / 'hero.png').write_bytes(png(size=(16, 9), color=(3, 3, 3)))
+    (work / 'pictures' / '01.png').write_bytes(png(size=(16, 9)))
+    (work / 'plan.md').write_text(PLAN.replace('- Asserts: three waves\n',
+                                               '- Asserts: three waves\n- Anchor: none\n- Character: ref/hero.png\n'),
+                                  encoding='utf-8')
+    prompts = gi.parse_plan((work / 'plan.md').read_text(encoding='utf-8'))
+    assert prompts.errors == [] and prompts.refs == {2: {'style': ['none'], 'character': ['ref/hero.png']}}
+    assert gi.main([str(work), '2', '--anchor', '1']) == 0         # the plan's "none" wins for slide 2
+    assert attached(fake[0]) == [('character', (ref / 'hero.png').read_bytes())]   # a path from the plan's folder
+
+
+@pytest.mark.parametrize('lines, message', [
+    ('- Sketch: maybe\n', '"Sketch:" is yes or no'),
+    ('- Character: 2\n- Character: 3\n', 'a second "Character:"'),
+])
+def test_reference_lines_in_the_plan_are_checked(lines, message):
+    prompts = gi.parse_plan(PLAN.replace('- Asserts: three waves\n', '- Asserts: three waves\n' + lines))
+    assert any(message in e for e in prompts.errors), prompts.errors
+    style = gi.parse_plan(PLAN.replace('```text\nWatercolour', '- Anchor: 1\n```text\nWatercolour'))
+    assert any('[Prompt style] takes no' in e for e in style.errors)
+
+
+def test_a_missing_reference_stops_the_run_before_anything_is_paid(work, fake, tmp_path, capsys):
+    assert gi.main([str(work), '2', '--character', str(tmp_path / 'nowhere.png')]) == 1
+    assert gi.main([str(work), '2', '--sketch']) == 1              # slide 2 has no picture to follow
+    assert gi.main([str(work), '2', '--character', str(work / 'plan.md')]) == 1
+    err = capsys.readouterr().err
+    assert 'not found' in err and 'no picture to follow' in err and 'not a picture' in err
+    assert fake == []
+
+
+def test_at_most_14_pictures(work, fake):
+    for n in range(1, 17):
+        (work / 'pictures' / f'{n:02d}.png').write_bytes(png(size=(16, 9)))
+    assert gi.main([str(work), '2'] + [a for n in range(3, 17) for a in ('--character', str(n))]) == 1
+    assert fake == []
+
+
+def test_slides_that_others_follow_are_made_first(work, fake, capsys):
+    (work / 'plan.md').write_text(PLAN.replace('- Asserts: nothing\n', '- Asserts: nothing\n- Character: 2\n'),
+                                  encoding='utf-8')
+    assert gi.main([str(work), '--anchor', 'none']) == 0
+    assert [c['body']['contents'][0]['parts'][-1]['text'].split('\n\n')[1][:7] for c in fake] == ['A storm', 'A light']
+    assert [role for role, _ in attached(fake[1])] == ['character']
+
+
+def test_dry_run_lists_the_references_by_role(work, monkeypatch, capsys):
+    monkeypatch.delenv(gi.KEY_ENV, raising=False)
+    (work / 'pictures' / '02.png').write_bytes(png(size=(16, 9)))
+    assert gi.main([str(work), '1', '2', '--sketch', '--dry-run']) == 1      # slide 1 has no sketch
+    assert gi.main([str(work), '2', '--sketch', '--dry-run']) == 0
+    out = capsys.readouterr().out
+    assert 'sketch: ' in out and '02.png' in out
+    assert '(style from slide 1: it has no picture yet; attached if it is made first in this run)' in out

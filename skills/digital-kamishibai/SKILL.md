@@ -47,7 +47,7 @@ on the spot. Do not hand the maker an English template to fill in.
 `[Slide N]`, the machine cues `[Picture]` `[Text]` `[BGM]` `[BGM once]` `[BGM after video]` `[BGM stop]` `[Sound]` `[Video]`,
 the words on a `[Text]` line (`place` `left` `top` `width` `height` `size` `bold` `align` `anchor` `color` `fill`
 and their values, such as `top`, `0.50in`, `54pt`), `> Language:`, and in the plan the prompt markers
-`[Prompt style]` `[Prompt N]` and the labels `Asserts:` `Seen:`.
+`[Prompt style]` `[Prompt N]` and the labels `Asserts:` `Seen:` `Anchor:` `Character:` `Sketch:`.
 Tools read these exactly. If they are translated, the tools find no slides and no cues.
 Slide titles, narration and free cues are written in the maker's language.
 

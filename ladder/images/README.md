@@ -42,6 +42,7 @@ python ladder/images/gen_images.py <work folder>            # slides that have n
 python ladder/images/gen_images.py <work folder> 3 5-7      # these slides
 python ladder/images/gen_images.py <work folder> --dry-run  # what would be sent, and the cost
 python ladder/images/gen_images.py <work folder> --use 3    # take the newest candidate for slide 3
+python ladder/images/gen_images.py <work folder> 3 --sketch # slide 3 again, following its picture now (a sketch)
 ```
 
 - **Nothing is overwritten.** A slide with no picture gets `pictures/NN.png`, which the builder finds by itself.
@@ -50,10 +51,33 @@ python ladder/images/gen_images.py <work folder> --use 3    # take the newest ca
   (`ending_video*.json`) shows the old picture in a seat, `--use` names the seat and the `--replace` command for the
   ending video ladder; it does not change the ending video.
 - **The style follows slide 1.** Slide 1's picture is attached to the others with "match this style".
-  If slide 1 is a photo or a placeholder, use `--anchor none` or `--anchor N`.
+  If slide 1 is a photo or a placeholder, use `--anchor none` or `--anchor N`. More in "Pictures to follow" below.
 - Every picture is saved as PNG, at most 1920 px on its long side, without an alpha channel when it is fully opaque.
   Keep these pictures: the same prompt never paints the same picture twice.
 - It warns when a picture is not 16:9, or has plain bands at its sides (a tall picture put in the middle).
+
+## Pictures to follow
+
+Pictures can be attached to a request, each with a **role** that says what to take from it:
+
+| Role | Command line | Line under `### [Prompt N]` | What the tool asks |
+|---|---|---|---|
+| Style | `--anchor N` or `--anchor FILE` (repeatable; default: slide 1), `--anchor none` | `- Anchor: 2, ../earlier-work/pictures/02.png` or `- Anchor: none` | the same drawing style, colours and light; **not** the same content |
+| Characters | `--character N` or `--character FILE` (repeatable) | `- Character: 2` | the same people, animals or things with the same look (face, hair, clothes, colours, build), in a new scene |
+| Composition | `--sketch` | `- Sketch: yes` (or `no`) | the slide's **own picture now** (a rough sketch) as the composition: the same things in the same places and sizes; not its words, notes, arrows, dotted lines, frames or paper colour |
+
+- A number is a slide of this work. Anything else is a picture file, so a picture from **an earlier work** can be
+  followed directly. On the command line a path is from where you are; in the plan, from the plan's folder.
+- A line under `### [Prompt N]` replaces the command line's choice of that role, for that slide only. The labels
+  `Anchor:`, `Character:` and `Sketch:` are never translated, like `Asserts:`.
+- They are attached in the order style, characters, composition. A slide that others follow is made first in the run.
+- `--sketch` needs a picture in the slide's place, so the new one is a candidate, chosen with `--use` as usual.
+- At most 14 pictures can be attached to one request. Google's guide for this model suggests up to 5 for characters
+  and up to 3 for style. A file that is not there stops the run before anything is sent or paid for. The attached
+  pictures add only a little to the cost of a picture.
+- What the sketch note says comes from trying it on a real work: sent as it was, a sketch's notes and frame were
+  copied, the middle came out white like its paper, and the areas left empty for the words came out as bands of
+  another colour. If a sketch is itself a picture in a frame, it may still be copied: make that slide without it.
 
 ## Look at every picture
 

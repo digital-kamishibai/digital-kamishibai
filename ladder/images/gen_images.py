@@ -20,6 +20,16 @@ in its place. If an ending video of the work (ending_video*.json) shows the old 
 and the command that puts the new picture there (it never changes the ending video itself). Every picture is saved as PNG, at most 1920 px on its long side, and without an alpha channel when it is
 fully opaque.
 
+Pictures can be attached as references, each with a role (on the command line, or per slide in the plan):
+    --anchor N|FILE      the style to follow (repeatable; default: slide 1; "none" for no style picture)
+    --character N|FILE   characters to draw with the same look (repeatable), e.g. a picture from the previous work
+    --sketch             the slide's own picture now (a rough sketch) as the composition to follow
+A number is a slide of this work; anything else is a file. In the plan, under "### [Prompt N]":
+    - Anchor: 2, ../previous-work/pictures/02.png     (or "none"; a path is from the plan's folder)
+    - Character: 2
+    - Sketch: yes
+A line in the plan replaces the command line's choice of that role for that slide.
+
 A generated picture does not keep to the numbers and shapes in its prompt. After each run, look at every new picture
 and check what the narration says about it (the "Asserts:" line of its prompt); write what you see on "Seen:".
 """
@@ -62,6 +72,19 @@ ASSERTS = re.compile(r'^[ \t]*[-*][ \t]*Asserts:[ \t]*(.*?)[ \t]*$')
 
 STYLE_NOTE = ('The attached picture is from the same picture-story show. Match its drawing style, colours, line '
               'quality and lighting closely. Draw a new picture; do not copy its content.\n\n')
+CHARACTER_NOTE = ('The attached picture shows characters of this picture-story show (people, animals or things). '
+                  'Wherever they appear in the new picture, draw them with the same look: face, hair, clothes, colours '
+                  'and build. Draw a new scene; do not copy its scene, pose or composition.\n\n')
+# a sketch: what rough sketches did when sent as they were (in a real work): their notes and frame were copied, the
+# middle was left white like their paper, and the empty areas asked for the words came out as bands of another colour
+SKETCH_NOTE = ('The attached picture is a rough sketch of this very picture. Follow its composition: the same things '
+               'in the same places, at about the same sizes, with the same colours where it shows them. It is only a '
+               'sketch: do not copy its words, notes, arrows, dotted lines, frames or the colour of its paper. Paint '
+               'the background across the whole picture in one piece, with no bands of another colour.\n\n')
+NOTES = {'style': STYLE_NOTE, 'character': CHARACTER_NOTE, 'sketch': SKETCH_NOTE}
+ROLES = {'Anchor': 'style', 'Character': 'character', 'Sketch': 'sketch'}
+MAX_REFERENCES = 14                                       # input pictures per request (Gemini 3 Pro Image)
+REFERENCE = re.compile(r'^[ \t]*[-*][ \t]*(Anchor|Character|Sketch):[ \t]*(.*?)[ \t]*$')
 
 
 @dataclass
@@ -69,6 +92,7 @@ class Prompts:
     style: str = ''
     slides: dict[int, str] = field(default_factory=dict)
     asserts: dict[int, str] = field(default_factory=dict)
+    refs: dict[int, dict] = field(default_factory=dict)   # slide -> {'style': [...], 'character': [...], 'sketch': bool}
     errors: list[str] = field(default_factory=list)
 
 
@@ -106,7 +130,7 @@ def parse_plan(text: str) -> Prompts:
         result.errors.append('a code block is not closed')
 
     for key, line, body in sections:
-        asserts, block, fence, done = '', [], '', False
+        asserts, block, fence, done, refs = '', [], '', False, {}
         for row in body:                                   # only the first code block is the prompt
             if done:
                 break
@@ -116,6 +140,17 @@ def parse_plan(text: str) -> Prompts:
                     fence = opened.group(1)
                 elif ASSERTS.match(row) and not asserts:
                     asserts = ASSERTS.match(row).group(1)
+                elif REFERENCE.match(row):
+                    name, value = REFERENCE.match(row).groups()
+                    role = ROLES[name]
+                    if role in refs:
+                        result.errors.append(f'line {line}: [Prompt {key}]: a second "{name}:"')
+                    elif role == 'sketch':
+                        if value.lower() not in ('yes', 'no'):
+                            result.errors.append(f'line {line}: [Prompt {key}]: "Sketch:" is yes or no')
+                        refs[role] = value.lower() == 'yes'
+                    else:
+                        refs[role] = [v.strip() for v in value.split(',') if v.strip()]
             elif row.strip().startswith(fence):
                 done = True
             else:
@@ -126,6 +161,8 @@ def parse_plan(text: str) -> Prompts:
                                  '(put it in a ``` code block under the heading)')
             continue
         if key == 'style':
+            if refs:
+                result.errors.append(f'line {line}: [Prompt style] takes no "Anchor:", "Character:" or "Sketch:"')
             if result.style:
                 result.errors.append(f'line {line}: a second [Prompt style]')
             result.style = prompt
@@ -139,6 +176,8 @@ def parse_plan(text: str) -> Prompts:
             result.slides[slide] = prompt
             if asserts:
                 result.asserts[slide] = asserts
+            if refs:
+                result.refs[slide] = refs
     if not result.errors and not result.slides:
         result.errors.append('no "### [Prompt N]" found in the plan (the marker is not translated)')
     return result
@@ -309,13 +348,14 @@ def picture_warnings(image) -> list[str]:
 
 # ---------- Gemini ----------
 
-def request_body(prompt: str, anchor: Path | None) -> dict:
+def request_body(prompt: str, refs: list[tuple[str, Path]]) -> dict:
+    """refs: (role, picture) in the order of references(); each picture is followed by what to take from it."""
     parts = []
-    if anchor is not None:
-        mime = 'image/png' if anchor.suffix.lower() == '.png' else (
-            'image/webp' if anchor.suffix.lower() == '.webp' else 'image/jpeg')
-        parts.append({'inline_data': {'mime_type': mime, 'data': base64.b64encode(anchor.read_bytes()).decode('ascii')}})
-        parts.append({'text': STYLE_NOTE})
+    for role, picture in refs:
+        mime = 'image/png' if picture.suffix.lower() == '.png' else (
+            'image/webp' if picture.suffix.lower() == '.webp' else 'image/jpeg')
+        parts.append({'inline_data': {'mime_type': mime, 'data': base64.b64encode(picture.read_bytes()).decode('ascii')}})
+        parts.append({'text': NOTES[role]})
     parts.append({'text': prompt})
     return {'contents': [{'parts': parts}],
             'generationConfig': {'responseModalities': ['IMAGE'],
@@ -368,13 +408,76 @@ def choose(prompts: Prompts, pictures: Path, numbers: list[int]) -> tuple[list[i
     return chosen, notes
 
 
-def anchor_for(pictures: Path, number: int, anchor: str) -> Path | None:
-    if anchor == 'none':
-        return None
-    source = int(anchor)
-    if source == number:
-        return None
-    return existing_picture(pictures, source)
+@dataclass
+class Choice:
+    """The references asked for on the command line. A slide's line in the plan replaces that role for the slide."""
+    style: list[str]
+    character: list[str]
+    sketch: bool
+    plan_dir: Path = Path('.')
+
+    def of(self, prompts: Prompts, number: int) -> tuple[list[str], list[str], bool]:
+        mine = prompts.refs.get(number, {})
+        style = mine.get('style', self.style)
+        return ([] if style == ['none'] else style), mine.get('character', self.character), mine.get('sketch', self.sketch)
+
+
+def references(choice: Choice, prompts: Prompts, pictures: Path,
+               number: int) -> tuple[list[tuple[str, Path]], list[str], list[str]]:
+    """The pictures to attach to slide `number`: [(role, picture)] in the order style, characters, sketch (the most
+    particular last, next to the prompt); then errors (nothing is sent for this slide) and notes.
+    A slide that has no picture yet is left out with a note (it may be made earlier in the same run)."""
+    style, character, sketch = choice.of(prompts, number)
+    mine = prompts.refs.get(number, {})
+    refs, errors, notes = [], [], []
+    for role, specs in (('style', style), ('character', character)):
+        for spec in specs:
+            if spec.isdigit():
+                source = int(spec)
+                if source == number:                       # its own picture is not its own reference
+                    continue
+                found = existing_picture(pictures, source)
+                if found is None:
+                    notes.append(f'{role} from slide {source}: it has no picture yet')
+                else:
+                    refs.append((role, found))
+                continue
+            path = Path(spec)
+            if not path.is_absolute() and role in mine:     # a path in the plan is read from the plan's folder
+                path = choice.plan_dir / path
+            if path.suffix.lower() not in PICTURE_EXTS:
+                errors.append(f'{role} from {spec}: not a picture ({", ".join(PICTURE_EXTS)})')
+            elif not path.is_file():
+                errors.append(f'{role} from {spec}: not found ({path})')
+            else:
+                refs.append((role, path))
+    if sketch:
+        own = existing_picture(pictures, number)
+        if own is None:
+            errors.append('sketch: the slide has no picture to follow')
+        else:
+            refs.append(('sketch', own))
+    if len(refs) > MAX_REFERENCES:
+        errors.append(f'{len(refs)} pictures attached; at most {MAX_REFERENCES}')
+    return refs, errors, notes
+
+
+def referred_slides(choice: Choice, prompts: Prompts, numbers: list[int]) -> list[int]:
+    """Slides of this run whose pictures others follow: they are made first."""
+    first = []
+    for n in numbers:
+        style, character, _ = choice.of(prompts, n)
+        for spec in style + character:
+            if spec.isdigit() and int(spec) in numbers and int(spec) != n and int(spec) not in first:
+                first.append(int(spec))
+    return first
+
+
+def describe(refs: list[tuple[str, Path]]) -> str:
+    if not refs:
+        return 'nothing attached'
+    return '; '.join(f'{role}: ' + ', '.join(str(p) for r, p in refs if r == role)
+                     for role in NOTES if any(r == role for r, _ in refs))
 
 
 def cost_line(model: str, count: int) -> str:
@@ -390,7 +493,13 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument('folder', type=Path, help='the work folder (pictures go in its pictures/ folder)')
     parser.add_argument('slides', nargs='*', help='slide numbers or ranges such as 5-7 (default: slides with no picture)')
     parser.add_argument('--plan', type=Path, help='the plan file (default: plan.md in the work folder)')
-    parser.add_argument('--anchor', default='1', help='slide whose picture sets the style (default 1), or "none"')
+    parser.add_argument('--anchor', action='append', metavar='N|FILE',
+                        help='a picture whose style to follow: a slide number or a file (repeatable; default 1), '
+                             'or "none"')
+    parser.add_argument('--character', action='append', default=[], metavar='N|FILE',
+                        help='a picture of characters to draw with the same look (repeatable)')
+    parser.add_argument('--sketch', action='store_true',
+                        help="follow the composition of the slide's own picture now (a rough sketch)")
     parser.add_argument('--model', default=os.environ.get('DK_GEMINI_MODEL', MODEL), help=f'default {MODEL}')
     parser.add_argument('--dry-run', action='store_true', help='show what would be sent and the cost; send nothing')
     parser.add_argument('--use', metavar='N[-K]', help='put candidate K (default: the newest) in slide N\'s place')
@@ -410,8 +519,9 @@ def main(argv: list[str] | None = None) -> int:
             print(f'error: {e}', file=sys.stderr)
             return 1
         return 0
-    if args.anchor != 'none' and not args.anchor.isdigit():
-        print('error: --anchor takes a slide number or "none"', file=sys.stderr)
+    style = args.anchor or ['1']
+    if 'none' in style and len(style) > 1:
+        print('error: --anchor none cannot go with another --anchor', file=sys.stderr)
         return 1
 
     plan = args.plan if args.plan is not None else args.folder / 'plan.md'
@@ -419,6 +529,7 @@ def main(argv: list[str] | None = None) -> int:
         print(f'error: {plan} not found', file=sys.stderr)
         return 1
     prompts = parse_plan(plan.read_text(encoding='utf-8'))
+    choice = Choice(style, args.character, args.sketch, plan.parent)
     for error in prompts.errors:
         print(f'error: {plan.name}: {error}', file=sys.stderr)
     if prompts.errors:
@@ -433,17 +544,23 @@ def main(argv: list[str] | None = None) -> int:
     if not numbers:
         print('nothing to make')
         return 0
-    # the style picture goes first, so that the others can follow it
-    anchor_number = None if args.anchor == 'none' else int(args.anchor)
-    if anchor_number in numbers:
-        numbers = [anchor_number] + [n for n in numbers if n != anchor_number]
+    # the pictures that others follow go first
+    first = referred_slides(choice, prompts, numbers)
+    numbers = first + [n for n in numbers if n not in first]
+    # a missing file stops the run before anything is paid for
+    stops = [f'slide {n}: {e}' for n in numbers for e in references(choice, prompts, pictures, n)[1]]
+    for stop in stops:
+        print(f'error: {stop}', file=sys.stderr)
+    if stops:
+        return 1
     print(cost_line(args.model, len(numbers)))
 
     if args.dry_run:
         for n in numbers:
-            anchor = anchor_for(pictures, n, args.anchor)
-            print(f'\n--- slide {n} -> {output_path(pictures, n)}'
-                  f' (style from: {anchor if anchor else "nothing"})\n{full_prompt(prompts, n)}')
+            refs, _, notes = references(choice, prompts, pictures, n)
+            print(f'\n--- slide {n} -> {output_path(pictures, n)} ({describe(refs)})'
+                  + ''.join(f'\n    ({note}; attached if it is made first in this run)' for note in notes)
+                  + f'\n{full_prompt(prompts, n)}')
         print('\n(dry run: nothing sent)')
         return 0
 
@@ -460,11 +577,15 @@ def main(argv: list[str] | None = None) -> int:
 
     made, failed, as_candidate = [], [], []
     for n in numbers:
-        anchor = anchor_for(pictures, n, args.anchor)
+        refs, errors, _ = references(choice, prompts, pictures, n)
+        if errors:                                             # over the limit, now that a slide of this run was made
+            print(f'slide {n}: failed: ' + '; '.join(errors), file=sys.stderr)
+            failed.append(n)
+            continue
         out = output_path(pictures, n)
-        print(f'slide {n}: asking {args.model}' + (f' (style from {anchor.name})' if anchor else '') + ' ...')
+        print(f'slide {n}: asking {args.model} ({describe(refs)}) ...')
         try:
-            image = tidy(request_image(key, args.model, request_body(full_prompt(prompts, n), anchor)))
+            image = tidy(request_image(key, args.model, request_body(full_prompt(prompts, n), refs)))
         except Exception as e:                                 # one failed slide does not stop the others
             message = str(e).replace(key, '***')
             print(f'slide {n}: failed: {message}', file=sys.stderr)

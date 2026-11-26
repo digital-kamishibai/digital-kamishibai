@@ -138,6 +138,9 @@ Reservations (things to say as "one person's idea", not as proven):
 
 The markers `[Prompt style]` and `[Prompt N]` and the labels `Asserts:` and `Seen:` are never translated:
 the picture ladder reads them. The prompt is the first code block under each marker.
+A slide may also say which pictures to follow, with the labels `Anchor:` (style), `Character:` (the same look) and
+`Sketch:` (`yes`: its own picture now is the composition), as in `- Character: 2, ../earlier-work/pictures/02.png`
+(`ladder/images/README.md`). Leave them out to follow slide 1's style.
 
 ### [Prompt style]
 
